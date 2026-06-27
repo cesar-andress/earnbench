@@ -459,3 +459,106 @@ def _mock_pi_env_runner_for_cli(request, *, hardening=None):
         hardening_flags_not_enforced=("tests_mount_readonly",),
         image_digest="sha256:cli-mock-image",
     )
+
+
+def test_swebench_diagnose_pi_env_cli(capsys, tmp_path: Path) -> None:
+    from earnbench.audit import AuditRecord, AuditStatus
+
+    nominal_dir = tmp_path / "nominal"
+    pi_env_dir = tmp_path / "pi_env.v1"
+    output_dir = tmp_path / "batch"
+    patch_path = tmp_path / "prod_only.patch"
+    patch_path.write_text(
+        "diff --git a/requests/models.py b/requests/models.py\n+fix\n",
+        encoding="utf-8",
+    )
+    instance_id = "psf__requests-1724"
+
+    nominal_dir.mkdir(parents=True)
+    (nominal_dir / "grade.json").write_text(
+        json.dumps(
+            {
+                "instance_id": instance_id,
+                "success": True,
+                "status": "ok",
+                "fail_to_pass": [
+                    "tests.test_models.TestCase.test_redirect",
+                    "tests.test_models.TestCase.test_other",
+                    "tests.test_utils.TestCase.test_ok",
+                ],
+                "pass_to_pass": ["tests.test_utils.TestCase.test_ok"],
+                "harness_command": "/bin/bash /eval.sh",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (nominal_dir / "harness.log").write_text("APPLY_PATCH_PASS\n", encoding="utf-8")
+    nominal_audit = AuditRecord(
+        instance_id=instance_id,
+        perturbation_id="nominal.v1",
+        config_digest="sha256:config",
+        patch_sha256="sha256:abc123",
+        status=AuditStatus.OK,
+        success=True,
+    )
+    (nominal_dir / "audit.json").write_text(
+        json.dumps(nominal_audit.to_dict()) + "\n",
+        encoding="utf-8",
+    )
+
+    pi_env_dir.mkdir(parents=True)
+    (pi_env_dir / "grade.json").write_text(
+        json.dumps(
+            {
+                "instance_id": instance_id,
+                "perturbation_id": "pi_env.v1",
+                "success": False,
+                "status": "ok",
+                "hardening_flags_enforced": ["pip_no_index"],
+                "hardening_flags_not_enforced": ["tests_mount_readonly"],
+                "harness_command": "/bin/bash /eval.sh",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (pi_env_dir / "harness.log").write_text(
+        "PIP_NO_INDEX=1\nERROR: Could not find a version that satisfies pytest\n",
+        encoding="utf-8",
+    )
+    pi_env_audit = AuditRecord(
+        instance_id=instance_id,
+        perturbation_id="pi_env.v1",
+        config_digest="sha256:config",
+        patch_sha256="sha256:abc123",
+        status=AuditStatus.OK,
+        success=False,
+    )
+    (pi_env_dir / "audit.json").write_text(
+        json.dumps(pi_env_audit.to_dict()) + "\n",
+        encoding="utf-8",
+    )
+
+    exit_code = main(
+        [
+            "swebench",
+            "diagnose-pi-env",
+            "--metadata-parquet",
+            str(FIXTURES / "swebench_smoke_metadata.json"),
+            "--instance-id",
+            instance_id,
+            "--patch",
+            str(patch_path),
+            "--nominal-dir",
+            str(nominal_dir),
+            "--pi-env-dir",
+            str(pi_env_dir),
+            "--output",
+            str(output_dir),
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    payload = json.loads(captured.out)
+    assert payload["likely_failure_category"] == "dependency_blocked_by_pip_no_index"
+    assert (output_dir / instance_id / "pi_env_diagnosis.json").is_file()

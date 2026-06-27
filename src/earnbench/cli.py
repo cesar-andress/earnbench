@@ -20,6 +20,7 @@ from earnbench.adapters.swebench_nominal import (
     run_nominal_grading,
 )
 from earnbench.adapters.swebench_pi_env import run_pi_env_grading
+from earnbench.adapters.swebench_pi_env_diagnosis import write_pi_env_diagnosis
 from earnbench.adapters.swebench_pi_verif import run_pi_verif_grading
 from earnbench.adapters.swebench_preflight import (
     MissingDockerImagesError,
@@ -492,6 +493,48 @@ def cmd_swebench_run_pi_env(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_swebench_diagnose_pi_env(args: argparse.Namespace) -> None:
+    """Compare nominal and pi_env artifacts to diagnose pi_env.v1 failures."""
+    metadata_path = Path(args.metadata_parquet)
+    patch_path = Path(args.patch)
+    nominal_dir = Path(args.nominal_dir)
+    pi_env_dir = Path(args.pi_env_dir)
+    output_dir = Path(args.output)
+    suffix = metadata_path.suffix.lower()
+    if suffix not in {".parquet", ".json"}:
+        raise CLIError(
+            f"--metadata-parquet must be a .parquet or .json file, got: {metadata_path}"
+        )
+    if not patch_path.is_file():
+        raise CLIError(f"--patch file not found: {patch_path}")
+    if not nominal_dir.is_dir():
+        raise CLIError(f"--nominal-dir not found: {nominal_dir}")
+    if not pi_env_dir.is_dir():
+        raise CLIError(f"--pi-env-dir not found: {pi_env_dir}")
+
+    try:
+        diagnosis = write_pi_env_diagnosis(
+            metadata_path=metadata_path,
+            instance_id=args.instance_id,
+            patch_path=patch_path,
+            nominal_dir=nominal_dir,
+            pi_env_dir=pi_env_dir,
+            output_dir=output_dir,
+        )
+    except MetadataLoadError as exc:
+        raise CLIError(str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(diagnosis, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
 def cmd_phase_a(args: argparse.Namespace) -> None:
     """Run Phase A golden validation with parallel instance and π scheduling."""
     metadata_path = Path(args.metadata_parquet)
@@ -815,6 +858,45 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write artifacts only; do not print grade.json to stdout",
     )
+    diagnose_pi_env_parser = swebench_subparsers.add_parser(
+        "diagnose-pi-env",
+        help="Compare nominal vs pi_env.v1 artifacts and diagnose failures",
+    )
+    diagnose_pi_env_parser.add_argument(
+        "--metadata-parquet",
+        required=True,
+        help="Path to SWE-bench Verified metadata (.parquet or test .json fixture)",
+    )
+    diagnose_pi_env_parser.add_argument(
+        "--instance-id",
+        required=True,
+        help="SWE-bench instance id (e.g. psf__requests-1724)",
+    )
+    diagnose_pi_env_parser.add_argument(
+        "--patch",
+        required=True,
+        help="Path to prod-only unified-diff patch file used for both runs",
+    )
+    diagnose_pi_env_parser.add_argument(
+        "--nominal-dir",
+        required=True,
+        help="Path to nominal artifact directory (contains grade.json, harness.log)",
+    )
+    diagnose_pi_env_parser.add_argument(
+        "--pi-env-dir",
+        required=True,
+        help="Path to pi_env.v1 artifact directory (contains grade.json, harness.log)",
+    )
+    diagnose_pi_env_parser.add_argument(
+        "--output",
+        required=True,
+        help="Output directory for pi_env_diagnosis.json and pi_env_diagnosis.md",
+    )
+    diagnose_pi_env_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write diagnosis files only; do not print JSON to stdout",
+    )
 
     phase_a_parser = subparsers.add_parser(
         "phase-a",
@@ -910,6 +992,8 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_swebench_run_pi_verif(args)
             elif args.swebench_command == "run-pi-env":
                 cmd_swebench_run_pi_env(args)
+            elif args.swebench_command == "diagnose-pi-env":
+                cmd_swebench_diagnose_pi_env(args)
             else:
                 parser.error(f"unknown swebench command: {args.swebench_command}")
         elif args.command == "phase-a":

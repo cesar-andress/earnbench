@@ -175,6 +175,24 @@ earnbench swebench run-pi-env \
   --reuse-images
 ```
 
+If **nominal** and **pi_verif.v1** pass but **pi_env.v1** fails, compare artifacts before
+changing the measurement protocol:
+
+```bash
+earnbench swebench diagnose-pi-env \
+  --metadata-parquet path/to/swe_verified_test.parquet \
+  --instance-id psf__requests-1724 \
+  --patch /tmp/earnbench_smoke/psf__requests-1724/patch/prod_only.patch \
+  --nominal-dir /tmp/earnbench_smoke/psf__requests-1724/nominal \
+  --pi-env-dir /tmp/earnbench_smoke/psf__requests-1724/pi_env.v1 \
+  --output /tmp/earnbench_smoke
+```
+
+Writes `<output>/<instance_id>/pi_env_diagnosis.json` and `pi_env_diagnosis.md`.
+When hardening flags (`PIP_NO_INDEX`, `PYTHONNOUSERSITE`, `network_disabled`) block
+legitimate runtime requirements, the diagnosis recommends **`status=invalid`** for the
+π run (excluded from EF), not **`success=false`**.
+
 **Phase A batch scheduler** (parallel instances and π perturbations):
 
 ```bash
