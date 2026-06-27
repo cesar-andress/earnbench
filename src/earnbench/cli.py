@@ -851,8 +851,14 @@ def cmd_report_policy_ef(args: argparse.Namespace) -> None:
             "output_dir": str(result.output_dir),
             "by_agent_csv": str(result.by_agent_csv),
             "variance_csv": str(result.variance_csv),
+            "pairwise_flips_csv": str(result.pairwise_flips_csv),
             "bootstrap_json": str(result.bootstrap_json),
             "report_md": str(result.report_md),
+            **(
+                {"exploitation_frontier_csv": str(result.exploitation_frontier_csv)}
+                if result.exploitation_frontier_csv is not None
+                else {}
+            ),
         },
         sys.stdout,
         indent=2,

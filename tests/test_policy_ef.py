@@ -12,6 +12,7 @@ from earnbench.cli import main
 from earnbench.policy_ef import (
     POLICY_EF_BOOTSTRAP_JSON,
     POLICY_EF_BY_AGENT_CSV,
+    POLICY_EF_PAIRWISE_FLIPS_CSV,
     POLICY_EF_REPORT_MD,
     POLICY_EF_VARIANCE_CSV,
     analyze_policy_ef,
@@ -147,7 +148,28 @@ def test_duplicate_agent_instance_replicate_rejected(tmp_path: Path) -> None:
         load_policy_agent_results(path)
 
 
-def test_generate_policy_ef_report_writes_artifacts(tmp_path: Path) -> None:
+def test_same_nominal_pass_rate_different_earned_pass_rate(tmp_path: Path) -> None:
+    path = tmp_path / "same_pass.csv"
+    _write_csv(
+        path,
+        [
+            ("alpha", "m1", "p1", "i1", "1", "1", "0.0", "defined", "visible_test_overfitting", "0", "ok"),
+            ("alpha", "m1", "p1", "i2", "1", "1", "0.0", "defined", "visible_test_overfitting", "0", "ok"),
+            ("beta", "m2", "p1", "i1", "1", "1", "1.0", "defined", "", "0", "ok"),
+            ("beta", "m2", "p1", "i2", "1", "1", "1.0", "defined", "", "0", "ok"),
+        ],
+    )
+    payload = analyze_policy_ef(load_policy_agent_results(path), bootstrap_draws=50)
+    alpha = next(row for row in payload["by_agent"] if row["agent"] == "alpha")
+    beta = next(row for row in payload["by_agent"] if row["agent"] == "beta")
+
+    assert alpha["nominal_pass_rate"] == pytest.approx(beta["nominal_pass_rate"])
+    assert alpha["earned_pass_rate"] == pytest.approx(0.0)
+    assert beta["earned_pass_rate"] == pytest.approx(1.0)
+    assert alpha["earned_rank"] > beta["earned_rank"]
+
+
+def test_pairwise_flips_csv_written(tmp_path: Path) -> None:
     input_csv = tmp_path / "agent_results.csv"
     _write_deterministic_dataset(input_csv)
     output_dir = tmp_path / "policy_ef"
@@ -159,11 +181,13 @@ def test_generate_policy_ef_report_writes_artifacts(tmp_path: Path) -> None:
 
     assert result.by_agent_csv.name == POLICY_EF_BY_AGENT_CSV
     assert result.variance_csv.name == POLICY_EF_VARIANCE_CSV
+    assert result.pairwise_flips_csv.name == POLICY_EF_PAIRWISE_FLIPS_CSV
     assert result.bootstrap_json.name == POLICY_EF_BOOTSTRAP_JSON
     assert result.report_md.name == POLICY_EF_REPORT_MD
     for artifact in (
         result.by_agent_csv,
         result.variance_csv,
+        result.pairwise_flips_csv,
         result.bootstrap_json,
         result.report_md,
     ):
@@ -171,6 +195,31 @@ def test_generate_policy_ef_report_writes_artifacts(tmp_path: Path) -> None:
 
     bootstrap = json.loads(result.bootstrap_json.read_text(encoding="utf-8"))
     assert bootstrap["schema_version"] == "earnbench.policy_ef_bootstrap.v1"
+    flip_rows = list(csv.DictReader(result.pairwise_flips_csv.open(encoding="utf-8")))
+    assert len(flip_rows) == 1
+    assert flip_rows[0]["rank_flip"] == "1"
+
+
+def test_exploitation_frontier_when_difficulty_present(tmp_path: Path) -> None:
+    path = tmp_path / "difficulty.csv"
+    header = HEADER + ("difficulty",)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(header)
+        writer.writerows(
+            [
+                ("alpha", "m1", "p1", "i1", "1", "1", "0.0", "defined", "visible_test_overfitting", "0", "ok", "easy"),
+                ("alpha", "m1", "p1", "i2", "1", "1", "1.0", "defined", "", "0", "ok", "hard"),
+                ("beta", "m2", "p1", "i1", "1", "1", "1.0", "defined", "", "0", "ok", "easy"),
+                ("beta", "m2", "p1", "i2", "1", "1", "1.0", "defined", "", "0", "ok", "hard"),
+            ]
+        )
+    output_dir = tmp_path / "frontier"
+    result = generate_policy_ef_report(path, output_dir, bootstrap_draws=50)
+    assert result.exploitation_frontier_csv is not None
+    assert result.exploitation_frontier_csv.is_file()
+    payload = analyze_policy_ef(load_policy_agent_results(path), bootstrap_draws=50)
+    assert len(payload["exploitation_frontier"]) == 4
 
 
 def test_cli_report_policy_ef(capsys, tmp_path: Path) -> None:

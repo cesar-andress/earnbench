@@ -33,8 +33,11 @@ REQUIRED_COLUMNS = (
 
 POLICY_EF_BY_AGENT_CSV = "policy_ef_by_agent.csv"
 POLICY_EF_VARIANCE_CSV = "policy_ef_variance.csv"
+POLICY_EF_PAIRWISE_FLIPS_CSV = "policy_ef_pairwise_flips.csv"
+POLICY_EF_EXPLOITATION_FRONTIER_CSV = "policy_ef_exploitation_frontier.csv"
 POLICY_EF_BOOTSTRAP_JSON = "policy_ef_bootstrap.json"
 POLICY_EF_REPORT_MD = "policy_ef_report.md"
+OPTIONAL_COLUMNS = ("difficulty",)
 
 BY_AGENT_COLUMNS = (
     "agent",
@@ -63,6 +66,28 @@ VARIANCE_COLUMNS = (
     "value",
 )
 
+PAIRWISE_FLIP_COLUMNS = (
+    "agent_a",
+    "agent_b",
+    "nominal_pass_rate_a",
+    "nominal_pass_rate_b",
+    "earned_pass_rate_a",
+    "earned_pass_rate_b",
+    "rank_flip",
+    "bootstrap_flip_probability",
+)
+
+EXPLOITATION_FRONTIER_COLUMNS = (
+    "agent",
+    "difficulty_bin",
+    "instance_count",
+    "attempt_count",
+    "nominal_pass_rate",
+    "earned_pass_rate",
+    "mean_ef_given_pass",
+    "policy_ef",
+)
+
 DEFAULT_BOOTSTRAP_DRAWS = 10_000
 BOOTSTRAP_SEED = 0
 CI_LOW_QUANTILE = 0.025
@@ -82,6 +107,7 @@ class PolicyAttemptRow:
     failed_mechanisms: tuple[str, ...]
     invalid_pi_count: int
     status: str
+    difficulty: str | None
     earned_contribution: float
     undefined_on_success: bool
 
@@ -91,8 +117,10 @@ class PolicyEFReportResult:
     output_dir: Path
     by_agent_csv: Path
     variance_csv: Path
+    pairwise_flips_csv: Path
     bootstrap_json: Path
     report_md: Path
+    exploitation_frontier_csv: Path | None = None
 
 
 def _as_bool(value: object) -> bool:
@@ -189,6 +217,12 @@ def load_policy_agent_results(path: Path) -> list[PolicyAttemptRow]:
                 ef_pi=ef_pi,
                 ef_status=ef_status,
             )
+            difficulty_raw = raw.get("difficulty")
+            difficulty = (
+                str(difficulty_raw).strip()
+                if difficulty_raw not in ("", None)
+                else None
+            )
             rows.append(
                 PolicyAttemptRow(
                     agent=agent,
@@ -202,6 +236,7 @@ def load_policy_agent_results(path: Path) -> list[PolicyAttemptRow]:
                     failed_mechanisms=_parse_failed_mechanisms(raw.get("failed_mechanisms")),
                     invalid_pi_count=_optional_int(raw.get("invalid_pi_count")),
                     status=str(raw.get("status", "")).strip(),
+                    difficulty=difficulty,
                     earned_contribution=earned,
                     undefined_on_success=undefined_on_success,
                 )
@@ -368,10 +403,38 @@ def _pairwise_flip_rows(
                     "nominal_pass_rate_b": nominal_rates[agent_b],
                     "earned_pass_rate_a": earned_rates[agent_a],
                     "earned_pass_rate_b": earned_rates[agent_b],
-                    "flip": flip,
+                    "rank_flip": flip,
                 }
             )
     return rows
+
+
+def _exploitation_frontier_rows(rows: list[PolicyAttemptRow]) -> list[dict[str, Any]]:
+    if not rows or not any(row.difficulty is not None for row in rows):
+        return []
+
+    grouped: dict[tuple[str, str], list[PolicyAttemptRow]] = defaultdict(list)
+    for row in rows:
+        if row.difficulty is None:
+            continue
+        grouped[(row.agent, row.difficulty)].append(row)
+
+    frontier_rows: list[dict[str, Any]] = []
+    for (agent, difficulty_bin), agent_rows in sorted(grouped.items()):
+        metrics = _agent_metrics(agent_rows)
+        frontier_rows.append(
+            {
+                "agent": agent,
+                "difficulty_bin": difficulty_bin,
+                "instance_count": metrics["instance_count"],
+                "attempt_count": metrics["attempt_count"],
+                "nominal_pass_rate": metrics["nominal_pass_rate"],
+                "earned_pass_rate": metrics["earned_pass_rate"],
+                "mean_ef_given_pass": metrics["mean_ef_given_pass"],
+                "policy_ef": metrics["policy_ef"],
+            }
+        )
+    return frontier_rows
 
 
 def _variance_decomposition(rows: list[PolicyAttemptRow]) -> dict[str, float | None]:
@@ -505,10 +568,10 @@ def _bootstrap_payload(
                 kendall_samples.append(tau)
 
             flips = _pairwise_flip_rows(agents, nominal_rates, earned_rates)
-            flip_count_samples.append(sum(int(row["flip"]) for row in flips))
+            flip_count_samples.append(sum(int(row["rank_flip"]) for row in flips))
             for row in flips:
                 pair_key = f"{row['agent_a']}|{row['agent_b']}"
-                flip_prob_by_pair.setdefault(pair_key, []).append(int(row["flip"]))
+                flip_prob_by_pair.setdefault(pair_key, []).append(int(row["rank_flip"]))
 
     by_agent_ci = {
         agent: {
@@ -622,9 +685,11 @@ def analyze_policy_ef(
         bootstrap_draws=bootstrap_draws,
         bootstrap_seed=bootstrap_seed,
     )
+    exploitation_frontier = _exploitation_frontier_rows(rows)
+
     if len(agents) >= 2:
         flips = _pairwise_flip_rows(agents, nominal_rates, earned_rates)
-        flip_count = sum(int(row["flip"]) for row in flips)
+        flip_count = sum(int(row["rank_flip"]) for row in flips)
         pair_count = len(flips)
         spearman = spearman_rank_correlation(
             [nominal_rank[agent] for agent in agents],
@@ -666,8 +731,30 @@ def analyze_policy_ef(
         "variance_rows": variance_rows,
         "variance_decomposition": decomposition,
         "ers": ers_payload,
+        "exploitation_frontier": exploitation_frontier,
+        "has_difficulty": bool(exploitation_frontier),
         "bootstrap": bootstrap_payload,
     }
+
+
+def _pairwise_flip_export_rows(
+    flips: list[dict[str, Any]],
+    *,
+    bootstrap_flip_probability_by_pair: dict[str, float | None] | None = None,
+) -> list[dict[str, Any]]:
+    export_rows: list[dict[str, Any]] = []
+    for row in flips:
+        pair_key = f"{row['agent_a']}|{row['agent_b']}"
+        probability = None
+        if bootstrap_flip_probability_by_pair is not None:
+            probability = bootstrap_flip_probability_by_pair.get(pair_key)
+        export_rows.append(
+            {
+                **row,
+                "bootstrap_flip_probability": probability,
+            }
+        )
+    return export_rows
 
 
 def _write_csv(
@@ -804,6 +891,29 @@ def render_policy_ef_report(payload: dict[str, Any]) -> str:
                     f"[{_format_float(stats['ci_low'])}, {_format_float(stats['ci_high'])}]"
                 )
 
+    if payload.get("exploitation_frontier"):
+        lines.extend(
+            [
+                "",
+                "## Exploitation frontier (by agent and difficulty bin)",
+                "",
+                "| Agent | Difficulty | Nominal | Earned pass | EF|pass | Policy EF |",
+                "| --- | --- | --- | --- | --- | --- |",
+            ]
+        )
+        for row in payload["exploitation_frontier"]:
+            lines.append(
+                "| {agent} | {difficulty_bin} | {nominal_pass_rate:.4f} | "
+                "{earned_pass_rate:.4f} | {mean_ef_given_pass} | {policy_ef} |".format(
+                    agent=row["agent"],
+                    difficulty_bin=row["difficulty_bin"],
+                    nominal_pass_rate=row["nominal_pass_rate"],
+                    earned_pass_rate=row["earned_pass_rate"],
+                    mean_ef_given_pass=_format_float(row["mean_ef_given_pass"], precision=4),
+                    policy_ef=_format_float(row["policy_ef"], precision=4),
+                )
+            )
+
     lines.extend(
         [
             "",
@@ -840,6 +950,7 @@ def generate_policy_ef_report(
 
     by_agent_csv = output_dir / POLICY_EF_BY_AGENT_CSV
     variance_csv = output_dir / POLICY_EF_VARIANCE_CSV
+    pairwise_flips_csv = output_dir / POLICY_EF_PAIRWISE_FLIPS_CSV
     bootstrap_json = output_dir / POLICY_EF_BOOTSTRAP_JSON
     report_md = output_dir / POLICY_EF_REPORT_MD
 
@@ -847,6 +958,21 @@ def generate_policy_ef_report(
     _write_csv(variance_csv, VARIANCE_COLUMNS, payload["variance_rows"])
 
     bootstrap_payload = payload.pop("bootstrap")
+    flip_probability_by_pair = bootstrap_payload.get("pairwise_flip_probability_by_pair")
+    pairwise_rows = _pairwise_flip_export_rows(
+        payload["ers"].get("pairwise_flips", []),
+        bootstrap_flip_probability_by_pair=flip_probability_by_pair,
+    )
+    _write_csv(pairwise_flips_csv, PAIRWISE_FLIP_COLUMNS, pairwise_rows)
+
+    exploitation_frontier_csv: Path | None = None
+    if payload.get("exploitation_frontier"):
+        exploitation_frontier_csv = output_dir / POLICY_EF_EXPLOITATION_FRONTIER_CSV
+        _write_csv(
+            exploitation_frontier_csv,
+            EXPLOITATION_FRONTIER_COLUMNS,
+            payload["exploitation_frontier"],
+        )
     bootstrap_payload["schema_version"] = "earnbench.policy_ef_bootstrap.v1"
     bootstrap_payload["agent_count"] = payload["agent_count"]
     bootstrap_payload["instance_count"] = payload["instance_count"]
@@ -861,16 +987,23 @@ def generate_policy_ef_report(
         output_dir=output_dir,
         by_agent_csv=by_agent_csv,
         variance_csv=variance_csv,
+        pairwise_flips_csv=pairwise_flips_csv,
         bootstrap_json=bootstrap_json,
         report_md=report_md,
+        exploitation_frontier_csv=exploitation_frontier_csv,
     )
 
 
 __all__ = [
     "BY_AGENT_COLUMNS",
     "DEFAULT_BOOTSTRAP_DRAWS",
+    "EXPLOITATION_FRONTIER_COLUMNS",
+    "OPTIONAL_COLUMNS",
+    "PAIRWISE_FLIP_COLUMNS",
     "POLICY_EF_BOOTSTRAP_JSON",
     "POLICY_EF_BY_AGENT_CSV",
+    "POLICY_EF_EXPLOITATION_FRONTIER_CSV",
+    "POLICY_EF_PAIRWISE_FLIPS_CSV",
     "POLICY_EF_REPORT_MD",
     "POLICY_EF_VARIANCE_CSV",
     "REQUIRED_COLUMNS",

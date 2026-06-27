@@ -1,8 +1,8 @@
 # Policy-level Earned Fraction
 
-Policy-level analysis aggregates **outcome-level EF@Π** over stochastic agent replicates without changing fixed-outcome EF semantics.
+See **[Policy-level earned credit analysis](policy_earned_credit.md)** for the canonical CLI reference, outputs, and metrics.
 
-**Paper note:** `paper/notes/policy_level_ef.md`
+This page is a short alias retained for backward compatibility.
 
 ## Outcome vs policy estimands
 

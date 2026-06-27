@@ -6,7 +6,8 @@ Documentation is in early draft. Design notes live in the private research repos
 
 - [Validation ladder CLI](validation_ladder.md)
 - [External unearned anchor](external_unearned_anchor.md)
-- [Policy-level EF (stochastic agents)](policy_ef.md)
+- [Policy-level earned credit (stochastic agents)](policy_earned_credit.md)
+- [Policy-level EF reference (legacy alias)](policy_ef.md)
 - [Maintainer-certified correctness anchor](maintainer_certified_correctness.md)
 - [Certified correct control study (legacy)](certified_correct_controls.md)
 - [Docker container cleanup (Phase A/B idempotency)](docker_container_cleanup.md)
