@@ -5,10 +5,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
+from earnbench.adapters.docker_cleanup import wrap_container_create_with_cleanup
 from earnbench.adapters.swebench import (
     DEFAULT_HOLDOUT_K,
     DEFAULT_HOLDOUT_SALT,
@@ -29,7 +31,6 @@ from earnbench.adapters.swebench_nominal import (
     NominalRunner,
     NominalRunRequest,
     NominalRunResult,
-    default_nominal_runner,
 )
 from earnbench.adapters.swebench_patch import sha256_hex
 from earnbench.audit import AuditRecord, AuditStatus
@@ -39,6 +40,166 @@ from earnbench.registry.pi_vtest_v1 import PI_VTEST_V1_ID
 
 DEFAULT_PI_VTEST_MODEL = "earnbench_pi_vtest"
 PI_VTEST_ARTIFACT_DIR = PI_VTEST_V1_ID
+PI_VTEST_CARVE_ENV = "EARNBENCH_PI_VTEST_V1"
+
+
+def _normalize_docker_env(
+    environment: dict[str, str] | list[str] | None,
+) -> dict[str, str]:
+    if environment is None:
+        return {}
+    if isinstance(environment, dict):
+        return dict(environment)
+    env: dict[str, str] = {}
+    for item in environment:
+        if "=" in item:
+            key, value = item.split("=", 1)
+            env[key] = value
+    return env
+
+
+def _serialize_docker_env(environment: dict[str, str] | None) -> dict[str, str] | None:
+    return environment
+
+
+@contextmanager
+def pi_vtest_container_create(client: Any) -> Iterator[None]:
+    """Patch Docker container creation to enable planted visible-test carve."""
+    _ = client
+    from docker.models.containers import ContainerCollection
+
+    original_create = ContainerCollection.create
+
+    def patched_create(
+        self: Any,
+        image: Any,
+        command: Any = None,
+        **kwargs: Any,
+    ) -> Any:
+        env = _normalize_docker_env(kwargs.get("environment"))
+        env[PI_VTEST_CARVE_ENV] = "1"
+        kwargs["environment"] = _serialize_docker_env(env)
+        return original_create(self, image, command, **kwargs)
+
+    ContainerCollection.create = wrap_container_create_with_cleanup(patched_create)  # type: ignore[method-assign]
+    try:
+        yield
+    finally:
+        ContainerCollection.create = original_create  # type: ignore[method-assign]
+
+
+def default_pi_vtest_runner(request: NominalRunRequest) -> NominalRunResult:
+    """Execute ``pi_vtest.v1`` grading with carve activation env in Docker."""
+    from earnbench.adapters.swebench_nominal import (
+        _normalize_row_for_harness,
+        _read_harness_logs,
+        _tests_run_from_report,
+        require_swebench_harness,
+    )
+
+    require_swebench_harness()
+    import docker
+    from swebench.harness.constants import (
+        KEY_INSTANCE_ID,
+        KEY_MODEL,
+        KEY_PREDICTION,
+        LOG_INSTANCE,
+        LOG_TEST_OUTPUT,
+        RUN_EVALUATION_LOG_DIR,
+    )
+    from swebench.harness.run_evaluation import run_instance
+    from swebench.harness.test_spec.test_spec import make_test_spec
+
+    started_at = utc_timestamp()
+    row = _normalize_row_for_harness(request.instance_row)
+    instance_id = str(row["instance_id"])
+    fail_to_pass = tuple(json.loads(row["FAIL_TO_PASS"]))
+    pass_to_pass = tuple(json.loads(row.get("PASS_TO_PASS") or "[]"))
+
+    test_spec = make_test_spec(row)
+    harness_command = "/bin/bash /eval.sh"
+    if test_spec.eval_script.strip():
+        harness_command = test_spec.eval_script.strip().splitlines()[0]
+
+    prediction = {
+        KEY_INSTANCE_ID: instance_id,
+        KEY_MODEL: request.model_name,
+        KEY_PREDICTION: request.patch_content,
+    }
+
+    client = docker.from_env()
+    outcome: dict[str, Any] = {"completed": False, "resolved": False}
+    report: dict[str, Any] = {}
+    warnings: list[str] = []
+    try:
+        with pi_vtest_container_create(client):
+            outcome = run_instance(
+                test_spec,
+                prediction,
+                rm_image=False,
+                force_rebuild=request.force_rebuild,
+                client=client,
+                run_id=request.run_id,
+                timeout=request.timeout_seconds,
+            )
+            report_path = (
+                RUN_EVALUATION_LOG_DIR
+                / request.run_id
+                / request.model_name.replace("/", "__")
+                / instance_id
+                / "report.json"
+            )
+            if report_path.is_file():
+                report = json.loads(report_path.read_text(encoding="utf-8"))
+    finally:
+        client.close()
+
+    log_dir = (
+        Path.cwd()
+        / RUN_EVALUATION_LOG_DIR
+        / request.run_id
+        / request.model_name.replace("/", "__")
+        / instance_id
+    )
+    log_text = _read_harness_logs(log_dir)
+    if not log_text:
+        run_log = log_dir / LOG_INSTANCE
+        test_log = log_dir / LOG_TEST_OUTPUT
+        if run_log.is_file():
+            log_text = run_log.read_text(encoding="utf-8", errors="replace")
+        elif test_log.is_file():
+            log_text = test_log.read_text(encoding="utf-8", errors="replace")
+        else:
+            warnings.append("harness log files not found under logs/run_evaluation")
+
+    completed = bool(outcome.get("completed"))
+    resolved = bool(outcome.get("resolved"))
+    if not completed:
+        status = AuditStatus.INVALID.value
+        success = False
+        if not warnings:
+            warnings.append("harness run did not complete")
+    else:
+        status = AuditStatus.OK.value
+        success = resolved
+
+    tests_run = _tests_run_from_report(
+        instance_id,
+        report,
+        fail_to_pass=fail_to_pass,
+        pass_to_pass=pass_to_pass,
+    )
+    return NominalRunResult(
+        success=success,
+        status=status,
+        harness_command=harness_command,
+        log_text=log_text,
+        tests_run=tests_run,
+        warnings=tuple(warnings),
+        started_at_utc=started_at,
+        completed_at_utc=utc_timestamp(),
+        patch_sha256=sha256_hex(request.patch_content),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,6 +267,7 @@ def pi_vtest_config_digest(
         "pass_to_pass": list(partition.pass_to_pass),
         "include_visible_f2p": include_visible_f2p,
         "timeout_seconds": timeout_seconds,
+        "carve_env": PI_VTEST_CARVE_ENV,
     }
     digest = hashlib.sha256(
         json.dumps(payload, sort_keys=True).encode(),
@@ -316,7 +478,7 @@ def run_pi_vtest_grading(
         original_cwd = os.getcwd()
         os.chdir(work_cwd)
         try:
-            execute = runner or default_nominal_runner
+            execute = runner or default_pi_vtest_runner
             harness_result = execute(
                 NominalRunRequest(
                     instance_row=_instance_row_for_pi_vtest(instance_row, partition),
@@ -403,12 +565,15 @@ def build_pi_vtest_config_from_record(
 __all__ = [
     "DEFAULT_PI_VTEST_MODEL",
     "PI_VTEST_ARTIFACT_DIR",
+    "PI_VTEST_CARVE_ENV",
     "PI_VTEST_V1_ID",
     "PiVtestPartition",
     "build_pi_vtest_audit",
     "build_pi_vtest_config_from_record",
     "build_pi_vtest_grade_payload",
+    "default_pi_vtest_runner",
     "pi_vtest_config_digest",
+    "pi_vtest_container_create",
     "resolve_pi_vtest_partition",
     "run_pi_vtest_grading",
 ]

@@ -4,6 +4,7 @@ Documentation is in early draft. Design notes live in the private research repos
 
 ## Checklists and policy
 
+- [Docker container cleanup (Phase A/B idempotency)](docker_container_cleanup.md)
 - [Perturbation outcome classification](outcome_classification.md)
 - [Zenodo readiness checklist](zenodo_checklist.md)
 - [Release and versioning policy](release_policy.md)

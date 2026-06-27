@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from earnbench.adapters.docker_cleanup import wrap_container_create_with_cleanup
 from earnbench.adapters.swebench_config import (
     SWEBenchRunConfig,
     instance_workspace_root,
@@ -173,7 +174,7 @@ def hardened_container_create(
         _apply_docker_hardening_kwargs(kwargs, hardening, enforced)
         return original_create(self, image, command, **kwargs)
 
-    ContainerCollection.create = patched_create  # type: ignore[method-assign]
+    ContainerCollection.create = wrap_container_create_with_cleanup(patched_create)  # type: ignore[method-assign]
     try:
         yield enforced, not_enforced, warnings
     finally:

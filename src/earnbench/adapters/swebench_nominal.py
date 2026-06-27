@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from earnbench.adapters.docker_cleanup import managed_swebench_container_create
 from earnbench.adapters.swebench_config import (
     SWEBenchRunConfig,
     instance_workspace_root,
@@ -187,15 +188,16 @@ def default_nominal_runner(request: NominalRunRequest) -> NominalRunResult:
     report: dict[str, Any] = {}
     warnings: list[str] = []
     try:
-        outcome = run_instance(
-            test_spec,
-            prediction,
-            rm_image=False,
-            force_rebuild=request.force_rebuild,
-            client=client,
-            run_id=request.run_id,
-            timeout=request.timeout_seconds,
-        )
+        with managed_swebench_container_create():
+            outcome = run_instance(
+                test_spec,
+                prediction,
+                rm_image=False,
+                force_rebuild=request.force_rebuild,
+                client=client,
+                run_id=request.run_id,
+                timeout=request.timeout_seconds,
+            )
         report_path = (
             RUN_EVALUATION_LOG_DIR
             / request.run_id
