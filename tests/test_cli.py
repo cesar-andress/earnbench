@@ -442,6 +442,55 @@ def test_swebench_run_pi_env_cli(capsys, tmp_path: Path) -> None:
     assert (artifact_dir / "audit.json").is_file()
 
 
+def test_swebench_run_pi_vtest_cli(capsys, tmp_path: Path) -> None:
+    output_dir = tmp_path / "out"
+    patch_path = tmp_path / "prod_only.patch"
+    patch_path.write_text(
+        "diff --git a/requests/models.py b/requests/models.py\n", encoding="utf-8"
+    )
+
+    with (
+        patch(
+            "earnbench.adapters.swebench_pi_vtest.default_nominal_runner",
+            _mock_nominal_runner_for_cli,
+        ),
+        patch(
+            "earnbench.adapters.swebench_preflight.check_nominal_docker_images",
+            lambda **_kwargs: (),
+        ),
+    ):
+        exit_code = main(
+            [
+                "swebench",
+                "run-pi-vtest",
+                "--metadata-parquet",
+                str(FIXTURES / "swebench_smoke_metadata.json"),
+                "--instance-id",
+                "psf__requests-1724",
+                "--patch",
+                str(patch_path),
+                "--output",
+                str(output_dir),
+                "--timeout-seconds",
+                "1800",
+                "--workers",
+                "12",
+                "--max-parallel-containers",
+                "12",
+                "--reuse-images",
+            ]
+        )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    grade = json.loads(captured.out)
+    assert grade["perturbation_id"] == "pi_vtest.v1"
+    assert grade["success"] is True
+    artifact_dir = output_dir / "psf__requests-1724" / "pi_vtest.v1"
+    assert (artifact_dir / "grade.json").is_file()
+    assert (artifact_dir / "audit.json").is_file()
+
+
 def _mock_pi_env_runner_for_cli(request, *, hardening=None):
     from earnbench.adapters.swebench_pi_env import (
         HARDENING_FLAG_NAMES,

@@ -105,17 +105,20 @@ def _scheduler_config(tmp_path: Path, *, resume: bool = False) -> PhaseASchedule
 @patch("earnbench.scheduler.ProcessPoolExecutor", _InlineProcessPool)
 @patch("earnbench.scheduler.run_swebench_preflight")
 @patch("earnbench.scheduler.run_nominal_grading")
+@patch("earnbench.scheduler.run_pi_vtest_grading")
 @patch("earnbench.scheduler.run_pi_verif_grading")
 @patch("earnbench.scheduler.run_pi_env_grading")
 def test_run_phase_a_scheduler_writes_csv_and_state(
     mock_pi_env,
     mock_pi_verif,
+    mock_pi_vtest,
     mock_nominal,
     mock_preflight,
     tmp_path: Path,
 ) -> None:
     mock_preflight.return_value = {"status": "ok"}
     mock_nominal.side_effect = lambda **kwargs: _write_nominal_artifacts(**kwargs)
+    mock_pi_vtest.side_effect = lambda **kwargs: _write_pi_vtest_artifacts(**kwargs)
     mock_pi_verif.side_effect = lambda **kwargs: _write_pi_verif_artifacts(**kwargs)
     mock_pi_env.side_effect = lambda **kwargs: _write_pi_env_artifacts(**kwargs)
 
@@ -133,7 +136,7 @@ def test_run_phase_a_scheduler_writes_csv_and_state(
     assert rows[0]["y0"] == "True"
     assert rows[0]["pi_verif_status"] == "ok"
     assert rows[0]["pi_env_status"] == "ok"
-    assert rows[0]["pi_vtest_status"] == "missing"
+    assert rows[0]["pi_vtest_status"] == "ok"
     assert (tmp_path / INSTANCE_ID / "report.json").is_file()
 
 
@@ -150,6 +153,15 @@ def _write_pi_verif_artifacts(**kwargs) -> dict[str, object]:
     from earnbench.adapters.swebench_pi_verif import run_pi_verif_grading
 
     return run_pi_verif_grading(
+        runner=_mock_pi_verif_runner,
+        **kwargs,
+    )
+
+
+def _write_pi_vtest_artifacts(**kwargs) -> dict[str, object]:
+    from earnbench.adapters.swebench_pi_vtest import run_pi_vtest_grading
+
+    return run_pi_vtest_grading(
         runner=_mock_pi_verif_runner,
         **kwargs,
     )
@@ -186,17 +198,20 @@ def _mock_pi_env_runner(request):
 @patch("earnbench.scheduler.ProcessPoolExecutor", _InlineProcessPool)
 @patch("earnbench.scheduler.run_swebench_preflight")
 @patch("earnbench.scheduler.run_nominal_grading")
+@patch("earnbench.scheduler.run_pi_vtest_grading")
 @patch("earnbench.scheduler.run_pi_verif_grading")
 @patch("earnbench.scheduler.run_pi_env_grading")
 def test_resume_skips_completed_jobs(
     mock_pi_env,
     mock_pi_verif,
+    mock_pi_vtest,
     mock_nominal,
     mock_preflight,
     tmp_path: Path,
 ) -> None:
     mock_preflight.return_value = {"status": "ok"}
     mock_nominal.side_effect = lambda **kwargs: _write_nominal_artifacts(**kwargs)
+    mock_pi_vtest.side_effect = lambda **kwargs: _write_pi_vtest_artifacts(**kwargs)
     mock_pi_verif.side_effect = lambda **kwargs: _write_pi_verif_artifacts(**kwargs)
     mock_pi_env.side_effect = lambda **kwargs: _write_pi_env_artifacts(**kwargs)
 
@@ -206,6 +221,7 @@ def test_resume_skips_completed_jobs(
 
     run_phase_a_scheduler(_scheduler_config(tmp_path, resume=True))
     assert mock_nominal.call_count == 1
+    assert mock_pi_vtest.call_count == 1
     assert mock_pi_verif.call_count == 1
     assert mock_pi_env.call_count == 1
 

@@ -20,6 +20,7 @@ from earnbench.adapters.swebench_metadata import load_verified_instance
 from earnbench.adapters.swebench_nominal import run_nominal_grading
 from earnbench.adapters.swebench_pi_env import run_pi_env_grading
 from earnbench.adapters.swebench_pi_verif import run_pi_verif_grading
+from earnbench.adapters.swebench_pi_vtest import run_pi_vtest_grading
 from earnbench.adapters.swebench_preflight import run_swebench_preflight
 from earnbench.classification import classify_from_diagnosis, classify_grade_record
 from earnbench.metrics import compute_earned_fraction
@@ -617,6 +618,17 @@ def run_perturbation_stage(
             instance_id=instance_id,
             perturbation_id=perturbation_id,
             message="not scheduled for this instance",
+        )
+        return
+    if perturbation_id == PI_VTEST_V1_ID:
+        patch_path = output_dir / instance_id / "patch" / "prod_only.patch"
+        run_pi_vtest_grading(
+            metadata_path=metadata_path,
+            instance_id=instance_id,
+            patch_path=patch_path,
+            output_dir=output_dir,
+            run_id=f"pi_vtest_{instance_id}",
+            config=run_config,
         )
         return
     if perturbation_id == PI_VERIF_V1_ID:

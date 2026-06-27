@@ -8,7 +8,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from earnbench.adapters.swebench import prepare_smoke
+from earnbench.adapters.swebench import (
+    DEFAULT_HOLDOUT_K,
+    DEFAULT_HOLDOUT_SALT,
+    prepare_smoke,
+)
 from earnbench.adapters.swebench_config import (
     add_swebench_performance_arguments,
     print_swebench_execution_summary,
@@ -22,6 +26,7 @@ from earnbench.adapters.swebench_nominal import (
 from earnbench.adapters.swebench_pi_env import run_pi_env_grading
 from earnbench.adapters.swebench_pi_env_diagnosis import write_pi_env_diagnosis
 from earnbench.adapters.swebench_pi_verif import run_pi_verif_grading
+from earnbench.adapters.swebench_pi_vtest import run_pi_vtest_grading
 from earnbench.adapters.swebench_preflight import (
     MissingDockerImagesError,
     run_swebench_preflight,
@@ -501,6 +506,61 @@ def cmd_swebench_run_pi_env(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_swebench_run_pi_vtest(args: argparse.Namespace) -> None:
+    """Run pi_vtest.v1 SWE-bench grading for one instance."""
+    metadata_path = Path(args.metadata_parquet)
+    patch_path = Path(args.patch)
+    output_dir = Path(args.output)
+    suffix = metadata_path.suffix.lower()
+    if suffix not in {".parquet", ".json"}:
+        raise CLIError(
+            f"--metadata-parquet must be a .parquet or .json file, got: {metadata_path}"
+        )
+    if not patch_path.is_file():
+        raise CLIError(f"--patch file not found: {patch_path}")
+
+    try:
+        run_config = resolve_swebench_run_config_from_args(args)
+    except (FileNotFoundError, ValueError) as exc:
+        raise CLIError(str(exc)) from exc
+
+    print_swebench_execution_summary(
+        command="run-pi-vtest",
+        config=run_config,
+        output_dir=output_dir,
+        instance_count=1,
+    )
+
+    try:
+        grade = run_pi_vtest_grading(
+            metadata_path=metadata_path,
+            instance_id=args.instance_id,
+            patch_path=patch_path,
+            output_dir=output_dir,
+            timeout_seconds=run_config.timeout_seconds,
+            run_id=args.run_id or None,
+            config=run_config,
+            holdout_salt=args.holdout_salt,
+            holdout_k=args.holdout_k,
+        )
+    except MetadataLoadError as exc:
+        raise CLIError(str(exc)) from exc
+    except HarnessNotInstalledError as exc:
+        raise CLIError(str(exc)) from exc
+    except MissingDockerImagesError as exc:
+        raise CLIError(str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(grade, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
 def cmd_swebench_diagnose_pi_env(args: argparse.Namespace) -> None:
     """Compare nominal and pi_env artifacts to diagnose pi_env.v1 failures."""
     metadata_path = Path(args.metadata_parquet)
@@ -866,6 +926,52 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write artifacts only; do not print grade.json to stdout",
     )
+    run_pi_vtest_parser = swebench_subparsers.add_parser(
+        "run-pi-vtest",
+        help="Run pi_vtest.v1 SWE-bench grading (holdout F2P re-grade)",
+    )
+    run_pi_vtest_parser.add_argument(
+        "--metadata-parquet",
+        required=True,
+        help="Path to SWE-bench Verified metadata (.parquet or test .json fixture)",
+    )
+    run_pi_vtest_parser.add_argument(
+        "--instance-id",
+        required=True,
+        help="SWE-bench instance id (e.g. psf__requests-1724)",
+    )
+    run_pi_vtest_parser.add_argument(
+        "--patch",
+        required=True,
+        help="Path to prod-only unified-diff patch file",
+    )
+    run_pi_vtest_parser.add_argument(
+        "--output",
+        required=True,
+        help="Output directory for pi_vtest.v1 grading artifacts",
+    )
+    add_swebench_performance_arguments(run_pi_vtest_parser)
+    run_pi_vtest_parser.add_argument(
+        "--holdout-salt",
+        default=DEFAULT_HOLDOUT_SALT,
+        help="Deterministic salt for holdout partition H(x)",
+    )
+    run_pi_vtest_parser.add_argument(
+        "--holdout-k",
+        type=int,
+        default=DEFAULT_HOLDOUT_K,
+        help="Modulus K for hash(instance_id + salt + test) mod K",
+    )
+    run_pi_vtest_parser.add_argument(
+        "--run-id",
+        default="",
+        help="Optional SWE-bench harness run id (default: pi_vtest_<instance_id>)",
+    )
+    run_pi_vtest_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write artifacts only; do not print grade.json to stdout",
+    )
     diagnose_pi_env_parser = swebench_subparsers.add_parser(
         "diagnose-pi-env",
         help="Compare nominal vs pi_env.v1 artifacts and diagnose failures",
@@ -1006,6 +1112,8 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_swebench_run_pi_verif(args)
             elif args.swebench_command == "run-pi-env":
                 cmd_swebench_run_pi_env(args)
+            elif args.swebench_command == "run-pi-vtest":
+                cmd_swebench_run_pi_vtest(args)
             elif args.swebench_command == "diagnose-pi-env":
                 cmd_swebench_diagnose_pi_env(args)
             else:
