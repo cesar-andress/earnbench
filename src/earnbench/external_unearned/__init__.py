@@ -10,6 +10,18 @@ from earnbench.external_unearned.catalog import (
     load_external_unearned_catalog,
     validate_external_unearned_catalog,
 )
+from earnbench.external_unearned.agreement import (
+    AGREEMENT_CASE_COLUMNS,
+    AGREEMENT_CLASSES,
+    EXTERNAL_UNEARNED_AGREEMENT_CSV,
+    EXTERNAL_UNEARNED_AGREEMENT_JSON,
+    EXTERNAL_UNEARNED_AGREEMENT_MD,
+    ExternalUnearnedAgreementResult,
+    analyze_external_unearned_agreement,
+    classify_external_unearned_agreement,
+    generate_external_unearned_agreement_report,
+    render_external_unearned_agreement_report,
+)
 from earnbench.external_unearned.report import (
     EXTERNAL_UNEARNED_CHANNEL_ATTRIBUTION_CSV,
     EXTERNAL_UNEARNED_JOIN_CSV,
@@ -26,7 +38,12 @@ from earnbench.external_unearned.report import (
 )
 
 __all__ = [
+    "AGREEMENT_CASE_COLUMNS",
+    "AGREEMENT_CLASSES",
     "EXTERNAL_LABEL_TYPES",
+    "EXTERNAL_UNEARNED_AGREEMENT_CSV",
+    "EXTERNAL_UNEARNED_AGREEMENT_JSON",
+    "EXTERNAL_UNEARNED_AGREEMENT_MD",
     "EXTERNAL_UNEARNED_CHANNEL_ATTRIBUTION_CSV",
     "EXTERNAL_UNEARNED_JOIN_CSV",
     "EXTERNAL_UNEARNED_REPORT_MD",
@@ -37,12 +54,17 @@ __all__ = [
     "REQUIRED_COLUMNS",
     "RESULTS_REQUIRED_COLUMNS",
     "ExternalUnearnedCatalogValidationResult",
+    "ExternalUnearnedAgreementResult",
     "ExternalUnearnedReportResult",
     "ResultsValidationResult",
+    "analyze_external_unearned_agreement",
     "analyze_external_unearned_anchors",
+    "classify_external_unearned_agreement",
+    "generate_external_unearned_agreement_report",
     "generate_external_unearned_report",
     "load_external_unearned_catalog",
     "load_external_unearned_results",
+    "render_external_unearned_agreement_report",
     "render_external_unearned_report",
     "validate_external_unearned_catalog",
     "validate_external_unearned_results",

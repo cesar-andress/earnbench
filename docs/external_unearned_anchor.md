@@ -49,6 +49,25 @@ Computes:
 | `external_unearned_join.csv` | Catalog × results join |
 | `external_unearned_channel_attribution.csv` | Detected unearned by channel |
 
+## EF agreement analysis
+
+Case-level agreement between external labels and EF outcomes (reviewer-facing disagreement taxonomy):
+
+```bash
+earnbench report external-unearned-agreement \
+  --catalog external_unearned_anchor.csv \
+  --results external_unearned_results.csv \
+  --output out/external_unearned_agreement
+```
+
+| File | Description |
+|------|-------------|
+| `external_unearned_agreement.md` | Agreement summary, disagreements, OOR expected misses |
+| `external_unearned_agreement.json` | Metrics payload |
+| `external_unearned_agreement.csv` | Per-case `agreement_class` and explanation |
+
+Agreement classes: `ef_detects`, `ef_misses_expected`, `ef_misses_unexpected`, `ef_undefined`, `ef_disagrees_with_label`.
+
 ## Relation to other anchors
 
 | Anchor | Construct pole |

@@ -47,6 +47,7 @@ from earnbench.cross_oracle_agreement import (
 )
 from earnbench.external_exploits import validate_external_exploit_catalog
 from earnbench.external_unearned import (
+    generate_external_unearned_agreement_report,
     generate_external_unearned_report,
     validate_external_unearned_catalog,
 )
@@ -1527,6 +1528,36 @@ def cmd_external_unearned_validate_catalog(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_report_external_unearned_agreement(args: argparse.Namespace) -> None:
+    """Generate external unearned anchor EF agreement analysis."""
+    try:
+        result = generate_external_unearned_agreement_report(
+            Path(args.catalog),
+            Path(args.results),
+            Path(args.output),
+        )
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(
+        {
+            "output_dir": str(result.output_dir),
+            "agreement_csv": str(result.agreement_csv),
+            "agreement_json": str(result.agreement_json),
+            "agreement_md": str(result.agreement_md),
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
 def cmd_report_external_unearned(args: argparse.Namespace) -> None:
     """Generate external unearned anchor validation report."""
     try:
@@ -2819,6 +2850,30 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write artifacts only; do not print JSON summary to stdout",
     )
+    report_external_unearned_agreement_parser = report_subparsers.add_parser(
+        "external-unearned-agreement",
+        help="External unearned anchor EF agreement analysis",
+    )
+    report_external_unearned_agreement_parser.add_argument(
+        "--catalog",
+        required=True,
+        help="Path to external_unearned_anchor.csv",
+    )
+    report_external_unearned_agreement_parser.add_argument(
+        "--results",
+        required=True,
+        help="Path to external_unearned_results.csv (harness outcomes)",
+    )
+    report_external_unearned_agreement_parser.add_argument(
+        "--output",
+        required=True,
+        help="Directory for external_unearned_agreement_* artifacts",
+    )
+    report_external_unearned_agreement_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write artifacts only; do not print JSON summary to stdout",
+    )
 
     investigate_parser = subparsers.add_parser(
         "investigate",
@@ -3007,6 +3062,8 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_report_certified_controls(args)
             elif args.report_command == "external-unearned":
                 cmd_report_external_unearned(args)
+            elif args.report_command == "external-unearned-agreement":
+                cmd_report_external_unearned_agreement(args)
             else:
                 parser.error(f"unknown report command: {args.report_command}")
         elif args.command == "investigate":

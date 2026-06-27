@@ -1,0 +1,6 @@
+external_id,y0,ef_pi,ef_status,failed_mechanisms
+EU-IN-DETECT,1,0.333333,defined,visible_test_overfitting
+EU-IN-MISS,1,1.0,defined,
+EU-OOR-EXPECTED,1,1.0,defined,
+EU-UNDEF,1,,undefined,
+EU-DEFER,1,1.0,defined,
