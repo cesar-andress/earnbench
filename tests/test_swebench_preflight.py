@@ -92,6 +92,25 @@ def test_run_preflight_missing_images_without_build(tmp_path: Path) -> None:
     assert any("preflight" in cmd for cmd in payload["actionable_commands"])
 
 
+def test_run_preflight_build_failed(tmp_path: Path) -> None:
+    def builder(_row: dict, _client) -> tuple[bool, str]:
+        return False, "env image build failed\n"
+
+    payload = run_swebench_preflight(
+        metadata_path=METADATA_FIXTURE,
+        instance_id=INSTANCE_ID,
+        output_dir=tmp_path,
+        build_missing_images=True,
+        discover=_mock_discover,
+        inspector=lambda _name: False,
+        builder=builder,
+    )
+
+    assert payload["build_attempted"] is True
+    assert payload["build_success"] is False
+    assert payload["status"] == PreflightStatus.BUILD_FAILED.value
+
+
 def test_run_preflight_build_missing_images_success(tmp_path: Path) -> None:
     present: set[str] = set()
 
@@ -124,23 +143,26 @@ def test_run_preflight_build_missing_images_success(tmp_path: Path) -> None:
     assert payload["missing_images"] == []
 
 
-def test_run_preflight_build_failed(tmp_path: Path) -> None:
-    def builder(_row: dict, _client) -> tuple[bool, str]:
-        return False, "env image build failed\n"
+def test_default_build_instance_images_passes_latest_tags(monkeypatch) -> None:
+    from earnbench.adapters.swebench_preflight import default_build_instance_images
 
-    payload = run_swebench_preflight(
-        metadata_path=METADATA_FIXTURE,
-        instance_id=INSTANCE_ID,
-        output_dir=tmp_path,
-        build_missing_images=True,
-        discover=_mock_discover,
-        inspector=lambda _name: False,
-        builder=builder,
+    captured: dict[str, object] = {}
+
+    def fake_build_instance_images(**kwargs):
+        captured.update(kwargs)
+        return ([], [])
+
+    monkeypatch.setattr(
+        "swebench.harness.docker_build.build_instance_images",
+        fake_build_instance_images,
     )
 
-    assert payload["build_attempted"] is True
-    assert payload["build_success"] is False
-    assert payload["status"] == PreflightStatus.BUILD_FAILED.value
+    ok, log = default_build_instance_images({"instance_id": "x"}, object())
+
+    assert ok is True
+    assert captured["tag"] == "latest"
+    assert captured["env_image_tag"] == "latest"
+    assert log == ""
 
 
 def test_run_preflight_harness_unavailable(tmp_path: Path, monkeypatch) -> None:

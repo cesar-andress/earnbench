@@ -180,19 +180,29 @@ def default_build_instance_images(
     client: Any,
 ) -> tuple[bool, str]:
     """Build missing SWE-bench images through the official harness API."""
+    from swebench.harness.constants import LATEST
     from swebench.harness.docker_build import build_instance_images
 
     from earnbench.adapters.swebench_nominal import _normalize_row_for_harness
 
     row = _normalize_row_for_harness(instance_row)
     buffer = io.StringIO()
-    with redirect_stdout(buffer), redirect_stderr(buffer):
-        _successful, failed = build_instance_images(
-            client=client,
-            dataset=[row],
-            force_rebuild=False,
-            max_workers=1,
-        )
+    try:
+        with redirect_stdout(buffer), redirect_stderr(buffer):
+            _successful, failed = build_instance_images(
+                client=client,
+                dataset=[row],
+                force_rebuild=False,
+                max_workers=1,
+                tag=LATEST,
+                env_image_tag=LATEST,
+            )
+    except Exception as exc:
+        log_text = buffer.getvalue()
+        if log_text and not log_text.endswith("\n"):
+            log_text += "\n"
+        log_text += f"Build error: {exc}\n"
+        return False, log_text
     log_text = buffer.getvalue()
     return len(failed) == 0, log_text
 
@@ -326,16 +336,20 @@ def run_swebench_preflight(
 
         if build_missing_images and missing_images:
             build_attempted = True
-            if builder is not None:
-                build_success, build_log = builder(instance_row, client)
-            elif client is not None:
-                build_success, build_log = default_build_instance_images(
-                    instance_row,
-                    client,
-                )
-            else:
-                build_log = "Cannot build images without a Docker client."
+            try:
+                if builder is not None:
+                    build_success, build_log = builder(instance_row, client)
+                elif client is not None:
+                    build_success, build_log = default_build_instance_images(
+                        instance_row,
+                        client,
+                    )
+                else:
+                    build_log = "Cannot build images without a Docker client."
+                    build_success = False
+            except Exception as exc:
                 build_success = False
+                build_log = f"Build error: {exc}"
             if build_log.strip():
                 log_lines.append(build_log.rstrip())
             present_images, missing_images = partition_images(required, inspect)
