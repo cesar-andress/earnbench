@@ -33,6 +33,8 @@ from earnbench.adapters.swebench_preflight import (
 )
 from earnbench.audit import AuditRecord
 from earnbench.classification import PerturbationOutcome
+from earnbench.exploits.catalog import ExploitCatalogError, get_exploit, list_exploits
+from earnbench.exploits.validate import validate_path
 from earnbench.metrics import compute_earned_fraction
 from earnbench.outcomes import NominalOutcome, OutcomeStatus, PerturbationResult
 from earnbench.phase_a_batch import (
@@ -116,9 +118,7 @@ def parse_compute_input(
         success = None if success_raw is None else bool(success_raw)
         outcome_raw = item.get("outcome")
         outcome = (
-            PerturbationOutcome(str(outcome_raw))
-            if outcome_raw is not None
-            else None
+            PerturbationOutcome(str(outcome_raw)) if outcome_raw is not None else None
         )
         try:
             perturbations.append(
@@ -740,6 +740,42 @@ def cmd_registry_validate(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_exploit_list(args: argparse.Namespace) -> None:
+    """List exploit specifications in a directory."""
+    directory = Path(args.directory)
+    try:
+        specs = list_exploits(directory)
+    except ExploitCatalogError as exc:
+        raise CLIError(str(exc)) from exc
+    payload = {"exploits": [spec.to_dict() for spec in specs]}
+    json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
+def cmd_exploit_show(args: argparse.Namespace) -> None:
+    """Print one exploit specification as JSON."""
+    directory = Path(args.directory)
+    try:
+        spec = get_exploit(directory, args.exploit_id)
+    except ExploitCatalogError as exc:
+        raise CLIError(str(exc)) from exc
+    json.dump(spec.to_dict(), sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
+def cmd_exploit_validate(args: argparse.Namespace) -> None:
+    """Validate one exploit spec file or a directory of specs."""
+    errors = validate_path(Path(args.path))
+    if errors:
+        for error in errors:
+            print(f"error: {error}", file=sys.stderr)
+        raise CLIError("exploit validation failed", exit_code=1)
+    if args.quiet:
+        return
+    json.dump({"status": "ok"}, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="earnbench",
@@ -815,6 +851,48 @@ def build_parser() -> argparse.ArgumentParser:
     registry_subparsers.add_parser(
         "validate",
         help="Validate manifest against built-in registry specs",
+    )
+
+    exploit_parser = subparsers.add_parser(
+        "exploit",
+        help="Inspect and validate planted exploit specifications",
+    )
+    exploit_subparsers = exploit_parser.add_subparsers(
+        dest="exploit_command",
+        required=True,
+    )
+    exploit_list_parser = exploit_subparsers.add_parser(
+        "list",
+        help="List exploit specs in a directory",
+    )
+    exploit_list_parser.add_argument(
+        "directory",
+        help="Directory containing exploit spec files (.json, .yaml, .yml)",
+    )
+    exploit_show_parser = exploit_subparsers.add_parser(
+        "show",
+        help="Show one exploit spec",
+    )
+    exploit_show_parser.add_argument(
+        "exploit_id",
+        help="Exploit id (exploit_id field)",
+    )
+    exploit_show_parser.add_argument(
+        "directory",
+        help="Directory containing exploit spec files",
+    )
+    exploit_validate_parser = exploit_subparsers.add_parser(
+        "validate",
+        help="Validate an exploit spec file or directory",
+    )
+    exploit_validate_parser.add_argument(
+        "path",
+        help="Exploit spec file or directory of specs",
+    )
+    exploit_validate_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print validation summary JSON on success",
     )
 
     swebench_parser = subparsers.add_parser(
@@ -1228,6 +1306,15 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_registry_validate(args)
             else:
                 parser.error(f"unknown registry command: {args.registry_command}")
+        elif args.command == "exploit":
+            if args.exploit_command == "list":
+                cmd_exploit_list(args)
+            elif args.exploit_command == "show":
+                cmd_exploit_show(args)
+            elif args.exploit_command == "validate":
+                cmd_exploit_validate(args)
+            else:
+                parser.error(f"unknown exploit command: {args.exploit_command}")
         elif args.command == "swebench":
             if args.swebench_command == "prepare-smoke":
                 cmd_swebench_prepare_smoke(args)
