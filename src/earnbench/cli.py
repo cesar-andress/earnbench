@@ -36,7 +36,17 @@ from earnbench.classification import PerturbationOutcome
 from earnbench.exploit_validator import validate_runtime_run
 from earnbench.exploits.catalog import ExploitCatalogError, get_exploit, list_exploits
 from earnbench.exploits.validate import validate_path
+from earnbench.bootstrap_uncertainty import generate_bootstrap_uncertainty_report
+from earnbench.cross_oracle_agreement import (
+    generate_cross_oracle_agreement_report,
+    validate_cross_oracle_table,
+)
 from earnbench.external_exploits import validate_external_exploit_catalog
+from earnbench.monte_carlo_ef import MonteCarloSimulationConfig, generate_monte_carlo_ef_report
+from earnbench.pi_ablation import generate_pi_ablation_report
+from earnbench.registry_agreement import validate_registry_agreement_table
+from earnbench.registry_evolution import validate_registry_evolution_scenario
+from earnbench.stress_test_schema import validate_stress_test_catalog
 from earnbench.injection_batch import InjectionBatchConfig, run_injection_batch
 from earnbench.injection_unblind import BlindUnblindError, unblind_injection_run
 from earnbench.injection_validity import generate_injection_validity_report
@@ -1273,6 +1283,160 @@ def cmd_injection_unblind(args: argparse.Namespace) -> None:
         sys.stdout.write("\n")
 
 
+def cmd_validation_bootstrap(args: argparse.Namespace) -> None:
+    """Compute instance-bootstrap uncertainty for summary.csv metrics."""
+    result = generate_bootstrap_uncertainty_report(
+        Path(args.summary),
+        Path(args.output),
+        bootstrap_draws=args.bootstrap_draws,
+        bootstrap_seed=args.bootstrap_seed,
+    )
+    payload = {
+        "status": "ok",
+        "output_dir": str(result.output_dir),
+        "metrics_csv": str(result.metrics_csv),
+        "report_json": str(result.report_json),
+    }
+    if args.quiet:
+        return
+    json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
+def cmd_validation_ablation(args: argparse.Namespace) -> None:
+    """Compute post-hoc Π ablation sensitivity from summary.csv."""
+    result = generate_pi_ablation_report(
+        Path(args.summary),
+        Path(args.output),
+    )
+    payload = {
+        "status": "ok",
+        "output_dir": str(result.output_dir),
+        "ablation_csv": str(result.ablation_csv),
+        "report_json": str(result.report_json),
+    }
+    if args.quiet:
+        return
+    json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
+def cmd_validation_monte_carlo(args: argparse.Namespace) -> None:
+    """Run Monte Carlo EF estimator simulation."""
+    config = MonteCarloSimulationConfig(
+        instance_count=args.instances,
+        pi_count=args.pi_count,
+        survival_probability=args.survival_prob,
+        invalid_probability=args.invalid_prob,
+        simulation_draws=args.simulation_draws,
+        simulation_seed=args.seed,
+    )
+    result = generate_monte_carlo_ef_report(Path(args.output), config)
+    payload = {
+        "status": "ok",
+        "output_dir": str(result.output_dir),
+        "summary_json": str(result.summary_json),
+        "metrics_csv": str(result.metrics_csv),
+    }
+    if args.quiet:
+        return
+    json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
+def cmd_validation_cross_oracle(args: argparse.Namespace) -> None:
+    """Validate and analyze cross-oracle agreement table."""
+    table_path = Path(args.table)
+    if args.validate_only:
+        result = validate_cross_oracle_table(table_path)
+        if not result.ok:
+            for error in result.errors:
+                print(f"error: {error}", file=sys.stderr)
+            raise CLIError("cross-oracle table validation failed", exit_code=1)
+        payload = {
+            "status": "ok",
+            "table": str(result.path),
+            "row_count": result.row_count,
+        }
+    else:
+        report = generate_cross_oracle_agreement_report(
+            table_path,
+            Path(args.output),
+        )
+        payload = {
+            "status": "ok",
+            "output_dir": str(report.output_dir),
+            "agreement_json": str(report.agreement_json),
+            "disagreements_csv": str(report.disagreements_csv),
+        }
+    if args.quiet:
+        return
+    json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
+def cmd_validation_stress_test(args: argparse.Namespace) -> None:
+    """Validate stress-test scenario catalog CSV schema."""
+    result = validate_stress_test_catalog(Path(args.catalog))
+    if not result.ok:
+        for error in result.errors:
+            print(f"error: {error}", file=sys.stderr)
+        raise CLIError("stress-test catalog validation failed", exit_code=1)
+    if args.quiet:
+        return
+    json.dump(
+        {
+            "status": "ok",
+            "catalog": str(result.path),
+            "row_count": result.row_count,
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
+def cmd_validation_registry_evolution(args: argparse.Namespace) -> None:
+    """Validate registry evolution scenario JSON schema."""
+    result = validate_registry_evolution_scenario(Path(args.scenario))
+    if not result.ok:
+        for error in result.errors:
+            print(f"error: {error}", file=sys.stderr)
+        raise CLIError("registry evolution scenario validation failed", exit_code=1)
+    if args.quiet:
+        return
+    json.dump(
+        {"status": "ok", "scenario": str(result.path)},
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
+def cmd_validation_registry_agreement(args: argparse.Namespace) -> None:
+    """Validate registry agreement comparison table CSV schema."""
+    result = validate_registry_agreement_table(Path(args.table))
+    if not result.ok:
+        for error in result.errors:
+            print(f"error: {error}", file=sys.stderr)
+        raise CLIError("registry agreement table validation failed", exit_code=1)
+    if args.quiet:
+        return
+    json.dump(
+        {
+            "status": "ok",
+            "table": str(result.path),
+            "row_count": result.row_count,
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
 def cmd_external_exploit_validate_catalog(args: argparse.Namespace) -> None:
     """Validate a Phase B-ext external exploit catalog CSV."""
     result = validate_external_exploit_catalog(Path(args.catalog))
@@ -1589,6 +1753,205 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to external_exploit_catalog.csv",
     )
     external_validate_catalog_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print validation summary JSON on success",
+    )
+
+    validation_parser = subparsers.add_parser(
+        "validation",
+        help="Validation ladder analysis and schema tools",
+    )
+    validation_subparsers = validation_parser.add_subparsers(
+        dest="validation_command",
+        required=True,
+    )
+
+    bootstrap_parser = validation_subparsers.add_parser(
+        "bootstrap",
+        help="Instance-bootstrap uncertainty for summary.csv metrics",
+    )
+    bootstrap_parser.add_argument(
+        "summary",
+        help="Phase A/B batch directory or path to summary.csv",
+    )
+    bootstrap_parser.add_argument(
+        "--output",
+        required=True,
+        help="Output directory for bootstrap artifacts",
+    )
+    bootstrap_parser.add_argument(
+        "--bootstrap-draws",
+        type=int,
+        default=10_000,
+        help="Number of bootstrap resamples (default: 10000)",
+    )
+    bootstrap_parser.add_argument(
+        "--bootstrap-seed",
+        type=int,
+        default=0,
+        help="Random seed for bootstrap resampling (default: 0)",
+    )
+    bootstrap_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print summary JSON on success",
+    )
+
+    ablation_parser = validation_subparsers.add_parser(
+        "ablation",
+        help="Post-hoc Π ablation sensitivity analysis",
+    )
+    ablation_parser.add_argument(
+        "summary",
+        help="Phase A/B batch directory or path to summary.csv",
+    )
+    ablation_parser.add_argument(
+        "--output",
+        required=True,
+        help="Output directory for ablation artifacts",
+    )
+    ablation_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print summary JSON on success",
+    )
+
+    monte_carlo_parser = validation_subparsers.add_parser(
+        "monte-carlo",
+        help="Monte Carlo EF estimator simulation",
+    )
+    monte_carlo_parser.add_argument(
+        "--output",
+        required=True,
+        help="Output directory for simulation artifacts",
+    )
+    monte_carlo_parser.add_argument(
+        "--instances",
+        type=int,
+        default=100,
+        help="Synthetic instances per simulation draw (default: 100)",
+    )
+    monte_carlo_parser.add_argument(
+        "--pi-count",
+        type=int,
+        default=3,
+        help="Perturbations per synthetic instance (default: 3)",
+    )
+    monte_carlo_parser.add_argument(
+        "--survival-prob",
+        type=float,
+        default=0.8,
+        help="Per-π survival probability (default: 0.8)",
+    )
+    monte_carlo_parser.add_argument(
+        "--invalid-prob",
+        type=float,
+        default=0.0,
+        help="Per-π invalid probability (default: 0.0)",
+    )
+    monte_carlo_parser.add_argument(
+        "--simulation-draws",
+        type=int,
+        default=10_000,
+        help="Number of Monte Carlo dataset draws (default: 10000)",
+    )
+    monte_carlo_parser.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+        help="Random seed (default: 0)",
+    )
+    monte_carlo_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print summary JSON on success",
+    )
+
+    cross_oracle_parser = validation_subparsers.add_parser(
+        "cross-oracle",
+        help="Cross-oracle agreement validation and analysis",
+    )
+    cross_oracle_parser.add_argument(
+        "table",
+        help="Path to cross_oracle_comparison.csv",
+    )
+    cross_oracle_parser.add_argument(
+        "--output",
+        help="Output directory for agreement artifacts (required unless --validate-only)",
+    )
+    cross_oracle_parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="Validate schema only; do not run agreement analysis",
+    )
+    cross_oracle_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print summary JSON on success",
+    )
+
+    stress_test_parser = validation_subparsers.add_parser(
+        "stress-test",
+        help="Stress-test scenario catalog tools",
+    )
+    stress_test_subparsers = stress_test_parser.add_subparsers(
+        dest="stress_test_command",
+        required=True,
+    )
+    stress_validate_parser = stress_test_subparsers.add_parser(
+        "validate-catalog",
+        help="Validate stress-test scenario catalog CSV schema",
+    )
+    stress_validate_parser.add_argument(
+        "catalog",
+        help="Path to stress_test_catalog.csv",
+    )
+    stress_validate_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print validation summary JSON on success",
+    )
+
+    registry_evolution_parser = validation_subparsers.add_parser(
+        "registry-evolution",
+        help="Registry evolution scenario tools",
+    )
+    registry_evolution_subparsers = registry_evolution_parser.add_subparsers(
+        dest="registry_evolution_command",
+        required=True,
+    )
+    registry_evolution_validate_parser = registry_evolution_subparsers.add_parser(
+        "validate-scenario",
+        help="Validate registry evolution scenario JSON schema",
+    )
+    registry_evolution_validate_parser.add_argument(
+        "scenario",
+        help="Path to registry_evolution_scenario.json",
+    )
+    registry_evolution_validate_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print validation summary JSON on success",
+    )
+
+    registry_agreement_parser = validation_subparsers.add_parser(
+        "registry-agreement",
+        help="Registry agreement comparison tools",
+    )
+    registry_agreement_subparsers = registry_agreement_parser.add_subparsers(
+        dest="registry_agreement_command",
+        required=True,
+    )
+    registry_agreement_validate_parser = registry_agreement_subparsers.add_parser(
+        "validate-table",
+        help="Validate registry agreement comparison CSV schema",
+    )
+    registry_agreement_validate_parser.add_argument(
+        "table",
+        help="Path to registry_agreement.csv",
+    )
+    registry_agreement_validate_parser.add_argument(
         "--quiet",
         action="store_true",
         help="Do not print validation summary JSON on success",
@@ -2306,6 +2669,42 @@ def main(argv: list[str] | None = None) -> int:
                 parser.error(
                     f"unknown external-exploit command: {args.external_exploit_command}"
                 )
+        elif args.command == "validation":
+            if args.validation_command == "bootstrap":
+                cmd_validation_bootstrap(args)
+            elif args.validation_command == "ablation":
+                cmd_validation_ablation(args)
+            elif args.validation_command == "monte-carlo":
+                cmd_validation_monte_carlo(args)
+            elif args.validation_command == "cross-oracle":
+                if not args.validate_only and not args.output:
+                    parser.error("cross-oracle requires --output unless --validate-only")
+                cmd_validation_cross_oracle(args)
+            elif args.validation_command == "stress-test":
+                if args.stress_test_command == "validate-catalog":
+                    cmd_validation_stress_test(args)
+                else:
+                    parser.error(
+                        f"unknown stress-test command: {args.stress_test_command}"
+                    )
+            elif args.validation_command == "registry-evolution":
+                if args.registry_evolution_command == "validate-scenario":
+                    cmd_validation_registry_evolution(args)
+                else:
+                    parser.error(
+                        "unknown registry-evolution command: "
+                        f"{args.registry_evolution_command}"
+                    )
+            elif args.validation_command == "registry-agreement":
+                if args.registry_agreement_command == "validate-table":
+                    cmd_validation_registry_agreement(args)
+                else:
+                    parser.error(
+                        "unknown registry-agreement command: "
+                        f"{args.registry_agreement_command}"
+                    )
+            else:
+                parser.error(f"unknown validation command: {args.validation_command}")
         elif args.command == "swebench":
             if args.swebench_command == "prepare-smoke":
                 cmd_swebench_prepare_smoke(args)
