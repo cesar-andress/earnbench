@@ -80,14 +80,15 @@ def test_default_hardening_config_requests_all_flags() -> None:
 
 
 def test_hardened_container_create_applies_docker_flags() -> None:
-    pytest.importorskip("swebench")
-    from swebench.harness import docker_build
+    from docker.models.containers import ContainerCollection
 
     client = MagicMock()
-    created = MagicMock()
-    client.containers.create.return_value = created
-    test_spec = MagicMock(instance_id="test_instance")
-    logger = MagicMock()
+    client.api._version = "1.41"
+    client.api.create_container.return_value = {"Id": "container-id"}
+    client.api.inspect_container.return_value = {"Id": "container-id"}
+    collection = ContainerCollection(client=client)
+    container = MagicMock(id="container-id")
+    collection.get = MagicMock(return_value=container)  # type: ignore[method-assign]
 
     hardening = PiEnvHardeningConfig()
     with hardened_container_create(client, hardening) as (
@@ -95,23 +96,63 @@ def test_hardened_container_create_applies_docker_flags() -> None:
         not_enforced,
         warnings,
     ):
-        docker_build.build_container(
-            test_spec,
-            client,
-            "run_id",
-            logger,
-            nocache=False,
+        collection.create(
+            image="swebench/test:latest",
+            environment={"PATH": "/usr/bin"},
         )
 
-    kwargs = client.containers.create.call_args.kwargs
-    assert kwargs["network_mode"] == "none"
+    kwargs = client.api.create_container.call_args.kwargs
+    assert kwargs["host_config"]["NetworkMode"] == "none"
     assert kwargs["environment"]["PYTHONNOUSERSITE"] == "1"
     assert kwargs["environment"]["PIP_NO_INDEX"] == "1"
+    assert kwargs["environment"]["PATH"] == "/usr/bin"
     assert "network_disabled" in enforced
     assert "python_nousersite" in enforced
     assert "pip_no_index" in enforced
     assert "tests_mount_readonly" in not_enforced
     assert any("tests_mount_readonly" in warning for warning in warnings)
+
+
+def test_hardened_container_create_applies_on_real_docker_client() -> None:
+    pytest.importorskip("swebench")
+    import logging
+    import uuid
+    from unittest.mock import MagicMock
+
+    import docker
+    from swebench.harness.docker_build import build_container
+
+    client = docker.from_env()
+    hardening = PiEnvHardeningConfig()
+    run_id = f"earnbench_hardening_test_{uuid.uuid4().hex[:8]}"
+    spec = MagicMock()
+    spec.instance_id = "psf__requests-1724"
+    spec.is_remote_image = True
+    spec.instance_image_key = "sweb.eval.x86_64.psf__requests-1724:latest"
+    spec.docker_specs = {}
+    spec.platform = None
+    spec.get_instance_container_name.return_value = run_id
+    container = None
+
+    try:
+        with hardened_container_create(client, hardening) as (enforced, _, _):
+            container = build_container(
+                spec,
+                client,
+                run_id,
+                logging.getLogger("earnbench.test"),
+                nocache=False,
+            )
+            assert enforced == [
+                "network_disabled",
+                "python_nousersite",
+                "pip_no_index",
+            ]
+            assert container.attrs["HostConfig"]["NetworkMode"] == "none"
+    finally:
+        if container is not None:
+            container.remove(force=True)
+        client.close()
 
 
 def test_run_pi_env_grading_writes_artifacts(tmp_path: Path) -> None:

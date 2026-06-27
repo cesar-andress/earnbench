@@ -143,7 +143,8 @@ def hardened_container_create(
     client: Any,
     hardening: PiEnvHardeningConfig,
 ) -> Iterator[tuple[list[str], list[str], list[str]]]:
-    """Patch SWE-bench ``build_container`` to apply supported hardening flags."""
+    """Patch Docker container creation to apply supported hardening flags."""
+    _ = client  # runner passes the harness client; patch is class-scoped
     enforced: list[str] = []
     not_enforced: list[str] = []
     warnings: list[str] = []
@@ -157,42 +158,24 @@ def hardened_container_create(
             )
         )
 
-    from swebench.harness import docker_build
+    from docker.models.containers import ContainerCollection
 
-    original_build_container = docker_build.build_container
+    original_create = ContainerCollection.create
 
-    def patched_build_container(
-        test_spec: Any,
-        client_arg: Any,
-        run_id: str,
-        logger: Any,
-        nocache: bool,
-        force_rebuild: bool = False,
+    def patched_create(
+        self: Any,
+        image: Any,
+        command: Any = None,
+        **kwargs: Any,
     ) -> Any:
-        original_create = client_arg.containers.create
+        _apply_docker_hardening_kwargs(kwargs, hardening, enforced)
+        return original_create(self, image, command, **kwargs)
 
-        def patched_create(*args: Any, **kwargs: Any) -> Any:
-            _apply_docker_hardening_kwargs(kwargs, hardening, enforced)
-            return original_create(*args, **kwargs)
-
-        client_arg.containers.create = patched_create  # type: ignore[method-assign]
-        try:
-            return original_build_container(
-                test_spec,
-                client_arg,
-                run_id,
-                logger,
-                nocache,
-                force_rebuild,
-            )
-        finally:
-            client_arg.containers.create = original_create  # type: ignore[method-assign]
-
-    docker_build.build_container = patched_build_container
+    ContainerCollection.create = patched_create  # type: ignore[method-assign]
     try:
         yield enforced, not_enforced, warnings
     finally:
-        docker_build.build_container = original_build_container
+        ContainerCollection.create = original_create  # type: ignore[method-assign]
 
 
 def resolve_instance_image_digest(client: Any, image_name: str) -> str | None:
