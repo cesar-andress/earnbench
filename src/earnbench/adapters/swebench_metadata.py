@@ -163,3 +163,17 @@ def load_verified_instance(path: Path, instance_id: str) -> SWEBenchVerifiedReco
 
     msg = f"instance_id not found in metadata: {instance_id!r}"
     raise MetadataLoadError(msg)
+
+
+def load_verified_instance_row(path: Path, instance_id: str) -> dict[str, Any]:
+    """Load the raw SWE-bench metadata row for harness execution."""
+    if not instance_id.strip():
+        msg = "instance_id must be non-empty"
+        raise MetadataLoadError(msg)
+
+    for row in load_metadata_rows(path):
+        if str(row.get("instance_id")) == instance_id:
+            return dict(row)
+
+    msg = f"instance_id not found in metadata: {instance_id!r}"
+    raise MetadataLoadError(msg)

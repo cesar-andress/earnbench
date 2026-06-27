@@ -10,6 +10,10 @@ from typing import Any
 
 from earnbench.adapters.swebench import prepare_smoke
 from earnbench.adapters.swebench_metadata import MetadataLoadError
+from earnbench.adapters.swebench_nominal import (
+    HarnessNotInstalledError,
+    run_nominal_grading,
+)
 from earnbench.audit import AuditRecord
 from earnbench.metrics import compute_earned_fraction
 from earnbench.outcomes import NominalOutcome, OutcomeStatus, PerturbationResult
@@ -266,6 +270,44 @@ def cmd_swebench_prepare_smoke(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_swebench_run_nominal(args: argparse.Namespace) -> None:
+    """Run nominal SWE-bench grading for one instance."""
+    metadata_path = Path(args.metadata_parquet)
+    patch_path = Path(args.patch)
+    output_dir = Path(args.output)
+    suffix = metadata_path.suffix.lower()
+    if suffix not in {".parquet", ".json"}:
+        raise CLIError(
+            f"--metadata-parquet must be a .parquet or .json file, got: {metadata_path}"
+        )
+    if not patch_path.is_file():
+        raise CLIError(f"--patch file not found: {patch_path}")
+
+    try:
+        grade = run_nominal_grading(
+            metadata_path=metadata_path,
+            instance_id=args.instance_id,
+            patch_path=patch_path,
+            output_dir=output_dir,
+            timeout_seconds=args.timeout_seconds,
+            run_id=args.run_id or None,
+        )
+    except MetadataLoadError as exc:
+        raise CLIError(str(exc)) from exc
+    except HarnessNotInstalledError as exc:
+        raise CLIError(str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(grade, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
 def cmd_registry_validate(args: argparse.Namespace) -> None:
     """Validate registry manifest against built-in specs."""
     del args
@@ -397,6 +439,46 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write artifacts only; do not print plan.json to stdout",
     )
+    run_nominal_parser = swebench_subparsers.add_parser(
+        "run-nominal",
+        help="Run nominal SWE-bench grading (Docker harness)",
+    )
+    run_nominal_parser.add_argument(
+        "--metadata-parquet",
+        required=True,
+        help="Path to SWE-bench Verified metadata (.parquet or test .json fixture)",
+    )
+    run_nominal_parser.add_argument(
+        "--instance-id",
+        required=True,
+        help="SWE-bench instance id (e.g. psf__requests-1724)",
+    )
+    run_nominal_parser.add_argument(
+        "--patch",
+        required=True,
+        help="Path to unified-diff patch file (prod-only recommended)",
+    )
+    run_nominal_parser.add_argument(
+        "--output",
+        required=True,
+        help="Output directory for nominal grading artifacts",
+    )
+    run_nominal_parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=1800,
+        help="Harness test timeout in seconds (default: 1800)",
+    )
+    run_nominal_parser.add_argument(
+        "--run-id",
+        default="",
+        help="Optional SWE-bench harness run id (default: nominal_<instance_id>)",
+    )
+    run_nominal_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write artifacts only; do not print grade.json to stdout",
+    )
 
     return parser
 
@@ -424,6 +506,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "swebench":
             if args.swebench_command == "prepare-smoke":
                 cmd_swebench_prepare_smoke(args)
+            elif args.swebench_command == "run-nominal":
+                cmd_swebench_run_nominal(args)
             else:
                 parser.error(f"unknown swebench command: {args.swebench_command}")
         else:

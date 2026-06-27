@@ -34,7 +34,7 @@ earnbench = "earnbench.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.4", "pyarrow>=15.0"]
-swebench = ["pyarrow>=15.0"]
+swebench = ["pyarrow>=15.0", "swebench>=2.0", "docker>=7.0"]
 
 [project.urls]
 Repository = "https://github.com/earnbench/earnbench"

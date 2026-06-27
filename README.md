@@ -111,8 +111,47 @@ earnbench run \
 ```
 
 Validates that `--patch` and `--config` exist, prints a status line on stderr,
-then exits with code **2** and a clear *not implemented* message. Real Docker /
-SWE-bench execution will replace this in a later release.
+then exits with code **2** and a clear *not implemented* message. Use
+`swebench run-nominal` for real SWE-bench Docker grading (see below).
+
+### SWE-bench smoke testing
+
+Install optional dependencies (Verified metadata + official harness):
+
+```bash
+pip install -e ".[swebench]"
+```
+
+Real grading also requires a running **Docker** daemon.
+
+Prepare smoke artifacts from SWE-bench Verified metadata:
+
+```bash
+earnbench swebench prepare-smoke \
+  --metadata-parquet path/to/swe_verified_test.parquet \
+  --instance-id psf__requests-1724 \
+  --output /tmp/earnbench_smoke
+```
+
+Run **nominal** grading (golden patch, F2P + P2P verification):
+
+```bash
+earnbench swebench run-nominal \
+  --metadata-parquet path/to/swe_verified_test.parquet \
+  --instance-id psf__requests-1724 \
+  --patch /tmp/earnbench_smoke/psf__requests-1724/patch/prod_only.patch \
+  --output /tmp/earnbench_smoke \
+  --timeout-seconds 1800
+```
+
+Writes under `<output>/<instance_id>/nominal/`:
+
+- `grade.json` — harness outcome summary
+- `harness.log` — captured harness output
+- `audit.json` — `AuditRecord` with `perturbation_id: nominal.v1`
+
+If the SWE-bench harness is not installed, the command exits with an actionable
+error pointing to `pip install -e ".[swebench]"`.
 
 Equivalent module invocation:
 

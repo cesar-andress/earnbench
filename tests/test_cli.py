@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -270,6 +271,82 @@ def test_swebench_prepare_smoke_missing_instance(capsys, tmp_path: Path) -> None
             str(FIXTURES / "swebench_smoke_metadata.json"),
             "--instance-id",
             "missing__instance-1",
+            "--output",
+            str(tmp_path / "out"),
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "not found" in captured.err.lower()
+
+
+def test_swebench_run_nominal_cli(capsys, tmp_path: Path) -> None:
+    output_dir = tmp_path / "out"
+    patch_path = tmp_path / "golden.patch"
+    patch_path.write_text(
+        "diff --git a/requests/models.py b/requests/models.py\n", encoding="utf-8"
+    )
+
+    with patch(
+        "earnbench.adapters.swebench_nominal.default_nominal_runner",
+        _mock_nominal_runner_for_cli,
+    ):
+        exit_code = main(
+            [
+                "swebench",
+                "run-nominal",
+                "--metadata-parquet",
+                str(FIXTURES / "swebench_smoke_metadata.json"),
+                "--instance-id",
+                "psf__requests-1724",
+                "--patch",
+                str(patch_path),
+                "--output",
+                str(output_dir),
+                "--timeout-seconds",
+                "1800",
+            ]
+        )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    grade = json.loads(captured.out)
+    assert grade["instance_id"] == "psf__requests-1724"
+    assert grade["success"] is True
+    nominal_dir = output_dir / "psf__requests-1724" / "nominal"
+    assert (nominal_dir / "grade.json").is_file()
+    assert (nominal_dir / "audit.json").is_file()
+
+
+def _mock_nominal_runner_for_cli(request):
+    from earnbench.adapters.swebench_nominal import NominalRunResult
+    from earnbench.adapters.swebench_patch import sha256_hex
+
+    return NominalRunResult(
+        success=True,
+        status="ok",
+        harness_command="/bin/bash /eval.sh",
+        log_text="cli mock log\n",
+        tests_run=("tests.test_models.TestCase.test_redirect",),
+        warnings=(),
+        started_at_utc="2025-06-01T12:00:00+00:00",
+        completed_at_utc="2025-06-01T12:05:00+00:00",
+        patch_sha256=sha256_hex(request.patch_content),
+    )
+
+
+def test_swebench_run_nominal_missing_patch(capsys, tmp_path: Path) -> None:
+    exit_code = main(
+        [
+            "swebench",
+            "run-nominal",
+            "--metadata-parquet",
+            str(FIXTURES / "swebench_smoke_metadata.json"),
+            "--instance-id",
+            "psf__requests-1724",
+            "--patch",
+            str(tmp_path / "missing.patch"),
             "--output",
             str(tmp_path / "out"),
         ]
