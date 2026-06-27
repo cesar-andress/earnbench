@@ -42,6 +42,7 @@ from earnbench.phase_a_batch import (
     resolve_batch_paths,
     run_phase_a_batch,
 )
+from earnbench.phase_a_report import generate_phase_a_report
 from earnbench.phase_b_batch import (
     PhaseBBatchConfig,
     resolve_metadata_path,
@@ -733,6 +734,31 @@ def cmd_phase_a_run(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_report_phase_a(args: argparse.Namespace) -> None:
+    """Generate deterministic Phase A markdown report."""
+    output_dir = Path(args.output_dir).resolve()
+    try:
+        result = generate_phase_a_report(output_dir)
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(
+        {
+            "report_path": str(result.report_path),
+            "output_dir": str(result.output_dir),
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
 def cmd_phase_b_run(args: argparse.Namespace) -> None:
     """Run Phase B planted exploit batch experiment."""
     exploit_dir = Path(args.exploit_dir)
@@ -1408,6 +1434,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Progress on stderr only; do not print batch summary JSON to stdout",
     )
 
+    report_parser = subparsers.add_parser(
+        "report",
+        help="Generate publication reports from completed batch outputs",
+    )
+    report_subparsers = report_parser.add_subparsers(
+        dest="report_command",
+        required=True,
+    )
+    report_phase_a_parser = report_subparsers.add_parser(
+        "phase-a",
+        help="Generate phase_a_report.md from a completed Phase A batch directory",
+    )
+    report_phase_a_parser.add_argument(
+        "output_dir",
+        help="Path to completed Phase A batch output (contains summary.csv)",
+    )
+    report_phase_a_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write report only; do not print JSON summary to stdout",
+    )
+
     return parser
 
 
@@ -1469,6 +1517,11 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_phase_b_run(args)
             else:
                 parser.error(f"unknown phase-b command: {args.phase_b_command}")
+        elif args.command == "report":
+            if args.report_command == "phase-a":
+                cmd_report_phase_a(args)
+            else:
+                parser.error(f"unknown report command: {args.report_command}")
         else:
             parser.error(f"unknown command: {args.command}")
     except CLIError as exc:

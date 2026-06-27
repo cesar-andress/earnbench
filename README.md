@@ -238,6 +238,17 @@ Writes `summary.csv`, `statistics.json`, `run_manifest.json`, and per-instance
 `report.json` / `audit.json` artifacts. See `docs/phase_b.md` for the exploit
 counterpart.
 
+**Phase A report** (deterministic markdown from completed batch):
+
+```bash
+earnbench report phase-a experiments/runs/phase_a_golden
+```
+
+Reads `summary.csv`, `statistics.json`, `failures.csv`, and `run_manifest.json`
+from the batch directory and writes `phase_a_report.md` with summary tables,
+EF and invalid histograms, sensitivity-gap analysis, retained/excluded instance
+lists, top failures, and publication-ready prose.
+
 **Phase B exploit batch** (planted criterion controls):
 
 ```bash
