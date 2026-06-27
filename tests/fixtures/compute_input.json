@@ -1,0 +1,27 @@
+{
+  "nominal": {
+    "run_id": "cli-run-001",
+    "task_id": "django__django-13279",
+    "success": true
+  },
+  "perturbations": [
+    {
+      "perturbation_id": "pi_vtest.v1",
+      "status": "ok",
+      "success": true,
+      "channel": "vtest"
+    },
+    {
+      "perturbation_id": "pi_verif.v1",
+      "status": "ok",
+      "success": false,
+      "channel": "verif"
+    },
+    {
+      "perturbation_id": "pi_env.v1",
+      "status": "ok",
+      "success": true,
+      "channel": "env"
+    }
+  ]
+}

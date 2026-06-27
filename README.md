@@ -38,6 +38,74 @@ Requires Python 3.10+.
 pip install -e ".[dev]"
 ```
 
+After installation, the **`earnbench`** command is available on your `PATH`.
+
+## CLI
+
+The CLI is a **skeleton**: `compute` and `validate-audit` are fully functional;
+`run` validates arguments but does not execute SWE-bench grading yet.
+
+### Compute Earned Fraction from outcomes
+
+Input JSON must contain a `nominal` object and a `perturbations` array (recorded
+harness outcomes, not raw logs):
+
+```bash
+earnbench compute tests/fixtures/compute_input.json
+```
+
+Example input:
+
+```json
+{
+  "nominal": {
+    "run_id": "cli-run-001",
+    "task_id": "django__django-13279",
+    "success": true
+  },
+  "perturbations": [
+    {
+      "perturbation_id": "pi_vtest.v1",
+      "status": "ok",
+      "success": true,
+      "channel": "vtest"
+    }
+  ]
+}
+```
+
+Prints an `EarnedFractionReport` as JSON on stdout.
+
+### Validate an audit record
+
+```bash
+earnbench validate-audit path/to/audit.json
+earnbench validate-audit --quiet path/to/audit.json
+```
+
+Exits with code **0** when the file matches `AuditRecord`; **nonzero** on invalid
+JSON or schema violations.
+
+### Run grading (stub)
+
+```bash
+earnbench run \
+  --instance django__django-13279 \
+  --patch path/to/prod_only.patch \
+  --perturbation pi_vtest.v1 \
+  --config path/to/run_config.yaml
+```
+
+Validates that `--patch` and `--config` exist, prints a status line on stderr,
+then exits with code **2** and a clear *not implemented* message. Real Docker /
+SWE-bench execution will replace this in a later release.
+
+Equivalent module invocation:
+
+```bash
+python -m earnbench compute tests/fixtures/compute_input.json
+```
+
 ## Development
 
 ```bash

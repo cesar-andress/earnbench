@@ -1,0 +1,9 @@
+{
+  "schema_version": "earnbench_audit.v1",
+  "instance_id": "django__django-13279",
+  "perturbation_id": "pi_vtest.v1",
+  "config_digest": "sha256:abc",
+  "patch_sha256": "",
+  "status": "ok",
+  "success": true
+}
