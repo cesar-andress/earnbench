@@ -31,7 +31,7 @@ Before each harness `ContainerCollection.create` call:
 
 This logic is applied in:
 
-- `default_nominal_runner` (Phase A nominal, Phase B nominal)
+- `default_nominal_runner` (Phase A nominal, Phase B nominal, **and** `pi_verif.v1` when tamper is not detected — it reuses the nominal harness)
 - `default_pi_vtest_runner` (Phase B visible overfit)
 - `default_pi_env_runner` (Phase A/B environment hardening)
 
