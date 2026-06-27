@@ -2,7 +2,11 @@
 
 Documentation is in early draft. Design notes live in the private research repository during initial development.
 
-Planned topics:
+## Checklists
+
+- [Zenodo readiness checklist](zenodo_checklist.md)
+
+## Planned topics
 
 - Earned Fraction definitions
 - Counterfactual perturbation specifications

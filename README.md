@@ -58,3 +58,7 @@ See [LICENSE](LICENSE).
 ## Citation
 
 See [CITATION.cff](CITATION.cff).
+
+## Zenodo release
+
+Before archiving on Zenodo, complete [docs/zenodo_checklist.md](docs/zenodo_checklist.md).
