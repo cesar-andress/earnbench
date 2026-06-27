@@ -1,0 +1,2 @@
+control_id,instance_id,repo,patch_source,patch_ref,upstream_commit,issue_ref,certification_basis,production_only,touches_tests,touches_verifier,touches_environment,minimality_score,issue_alignment_score,certification_status,undecidable_reason,notes
+CC001,inst-1,org/repo,upstream_merge,abc123,abc123,https://example.org/1,merged_upstream_pr;issue_linked;prod_only_extract,yes,no,no,no,0.9,0.95,certified_correct,,fixture row

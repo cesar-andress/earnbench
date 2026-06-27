@@ -36,6 +36,10 @@ from earnbench.classification import PerturbationOutcome
 from earnbench.exploit_validator import validate_runtime_run
 from earnbench.exploits.catalog import ExploitCatalogError, get_exploit, list_exploits
 from earnbench.exploits.validate import validate_path
+from earnbench.certified_controls import (
+    generate_certified_controls_report,
+    validate_certified_controls_manifest,
+)
 from earnbench.bootstrap_uncertainty import generate_bootstrap_uncertainty_report
 from earnbench.cross_oracle_agreement import (
     generate_cross_oracle_agreement_report,
@@ -1283,6 +1287,59 @@ def cmd_injection_unblind(args: argparse.Namespace) -> None:
         sys.stdout.write("\n")
 
 
+def cmd_controls_validate_manifest(args: argparse.Namespace) -> None:
+    """Validate a certified correct controls manifest CSV."""
+    result = validate_certified_controls_manifest(Path(args.manifest))
+    if not result.ok:
+        for error in result.errors:
+            print(f"error: {error}", file=sys.stderr)
+        raise CLIError("certified controls manifest validation failed", exit_code=1)
+    if args.quiet:
+        return
+    json.dump(
+        {
+            "status": "ok",
+            "manifest": str(result.path),
+            "row_count": result.row_count,
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
+def cmd_report_certified_controls(args: argparse.Namespace) -> None:
+    """Generate certified correct control study report."""
+    try:
+        result = generate_certified_controls_report(
+            Path(args.manifest),
+            Path(args.phase_a_run),
+            Path(args.output),
+        )
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(
+        {
+            "output_dir": str(result.output_dir),
+            "report_md": str(result.report_md),
+            "summary_json": str(result.summary_json),
+            "ef_distribution_csv": str(result.ef_distribution_csv),
+            "false_unearned_csv": str(result.false_unearned_csv),
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
 def cmd_validation_bootstrap(args: argparse.Namespace) -> None:
     """Compute instance-bootstrap uncertainty for summary.csv metrics."""
     result = generate_bootstrap_uncertainty_report(
@@ -1734,6 +1791,28 @@ def build_parser() -> argparse.ArgumentParser:
         "--quiet",
         action="store_true",
         help="Do not print unblind summary JSON on success",
+    )
+
+    controls_parser = subparsers.add_parser(
+        "controls",
+        help="Certified correct control study tools",
+    )
+    controls_subparsers = controls_parser.add_subparsers(
+        dest="controls_command",
+        required=True,
+    )
+    controls_validate_parser = controls_subparsers.add_parser(
+        "validate-manifest",
+        help="Validate certified correct controls manifest CSV schema",
+    )
+    controls_validate_parser.add_argument(
+        "manifest",
+        help="Path to certified_correct_controls_manifest.csv",
+    )
+    controls_validate_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print validation summary JSON on success",
     )
 
     external_exploit_parser = subparsers.add_parser(
@@ -2582,6 +2661,30 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write artifacts only; do not print JSON summary to stdout",
     )
+    report_certified_controls_parser = report_subparsers.add_parser(
+        "certified-controls",
+        help="Certified correct control study report (false-unearned base rate)",
+    )
+    report_certified_controls_parser.add_argument(
+        "--manifest",
+        required=True,
+        help="Path to certified_correct_controls_manifest.csv",
+    )
+    report_certified_controls_parser.add_argument(
+        "--phase-a-run",
+        required=True,
+        help="Completed Phase A batch directory (contains summary.csv)",
+    )
+    report_certified_controls_parser.add_argument(
+        "--output",
+        required=True,
+        help="Directory for certified_controls_* artifacts",
+    )
+    report_certified_controls_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write artifacts only; do not print JSON summary to stdout",
+    )
 
     investigate_parser = subparsers.add_parser(
         "investigate",
@@ -2662,6 +2765,11 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_injection_unblind(args)
             else:
                 parser.error(f"unknown injection command: {args.injection_command}")
+        elif args.command == "controls":
+            if args.controls_command == "validate-manifest":
+                cmd_controls_validate_manifest(args)
+            else:
+                parser.error(f"unknown controls command: {args.controls_command}")
         elif args.command == "external-exploit":
             if args.external_exploit_command == "validate-catalog":
                 cmd_external_exploit_validate_catalog(args)
@@ -2752,6 +2860,8 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_report_rank_stability(args)
             elif args.report_command == "injection-validity":
                 cmd_report_injection_validity(args)
+            elif args.report_command == "certified-controls":
+                cmd_report_certified_controls(args)
             else:
                 parser.error(f"unknown report command: {args.report_command}")
         elif args.command == "investigate":
