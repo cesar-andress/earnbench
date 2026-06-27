@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import sys
+import types
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -16,9 +18,11 @@ from earnbench.adapters.swebench_pi_env import (
     PI_ENV_ARTIFACT_DIR,
     PiEnvHardeningConfig,
     PiEnvHarnessResult,
+    _apply_docker_hardening_kwargs,
     build_pi_env_grade_payload,
     default_pi_env_hardening_config,
     hardened_container_create,
+    not_enforced_warning,
     run_pi_env_grading,
 )
 from earnbench.audit import AuditRecord, AuditStatus
@@ -44,6 +48,50 @@ GRADE_FIELDS = (
     "harness_command",
     "log_ref",
 )
+
+
+def _require_working_docker_sdk() -> None:
+    """Skip integration tests when the Docker SDK cannot be imported."""
+    try:
+        import docker  # noqa: F401
+        from docker.models.containers import ContainerCollection  # noqa: F401
+    except ModuleNotFoundError as exc:
+        if exc.name == "distutils":
+            pytest.skip(
+                "Docker SDK requires distutils, which is unavailable in this "
+                "Python environment (common with distro docker packages on 3.12+)",
+            )
+        pytest.skip(f"Docker SDK unavailable: {exc}")
+    except ImportError as exc:
+        pytest.skip(
+            "Docker SDK import failed in this environment "
+            f"(environment/package issue, not EarnBench logic): {exc}",
+        )
+
+
+def _install_fake_docker_container_collection(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    recorded_kwargs: dict[str, object],
+) -> type:
+    def fake_original_create(
+        self: object,
+        image: object,
+        command: object = None,
+        **kwargs: object,
+    ) -> MagicMock:
+        recorded_kwargs.clear()
+        recorded_kwargs.update(kwargs)
+        return MagicMock(id="container-id")
+
+    class FakeContainerCollection:
+        create = fake_original_create
+
+    containers_mod = types.SimpleNamespace(
+        ContainerCollection=FakeContainerCollection,
+    )
+    monkeypatch.setitem(sys.modules, "docker.models.containers", containers_mod)
+    return FakeContainerCollection
 
 
 def _mock_runner(request: NominalRunRequest) -> PiEnvHarnessResult:
@@ -79,33 +127,48 @@ def test_default_hardening_config_requests_all_flags() -> None:
     assert config.tests_mount_readonly is True
 
 
-def test_hardened_container_create_applies_docker_flags() -> None:
-    from docker.models.containers import ContainerCollection
+def test_apply_docker_hardening_kwargs_sets_network_and_env() -> None:
+    kwargs: dict[str, object] = {"environment": {"PATH": "/usr/bin"}}
+    enforced: list[str] = []
+    _apply_docker_hardening_kwargs(kwargs, PiEnvHardeningConfig(), enforced)
+
+    assert kwargs["network_mode"] == "none"
+    environment = kwargs["environment"]
+    assert isinstance(environment, dict)
+    assert environment["PYTHONNOUSERSITE"] == "1"
+    assert environment["PIP_NO_INDEX"] == "1"
+    assert environment["PATH"] == "/usr/bin"
+    assert enforced == ["network_disabled", "python_nousersite", "pip_no_index"]
+
+
+def test_hardened_container_create_applies_docker_flags(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorded_kwargs: dict[str, object] = {}
+    fake_collection = _install_fake_docker_container_collection(
+        monkeypatch,
+        recorded_kwargs=recorded_kwargs,
+    )
 
     client = MagicMock()
-    client.api._version = "1.41"
-    client.api.create_container.return_value = {"Id": "container-id"}
-    client.api.inspect_container.return_value = {"Id": "container-id"}
-    collection = ContainerCollection(client=client)
-    container = MagicMock(id="container-id")
-    collection.get = MagicMock(return_value=container)  # type: ignore[method-assign]
-
     hardening = PiEnvHardeningConfig()
     with hardened_container_create(client, hardening) as (
         enforced,
         not_enforced,
         warnings,
     ):
-        collection.create(
-            image="swebench/test:latest",
+        fake_collection.create(
+            fake_collection(),
+            "swebench/test:latest",
             environment={"PATH": "/usr/bin"},
         )
 
-    kwargs = client.api.create_container.call_args.kwargs
-    assert kwargs["host_config"]["NetworkMode"] == "none"
-    assert kwargs["environment"]["PYTHONNOUSERSITE"] == "1"
-    assert kwargs["environment"]["PIP_NO_INDEX"] == "1"
-    assert kwargs["environment"]["PATH"] == "/usr/bin"
+    assert recorded_kwargs["network_mode"] == "none"
+    environment = recorded_kwargs["environment"]
+    assert isinstance(environment, dict)
+    assert environment["PYTHONNOUSERSITE"] == "1"
+    assert environment["PIP_NO_INDEX"] == "1"
+    assert environment["PATH"] == "/usr/bin"
     assert "network_disabled" in enforced
     assert "python_nousersite" in enforced
     assert "pip_no_index" in enforced
@@ -113,7 +176,35 @@ def test_hardened_container_create_applies_docker_flags() -> None:
     assert any("tests_mount_readonly" in warning for warning in warnings)
 
 
+def test_hardened_container_create_reports_readonly_not_enforced(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorded_kwargs: dict[str, object] = {}
+    fake_collection = _install_fake_docker_container_collection(
+        monkeypatch,
+        recorded_kwargs=recorded_kwargs,
+    )
+
+    client = MagicMock()
+    hardening = PiEnvHardeningConfig(tests_mount_readonly=True)
+    with hardened_container_create(client, hardening) as (
+        _enforced,
+        not_enforced,
+        warnings,
+    ):
+        fake_collection.create(fake_collection(), "img")
+
+    assert "tests_mount_readonly" in not_enforced
+    assert warnings == [
+        not_enforced_warning(
+            "tests_mount_readonly",
+            "SWE-bench harness has no read-only test mount hook",
+        ),
+    ]
+
+
 def test_hardened_container_create_applies_on_real_docker_client() -> None:
+    _require_working_docker_sdk()
     pytest.importorskip("swebench")
     import logging
     import uuid
