@@ -95,6 +95,7 @@ from earnbench.phase_c_agents import (
 from earnbench.provenance import Provenance, build_provenance
 from earnbench.phase_c_prime import validate_phase_c_prime_manifest
 from earnbench.registry_geometry import generate_registry_geometry_report
+from earnbench.registry_structure_validation import generate_registry_structure_report
 from earnbench.policy_ef import generate_policy_ef_report
 from earnbench.policy_variance import generate_policy_variance_report
 from earnbench.rank_stability import generate_rank_stability_report
@@ -920,6 +921,41 @@ def cmd_report_registry_geometry(args: argparse.Namespace) -> None:
             "channel_correlations_csv": str(result.channel_correlations_csv),
             "marginal_contribution_csv": str(result.marginal_contribution_csv),
             "report_md": str(result.report_md),
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
+def cmd_report_registry_structure(args: argparse.Namespace) -> None:
+    """Generate Validation 11 registry structure artifacts from summary.csv."""
+    try:
+        result = generate_registry_structure_report(
+            Path(args.summary),
+            Path(args.output),
+        )
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(
+        {
+            "output_dir": str(result.output_dir),
+            "report_md": str(result.report_md),
+            "summary_json": str(result.summary_json),
+            "cofailure_matrix_csv": str(result.cofailure_matrix_csv),
+            "overlap_csv": str(result.overlap_csv),
+            "unique_detection_csv": str(result.unique_detection_csv),
+            "information_content_csv": str(result.information_content_csv),
+            "same_ef_profiles_csv": str(result.same_ef_profiles_csv),
+            "dimensionality_json": str(result.dimensionality_json),
+            "invalid_distribution_csv": str(result.invalid_distribution_csv),
         },
         sys.stdout,
         indent=2,
@@ -2995,6 +3031,25 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write artifacts only; do not print JSON summary to stdout",
     )
+    report_registry_structure_parser = report_subparsers.add_parser(
+        "registry-structure",
+        help="Validation 11 registry structure analysis on summary.csv",
+    )
+    report_registry_structure_parser.add_argument(
+        "--summary",
+        required=True,
+        help="Phase A/B/blind/Phase C summary.csv (or directory containing it)",
+    )
+    report_registry_structure_parser.add_argument(
+        "--output",
+        required=True,
+        help="Directory for registry_structure_* artifacts",
+    )
+    report_registry_structure_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write artifacts only; do not print JSON summary to stdout",
+    )
     report_injection_validity_parser = report_subparsers.add_parser(
         "injection-validity",
         help="Analyze blinded mechanism injection construct validity",
@@ -3308,6 +3363,8 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_report_policy_variance(args)
             elif args.report_command == "registry-geometry":
                 cmd_report_registry_geometry(args)
+            elif args.report_command == "registry-structure":
+                cmd_report_registry_structure(args)
             elif args.report_command == "injection-validity":
                 cmd_report_injection_validity(args)
             elif args.report_command == "controls":
