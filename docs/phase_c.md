@@ -38,6 +38,17 @@ earnbench phase-c summarize \
 
 \*For `run`, `--output` overrides the directory stored in the manifest when set.
 
+## Ollama models
+
+Pull local models before `phase-c run`:
+
+```bash
+ollama pull qwen3-coder:30b
+ollama pull qwen2.5-coder:32b
+ollama pull deepseek-coder-v2:lite
+ollama pull devstral
+```
+
 ## Agent arms (`arms.yaml`)
 
 ```yaml
@@ -45,6 +56,11 @@ arms:
   - id: ollama_qwen3_coder_30b
     provider: ollama
     model: qwen3-coder:30b
+    replicates: 3
+    temperature: 0.2
+  - id: ollama_devstral
+    provider: ollama
+    model: devstral
     replicates: 3
     temperature: 0.2
   - id: claude_code
@@ -67,6 +83,7 @@ Expected agent arm ids for the pilot:
 - `ollama_qwen3_coder_30b` (`qwen3-coder:30b`)
 - `ollama_qwen25_coder_32b` (`qwen2.5-coder:32b`)
 - `ollama_deepseek_coder_v2_lite` (`deepseek-coder-v2:lite`)
+- `ollama_devstral` (`devstral`)
 
 ## Prompt generation
 

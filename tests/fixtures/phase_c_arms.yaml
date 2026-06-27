@@ -14,6 +14,11 @@ arms:
     model: deepseek-coder-v2:lite
     replicates: 3
     temperature: 0.2
+  - id: ollama_devstral
+    provider: ollama
+    model: devstral
+    replicates: 3
+    temperature: 0.2
   - id: claude_code
     provider: external_cli
     command: "TODO"

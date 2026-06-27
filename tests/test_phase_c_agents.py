@@ -113,12 +113,13 @@ def test_attempt_record_validation() -> None:
 
 def test_load_arms_yaml_parses_fixture() -> None:
     arms = load_arms_yaml(ARMS_FIXTURE)
-    assert len(arms) == 6
+    assert len(arms) == 7
     ids = {arm.id for arm in arms}
     assert ids == {
         "ollama_qwen3_coder_30b",
         "ollama_qwen25_coder_32b",
         "ollama_deepseek_coder_v2_lite",
+        "ollama_devstral",
         "claude_code",
         "codex",
         "gemini",
