@@ -35,7 +35,11 @@ from earnbench.audit import AuditRecord
 from earnbench.classification import PerturbationOutcome
 from earnbench.metrics import compute_earned_fraction
 from earnbench.outcomes import NominalOutcome, OutcomeStatus, PerturbationResult
-from earnbench.phase_a_batch import PhaseABatchConfig, run_phase_a_batch
+from earnbench.phase_a_batch import (
+    PhaseABatchConfig,
+    resolve_batch_paths,
+    run_phase_a_batch,
+)
 from earnbench.provenance import Provenance, build_provenance
 from earnbench.registry import RegistryError
 from earnbench.registry import get as get_perturbation
@@ -664,11 +668,20 @@ def cmd_phase_a_schedule(args: argparse.Namespace) -> None:
 def cmd_phase_a_run(args: argparse.Namespace) -> None:
     """Run Phase A golden validation batch experiment (sequential π per instance)."""
     manifest_path = Path(args.manifest)
-    metadata_path = Path(args.metadata_parquet)
-    output_dir = Path(args.output)
 
     if not manifest_path.is_file():
         raise CLIError(f"--manifest file not found: {manifest_path}")
+
+    try:
+        metadata_path, output_dir = resolve_batch_paths(
+            manifest_path,
+            metadata_parquet=Path(args.metadata_parquet)
+            if args.metadata_parquet
+            else None,
+            output_dir=Path(args.output) if args.output else None,
+        )
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
 
     suffix = metadata_path.suffix.lower()
     if suffix not in {".parquet", ".json"}:
@@ -1093,13 +1106,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     phase_a_run_parser.add_argument(
         "--metadata-parquet",
-        required=True,
-        help="Path to SWE-bench Verified metadata (.parquet or test .json fixture)",
+        default="",
+        help=(
+            "SWE-bench Verified metadata (.parquet or .json). "
+            "Default: manifest metadata_parquet, "
+            "$EARNBENCH_METADATA_PARQUET, or ../paper/vendor/swe_verified_test.parquet"
+        ),
     )
     phase_a_run_parser.add_argument(
         "--output",
-        required=True,
-        help="Batch output directory (instance trees, reports/, summary.csv, …)",
+        default="",
+        help="Batch output directory (default: phase_a/ or manifest output field)",
     )
     add_swebench_performance_arguments(phase_a_run_parser)
     phase_a_run_parser.add_argument(

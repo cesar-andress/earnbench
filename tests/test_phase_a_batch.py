@@ -11,9 +11,12 @@ from unittest.mock import patch
 from earnbench.adapters.swebench_config import SWEBenchRunConfig
 from earnbench.phase_a_batch import (
     BATCH_PI_ORDER,
+    DEFAULT_BATCH_OUTPUT_DIR,
     PhaseABatchConfig,
     build_statistics,
     load_pilot_manifest,
+    parse_batch_manifest,
+    resolve_batch_paths,
     run_phase_a_batch,
     write_ef_distribution_csv,
 )
@@ -71,6 +74,63 @@ def test_load_pilot_manifest_is_sorted() -> None:
     rows = load_pilot_manifest(MANIFEST_FIXTURE)
     assert len(rows) == 1
     assert rows[0]["instance_id"] == INSTANCE_ID
+
+
+def test_parse_batch_manifest_wrapped_object(tmp_path: Path) -> None:
+    manifest = tmp_path / "pilot.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "metadata_parquet": str(METADATA_FIXTURE),
+                "output": "batch_out",
+                "instances": [{"instance_id": INSTANCE_ID, "repo": "psf/requests"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    rows, meta = parse_batch_manifest(manifest)
+    assert rows[0]["instance_id"] == INSTANCE_ID
+    assert meta["metadata_parquet"] == str(METADATA_FIXTURE)
+    assert meta["output"] == "batch_out"
+
+
+def test_resolve_batch_paths_defaults(tmp_path: Path, monkeypatch) -> None:
+    manifest = tmp_path / "pilot.json"
+    manifest.write_text(
+        json.dumps([{"instance_id": INSTANCE_ID}]),
+        encoding="utf-8",
+    )
+    metadata = tmp_path / "meta.json"
+    metadata.write_text(METADATA_FIXTURE.read_text(encoding="utf-8"), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    resolved_metadata, resolved_output = resolve_batch_paths(
+        manifest,
+        metadata_parquet=metadata,
+    )
+    assert resolved_metadata == metadata.resolve()
+    assert resolved_output == (tmp_path / DEFAULT_BATCH_OUTPUT_DIR).resolve()
+
+
+def test_resolve_batch_paths_from_manifest_fields(tmp_path: Path) -> None:
+    metadata = tmp_path / "meta.json"
+    metadata.write_text(METADATA_FIXTURE.read_text(encoding="utf-8"), encoding="utf-8")
+    out_dir = tmp_path / "custom_out"
+    manifest = tmp_path / "pilot.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "metadata_parquet": metadata.name,
+                "output_dir": out_dir.name,
+                "pilot": [{"instance_id": INSTANCE_ID}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    resolved_metadata, resolved_output = resolve_batch_paths(manifest)
+    assert resolved_metadata == metadata.resolve()
+    assert resolved_output == out_dir.resolve()
 
 
 def test_build_statistics_and_ef_distribution(tmp_path: Path) -> None:
@@ -187,4 +247,47 @@ def test_cli_phase_a_run(capsys, tmp_path: Path) -> None:
     mock_run.assert_called_once()
     config = mock_run.call_args.args[0]
     assert config.resume is True
+    assert config.workers == 12
+
+
+def test_cli_phase_a_run_manifest_only(capsys, tmp_path: Path, monkeypatch) -> None:
+    from earnbench.cli import main
+
+    manifest = tmp_path / "pilot.json"
+    manifest.write_text(MANIFEST_FIXTURE.read_text(encoding="utf-8"), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    with (
+        patch("earnbench.cli.run_phase_a_batch") as mock_run,
+        patch("earnbench.cli.print_swebench_execution_summary"),
+        patch(
+            "earnbench.cli.resolve_batch_paths",
+            return_value=(METADATA_FIXTURE.resolve(), tmp_path / "phase_a"),
+        ),
+    ):
+        mock_run.return_value = {
+            "run_id": "phase_a_phase_a",
+            "instance_count": 1,
+            "completed_instances": 1,
+            "failed_instances": 0,
+            "skipped_instances": 0,
+            "interrupted": False,
+            "summary_csv": str(tmp_path / "phase_a" / "summary.csv"),
+        }
+        exit_code = main(
+            [
+                "phase-a",
+                "run",
+                "--manifest",
+                str(manifest),
+                "--workers",
+                "12",
+                "--no-build",
+            ]
+        )
+
+    assert exit_code == 0
+    config = mock_run.call_args.args[0]
+    assert config.metadata_path == METADATA_FIXTURE.resolve()
+    assert config.output_dir == (tmp_path / "phase_a").resolve()
     assert config.workers == 12

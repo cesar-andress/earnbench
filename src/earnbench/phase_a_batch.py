@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 import logging
+import os
 import shutil
 import signal
 import sys
@@ -64,6 +65,13 @@ FAILURE_COLUMNS = ("instance_id", "stage", "error", "timestamp_utc")
 
 BATCH_PI_ORDER = (PI_VERIF_V1_ID, PI_VTEST_V1_ID, PI_ENV_V1_ID)
 PREPARE_STAGES = ("prepare", "preflight", "nominal")
+DEFAULT_BATCH_OUTPUT_DIR = Path("phase_a")
+METADATA_ENV_VAR = "EARNBENCH_METADATA_PARQUET"
+DEFAULT_METADATA_CANDIDATES = (
+    "../paper/vendor/swe_verified_test.parquet",
+    "../vendor/swe_verified_test.parquet",
+    "vendor/swe_verified_test.parquet",
+)
 
 logger = logging.getLogger("earnbench.phase_a_batch")
 
@@ -133,25 +141,133 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     )
 
 
-def load_pilot_manifest(path: Path) -> list[dict[str, Any]]:
-    """Load and return pilot rows sorted deterministically by instance_id."""
-    if not path.is_file():
-        msg = f"manifest not found: {path}"
-        raise FileNotFoundError(msg)
-    payload = json.loads(path.read_text(encoding="utf-8"))
+def _resolve_relative(path: Path, *, base_dir: Path) -> Path:
+    if path.is_absolute():
+        return path
+    return (base_dir / path).resolve()
+
+
+def _coerce_instance_rows(payload: Any, *, context: str) -> list[dict[str, Any]]:
     if not isinstance(payload, list):
-        msg = "manifest must be a JSON array of instance rows"
+        msg = f"{context} must be a JSON array of instance rows"
         raise ValueError(msg)
     rows: list[dict[str, Any]] = []
     for index, item in enumerate(payload):
         if not isinstance(item, dict):
-            msg = f"manifest[{index}] must be an object"
+            msg = f"{context}[{index}] must be an object"
             raise ValueError(msg)
         if "instance_id" not in item:
-            msg = f"manifest[{index}] missing instance_id"
+            msg = f"{context}[{index}] missing instance_id"
             raise ValueError(msg)
         rows.append(item)
     return sorted(rows, key=lambda row: str(row["instance_id"]))
+
+
+def parse_batch_manifest(path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Load pilot rows and optional batch-level paths from a manifest file."""
+    if not path.is_file():
+        msg = f"manifest not found: {path}"
+        raise FileNotFoundError(msg)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(payload, list):
+        return _coerce_instance_rows(payload, context="manifest"), {}
+    if not isinstance(payload, dict):
+        msg = "manifest must be a JSON array or object with an instances list"
+        raise ValueError(msg)
+
+    rows_raw = None
+    for key in ("instances", "pilot_instances", "pilot"):
+        candidate = payload.get(key)
+        if isinstance(candidate, list):
+            rows_raw = candidate
+            break
+    if rows_raw is None:
+        msg = "manifest object must include instances, pilot_instances, or pilot"
+        raise ValueError(msg)
+
+    meta = {
+        key: payload[key]
+        for key in (
+            "metadata_parquet",
+            "metadata_path",
+            "output",
+            "output_dir",
+            "run_id",
+            "dataset_revision",
+        )
+        if key in payload
+    }
+    return _coerce_instance_rows(rows_raw, context="manifest.instances"), meta
+
+
+def load_pilot_manifest(path: Path) -> list[dict[str, Any]]:
+    """Load and return pilot rows sorted deterministically by instance_id."""
+    rows, _meta = parse_batch_manifest(path)
+    return rows
+
+
+def resolve_batch_paths(
+    manifest_path: Path,
+    *,
+    metadata_parquet: Path | None = None,
+    output_dir: Path | None = None,
+) -> tuple[Path, Path]:
+    """Resolve metadata and output directories for a batch run."""
+    manifest_path = manifest_path.resolve()
+    _rows, meta = parse_batch_manifest(manifest_path)
+    base_dir = manifest_path.parent
+
+    resolved_output = output_dir
+    if resolved_output is None:
+        output_raw = meta.get("output_dir") or meta.get("output") or DEFAULT_BATCH_OUTPUT_DIR
+        resolved_output = Path(str(output_raw))
+        if not resolved_output.is_absolute():
+            resolved_output = _resolve_relative(resolved_output, base_dir=base_dir)
+    elif not resolved_output.is_absolute():
+        resolved_output = (Path.cwd() / resolved_output).resolve()
+
+    if metadata_parquet is not None:
+        resolved_metadata = _resolve_relative(metadata_parquet, base_dir=base_dir)
+        if not resolved_metadata.is_file():
+            msg = f"--metadata-parquet file not found: {resolved_metadata}"
+            raise FileNotFoundError(msg)
+        return resolved_metadata, resolved_output
+
+    manifest_metadata = meta.get("metadata_parquet") or meta.get("metadata_path")
+    if manifest_metadata:
+        resolved_metadata = _resolve_relative(
+            Path(str(manifest_metadata)), base_dir=base_dir
+        )
+        if not resolved_metadata.is_file():
+            msg = f"manifest metadata file not found: {resolved_metadata}"
+            raise FileNotFoundError(msg)
+        return resolved_metadata, resolved_output
+
+    env_metadata = os.environ.get(METADATA_ENV_VAR, "").strip()
+    if env_metadata:
+        resolved_metadata = _resolve_relative(Path(env_metadata), base_dir=base_dir)
+        if resolved_metadata.is_file():
+            return resolved_metadata, resolved_output
+
+    for candidate in DEFAULT_METADATA_CANDIDATES:
+        resolved_metadata = _resolve_relative(Path(candidate), base_dir=base_dir)
+        if resolved_metadata.is_file():
+            return resolved_metadata, resolved_output
+
+    searched = [
+        *( [str(manifest_metadata)] if manifest_metadata else [] ),
+        *( [env_metadata] if env_metadata else [] ),
+        *[
+            str(_resolve_relative(Path(candidate), base_dir=base_dir))
+            for candidate in DEFAULT_METADATA_CANDIDATES
+        ],
+    ]
+    msg = (
+        "could not resolve SWE-bench metadata path; pass --metadata-parquet, set "
+        f"{METADATA_ENV_VAR}, or add metadata_parquet to the manifest. Tried: "
+        + ", ".join(searched)
+    )
+    raise FileNotFoundError(msg)
 
 
 def instance_log_path(output_dir: Path, instance_id: str) -> Path:
@@ -634,9 +750,13 @@ def run_phase_a_batch(config: PhaseABatchConfig) -> dict[str, Any]:
 
 __all__ = [
     "BATCH_PI_ORDER",
+    "DEFAULT_BATCH_OUTPUT_DIR",
+    "METADATA_ENV_VAR",
     "PhaseABatchConfig",
     "build_statistics",
     "load_pilot_manifest",
+    "parse_batch_manifest",
+    "resolve_batch_paths",
     "run_instance_batch_pipeline",
     "run_phase_a_batch",
 ]
