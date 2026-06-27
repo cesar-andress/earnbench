@@ -13,6 +13,7 @@ from earnbench.adapters.base import AdapterConfig
 from earnbench.adapters.swebench import build_pi_verif_prepare_bundle
 from earnbench.adapters.swebench_config import (
     SWEBenchRunConfig,
+    instance_workspace_root,
     prepare_swebench_workdir,
 )
 from earnbench.adapters.swebench_metadata import (
@@ -307,7 +308,10 @@ def run_pi_verif_grading(
                     output_dir=output_dir,
                 )
 
-        work_cwd = prepare_swebench_workdir(output_dir, run_config)
+        work_cwd = prepare_swebench_workdir(
+            instance_workspace_root(output_dir, instance_id),
+            run_config,
+        )
         original_cwd = os.getcwd()
         os.chdir(work_cwd)
         try:

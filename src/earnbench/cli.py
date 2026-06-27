@@ -32,6 +32,11 @@ from earnbench.registry import RegistryError
 from earnbench.registry import get as get_perturbation
 from earnbench.registry import list as list_perturbations
 from earnbench.registry import validate as validate_registry
+from earnbench.scheduler import (
+    PhaseASchedulerConfig,
+    configure_structured_logging,
+    run_phase_a_scheduler,
+)
 
 
 class CLIError(Exception):
@@ -433,6 +438,63 @@ def cmd_swebench_run_pi_verif(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_phase_a(args: argparse.Namespace) -> None:
+    """Run Phase A golden validation with parallel instance and π scheduling."""
+    metadata_path = Path(args.metadata_parquet)
+    output_dir = Path(args.output)
+    suffix = metadata_path.suffix.lower()
+    if suffix not in {".parquet", ".json"}:
+        raise CLIError(
+            f"--metadata-parquet must be a .parquet or .json file, got: {metadata_path}"
+        )
+
+    instance_ids: tuple[str, ...] | None = None
+    if args.instances:
+        instance_ids = tuple(
+            sorted({item.strip() for item in args.instances.split(",") if item.strip()})
+        )
+        if not instance_ids:
+            raise CLIError("--instances must list at least one instance id")
+
+    try:
+        run_config = resolve_swebench_run_config_from_args(args)
+    except (FileNotFoundError, ValueError) as exc:
+        raise CLIError(str(exc)) from exc
+
+    configure_structured_logging(verbose=not args.quiet)
+    print_swebench_execution_summary(
+        command="phase-a",
+        config=run_config,
+        output_dir=output_dir,
+        instance_count=len(instance_ids) if instance_ids else 0,
+    )
+
+    config = PhaseASchedulerConfig(
+        metadata_path=metadata_path,
+        output_dir=output_dir,
+        instance_ids=instance_ids or (),
+        workers=args.workers if args.workers is not None else run_config.workers,
+        parallel_perturbations=args.parallel_perturbations,
+        resume=args.resume,
+        retry_failed=args.retry_failed,
+        run_config=run_config,
+        run_id=args.run_id or f"phase_a_{output_dir.name}",
+        dataset_revision=args.dataset_revision,
+        build_missing_images=args.build_missing_images,
+    )
+
+    try:
+        summary = run_phase_a_scheduler(config)
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(summary, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
 def cmd_registry_validate(args: argparse.Namespace) -> None:
     """Validate registry manifest against built-in specs."""
     del args
@@ -665,6 +727,66 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write artifacts only; do not print grade.json to stdout",
     )
 
+    phase_a_parser = subparsers.add_parser(
+        "phase-a",
+        help="Run Phase A golden validation batch (parallel scheduler)",
+    )
+    phase_a_parser.add_argument(
+        "--metadata-parquet",
+        required=True,
+        help="Path to SWE-bench Verified metadata (.parquet or test .json fixture)",
+    )
+    phase_a_parser.add_argument(
+        "--output",
+        required=True,
+        help="Batch output directory for Phase A artifacts and golden_validation.csv",
+    )
+    phase_a_parser.add_argument(
+        "--instances",
+        default="",
+        help=(
+            "Comma-separated instance ids "
+            "(required for parquet; optional for json fixtures)"
+        ),
+    )
+    phase_a_parser.add_argument(
+        "--parallel-perturbations",
+        type=int,
+        default=3,
+        help="Max concurrent π perturbation workers per instance (default: 3)",
+    )
+    phase_a_parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Skip completed jobs recorded in phase_a_scheduler_state.json",
+    )
+    phase_a_parser.add_argument(
+        "--retry-failed",
+        action="store_true",
+        help="With --resume, re-run jobs previously marked failed",
+    )
+    phase_a_parser.add_argument(
+        "--run-id",
+        default="",
+        help="Batch run identifier stored in meta.json and golden_validation.csv",
+    )
+    phase_a_parser.add_argument(
+        "--dataset-revision",
+        default="unpinned",
+        help="Dataset revision label stored in adapter config digest inputs",
+    )
+    phase_a_parser.add_argument(
+        "--build-missing-images",
+        action="store_true",
+        help="Build missing SWE-bench harness images during preflight",
+    )
+    add_swebench_performance_arguments(phase_a_parser)
+    phase_a_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Structured logs only; do not print scheduler summary JSON to stdout",
+    )
+
     return parser
 
 
@@ -699,6 +821,8 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_swebench_run_pi_verif(args)
             else:
                 parser.error(f"unknown swebench command: {args.swebench_command}")
+        elif args.command == "phase-a":
+            cmd_phase_a(args)
         else:
             parser.error(f"unknown command: {args.command}")
     except CLIError as exc:

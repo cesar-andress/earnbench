@@ -12,6 +12,7 @@ from typing import Any
 
 from earnbench.adapters.swebench_config import (
     SWEBenchRunConfig,
+    instance_workspace_root,
     prepare_swebench_workdir,
 )
 from earnbench.adapters.swebench_metadata import (
@@ -376,7 +377,10 @@ def run_nominal_grading(
                 output_dir=output_dir,
             )
 
-    work_cwd = prepare_swebench_workdir(output_dir, run_config)
+    work_cwd = prepare_swebench_workdir(
+        instance_workspace_root(output_dir, instance_id),
+        run_config,
+    )
     original_cwd = os.getcwd()
     os.chdir(work_cwd)
     try:

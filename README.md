@@ -164,6 +164,22 @@ earnbench swebench run-pi-verif \
   --output /tmp/earnbench_smoke
 ```
 
+**Phase A batch scheduler** (parallel instances and π perturbations):
+
+```bash
+earnbench phase-a \
+  --metadata-parquet path/to/swe_verified_test.parquet \
+  --instances django__django-13279,psf__requests-1724 \
+  --output /tmp/phase_a_batch \
+  --workers 8 \
+  --parallel-perturbations 3 \
+  --max-parallel-containers 6 \
+  --build-missing-images \
+  --resume
+```
+
+Per instance the protocol order is unchanged: **nominal → (π_verif ∥ π_env ∥ π_vtest) → audit/EF/report**, then the batch writes `golden_validation.csv` and `phase_a_scheduler_state.json` for resume. Use `--retry-failed` with `--resume` to re-run failed jobs. π executors other than `pi_verif.v1` record `status=missing` until implemented.
+
 **Performance settings**
 
 Defaults (when flags are omitted) use **`min(cpu_count(), 12)`** for
@@ -187,7 +203,7 @@ Override any of them explicitly or via JSON config:
 | `--max-parallel-builds` | Cap on concurrent harness Docker image builds (`preflight`) |
 | `--reuse-images` / `--no-reuse-images` | Reuse local images vs force rebuild |
 | `--no-build` | Never build images during preflight |
-| `--cache-dir` | Persistent harness build logs (default `<output>/.swebench_cache`) |
+| `--cache-dir` | Persistent harness build logs (default `<output>/<instance_id>/.swebench_cache`) |
 | `--timeout-seconds` | Per-instance harness timeout (default **1800**) |
 | `--config` | JSON file with any of the above |
 

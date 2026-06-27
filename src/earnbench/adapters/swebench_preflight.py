@@ -13,6 +13,7 @@ from typing import Any
 
 from earnbench.adapters.swebench_config import (
     SWEBenchRunConfig,
+    instance_workspace_root,
     prepare_swebench_workdir,
 )
 from earnbench.adapters.swebench_metadata import (
@@ -336,10 +337,14 @@ def run_swebench_preflight(
         cache_dir=None,
         timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
     )
-    prepare_swebench_workdir(output_dir, run_config)
+    prepare_swebench_workdir(
+        instance_workspace_root(output_dir, instance_id),
+        run_config,
+    )
     parallel = run_config.parallelism_summary(instance_count=1)
+    workspace = instance_workspace_root(output_dir, instance_id)
     performance = {
-        **describe_image_cache_status(run_config, output_dir),
+        **describe_image_cache_status(run_config, workspace),
         **parallel,
         "timeout_seconds": run_config.timeout_seconds,
     }
@@ -349,7 +354,7 @@ def run_swebench_preflight(
     instance_dir = output_dir / instance_id
     instance_dir.mkdir(parents=True, exist_ok=True)
     log_lines: list[str] = [
-        f"cache_dir={effective_cache_dir(run_config, output_dir)}",
+        f"cache_dir={effective_cache_dir(run_config, workspace)}",
         f"workers={parallel['workers']} "
         f"max_parallel_builds={parallel['max_parallel_builds']} "
         f"effective_build_workers={parallel['effective_build_workers']}",

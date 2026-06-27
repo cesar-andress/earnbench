@@ -202,19 +202,25 @@ def resolve_swebench_run_config_from_args(args: Any) -> SWEBenchRunConfig:
     )
 
 
-def effective_cache_dir(config: SWEBenchRunConfig, output_dir: Path) -> Path:
+def effective_cache_dir(config: SWEBenchRunConfig, workspace_root: Path) -> Path:
     """Return the directory used for persistent harness build artifacts."""
     if config.cache_dir is not None:
         return config.cache_dir
-    return output_dir / ".swebench_cache"
+    return workspace_root / ".swebench_cache"
 
 
-def prepare_swebench_workdir(output_dir: Path, config: SWEBenchRunConfig) -> Path:
+def instance_workspace_root(output_dir: Path, instance_id: str) -> Path:
+    """Return the isolated workspace root for one SWE-bench instance."""
+    return output_dir / instance_id
+
+
+def prepare_swebench_workdir(workspace_root: Path, config: SWEBenchRunConfig) -> Path:
     """Create work cwd and link harness ``logs/`` into the cache directory."""
-    work_cwd = output_dir / ".swebench_work"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    work_cwd = workspace_root / ".swebench_work"
     work_cwd.mkdir(parents=True, exist_ok=True)
 
-    cache_root = effective_cache_dir(config, output_dir)
+    cache_root = effective_cache_dir(config, workspace_root)
     cache_root.mkdir(parents=True, exist_ok=True)
     cache_logs = cache_root / "logs"
     cache_logs.mkdir(parents=True, exist_ok=True)
@@ -236,10 +242,10 @@ def prepare_swebench_workdir(output_dir: Path, config: SWEBenchRunConfig) -> Pat
 
 def describe_image_cache_status(
     config: SWEBenchRunConfig,
-    output_dir: Path,
+    workspace_root: Path,
 ) -> dict[str, Any]:
     """Summarize cache directory presence for operator logs."""
-    cache_path = effective_cache_dir(config, output_dir)
+    cache_path = effective_cache_dir(config, workspace_root)
     logs_path = cache_path / "logs"
     build_images_path = logs_path / "build_images"
     return {
@@ -360,6 +366,7 @@ __all__ = [
     "default_workers",
     "describe_image_cache_status",
     "effective_cache_dir",
+    "instance_workspace_root",
     "load_swebench_config_file",
     "prepare_swebench_workdir",
     "print_swebench_execution_summary",
