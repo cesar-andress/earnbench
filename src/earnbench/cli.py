@@ -19,6 +19,7 @@ from earnbench.adapters.swebench_nominal import (
     HarnessNotInstalledError,
     run_nominal_grading,
 )
+from earnbench.adapters.swebench_pi_verif import run_pi_verif_grading
 from earnbench.adapters.swebench_preflight import (
     MissingDockerImagesError,
     run_swebench_preflight,
@@ -379,6 +380,59 @@ def cmd_swebench_run_nominal(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_swebench_run_pi_verif(args: argparse.Namespace) -> None:
+    """Run pi_verif.v1 SWE-bench grading for one instance."""
+    metadata_path = Path(args.metadata_parquet)
+    patch_path = Path(args.patch)
+    output_dir = Path(args.output)
+    suffix = metadata_path.suffix.lower()
+    if suffix not in {".parquet", ".json"}:
+        raise CLIError(
+            f"--metadata-parquet must be a .parquet or .json file, got: {metadata_path}"
+        )
+    if not patch_path.is_file():
+        raise CLIError(f"--patch file not found: {patch_path}")
+
+    try:
+        run_config = resolve_swebench_run_config_from_args(args)
+    except (FileNotFoundError, ValueError) as exc:
+        raise CLIError(str(exc)) from exc
+
+    print_swebench_execution_summary(
+        command="run-pi-verif",
+        config=run_config,
+        output_dir=output_dir,
+        instance_count=1,
+    )
+
+    try:
+        grade = run_pi_verif_grading(
+            metadata_path=metadata_path,
+            instance_id=args.instance_id,
+            patch_path=patch_path,
+            output_dir=output_dir,
+            timeout_seconds=run_config.timeout_seconds,
+            run_id=args.run_id or None,
+            config=run_config,
+        )
+    except MetadataLoadError as exc:
+        raise CLIError(str(exc)) from exc
+    except HarnessNotInstalledError as exc:
+        raise CLIError(str(exc)) from exc
+    except MissingDockerImagesError as exc:
+        raise CLIError(str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(grade, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
 def cmd_registry_validate(args: argparse.Namespace) -> None:
     """Validate registry manifest against built-in specs."""
     del args
@@ -575,6 +629,41 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write artifacts only; do not print grade.json to stdout",
     )
+    run_pi_verif_parser = swebench_subparsers.add_parser(
+        "run-pi-verif",
+        help="Run pi_verif.v1 SWE-bench grading (pristine trusted verifier)",
+    )
+    run_pi_verif_parser.add_argument(
+        "--metadata-parquet",
+        required=True,
+        help="Path to SWE-bench Verified metadata (.parquet or test .json fixture)",
+    )
+    run_pi_verif_parser.add_argument(
+        "--instance-id",
+        required=True,
+        help="SWE-bench instance id (e.g. psf__requests-1724)",
+    )
+    run_pi_verif_parser.add_argument(
+        "--patch",
+        required=True,
+        help="Path to prod-only unified-diff patch file",
+    )
+    run_pi_verif_parser.add_argument(
+        "--output",
+        required=True,
+        help="Output directory for pi_verif.v1 grading artifacts",
+    )
+    add_swebench_performance_arguments(run_pi_verif_parser)
+    run_pi_verif_parser.add_argument(
+        "--run-id",
+        default="",
+        help="Optional SWE-bench harness run id (default: pi_verif_<instance_id>)",
+    )
+    run_pi_verif_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write artifacts only; do not print grade.json to stdout",
+    )
 
     return parser
 
@@ -606,6 +695,8 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_swebench_preflight(args)
             elif args.swebench_command == "run-nominal":
                 cmd_swebench_run_nominal(args)
+            elif args.swebench_command == "run-pi-verif":
+                cmd_swebench_run_pi_verif(args)
             else:
                 parser.error(f"unknown swebench command: {args.swebench_command}")
         else:

@@ -49,6 +49,22 @@ def _run_nominal_argv(*extra: str) -> list[str]:
     return base + list(extra)
 
 
+def _run_pi_verif_argv(*extra: str) -> list[str]:
+    base = [
+        "swebench",
+        "run-pi-verif",
+        "--metadata-parquet",
+        str(METADATA),
+        "--instance-id",
+        "psf__requests-1724",
+        "--patch",
+        "/tmp/prod_only.patch",
+        "--output",
+        "/tmp/out",
+    ]
+    return base + list(extra)
+
+
 def test_preflight_parses_performance_flags() -> None:
     parser = build_parser()
     args = parser.parse_args(
@@ -90,6 +106,25 @@ def test_run_nominal_parses_performance_flags() -> None:
     assert args.no_build is False
     assert args.cache_dir == Path("/data/swebench")
     assert args.timeout_seconds is None
+
+
+def test_run_pi_verif_parses_performance_flags() -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        _run_pi_verif_argv(
+            "--workers",
+            "1",
+            "--timeout-seconds",
+            "1800",
+            "--cache-dir",
+            "/tmp/cache",
+        )
+    )
+
+    assert args.swebench_command == "run-pi-verif"
+    assert args.workers == 1
+    assert args.timeout_seconds == 1800
+    assert args.cache_dir == Path("/tmp/cache")
 
 
 def test_resolve_config_uses_json_defaults(tmp_path: Path) -> None:

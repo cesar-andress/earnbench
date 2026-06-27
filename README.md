@@ -157,6 +157,14 @@ earnbench swebench run-nominal \
   --patch /tmp/earnbench_smoke/psf__requests-1724/patch/prod_only.patch \
   --output /tmp/earnbench_smoke \
   --workers 1
+
+# 4. Pristine trusted verifier (pi_verif.v1) on the same prod-only patch
+earnbench swebench run-pi-verif \
+  --metadata-parquet path/to/swe_verified_test.parquet \
+  --instance-id psf__requests-1724 \
+  --patch /tmp/earnbench_smoke/psf__requests-1724/patch/prod_only.patch \
+  --output /tmp/earnbench_smoke \
+  --workers 1
 ```
 
 Optional JSON config (defaults for `--timeout-seconds`, `--workers`, cache):
@@ -215,6 +223,12 @@ Writes under `<output>/<instance_id>/nominal/`:
 - `grade.json` — harness outcome summary
 - `harness.log` — captured harness output
 - `audit.json` — `AuditRecord` with `perturbation_id: nominal.v1`
+
+`run-pi-verif` writes the same layout under `<output>/<instance_id>/pi_verif.v1/`.
+If the patch modifies protected verifier paths, grading is skipped: `audit.json`
+records `status: ok`, `success: false`, and a tamper warning (expected for raw
+golden patches that still contain test hunks). Use the prod-only patch from
+`prepare-smoke` for the smoke pass case.
 
 If the SWE-bench harness is not installed, the command exits with an actionable
 error pointing to `pip install -e ".[swebench]"`.
