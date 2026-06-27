@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+title: EarnBench
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - name: EarnBench contributors
+license: MIT
+repository-code: "https://github.com/earnbench/earnbench"
+version: 0.1.0
+date-released: 2026-06-27
+keywords:
+  - software engineering agents
+  - benchmark integrity
+  - reward hacking
+  - counterfactual evaluation
+  - earned fraction
+abstract: >-
+  Executable counterfactual measurement framework for estimating how much of an
+  AI software-engineering agent's success is earned rather than supported by
+  exploitable evaluation channels.
