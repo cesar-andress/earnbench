@@ -161,9 +161,7 @@ class AuditRecord:
         success = data.get("success")
         outcome_raw = data.get("outcome")
         outcome = (
-            PerturbationOutcome(str(outcome_raw))
-            if outcome_raw is not None
-            else None
+            PerturbationOutcome(str(outcome_raw)) if outcome_raw is not None else None
         )
         default_version = _default_earnbench_version()
         provenance_raw = data.get("provenance")

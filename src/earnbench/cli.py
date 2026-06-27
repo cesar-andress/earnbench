@@ -42,6 +42,11 @@ from earnbench.phase_a_batch import (
     resolve_batch_paths,
     run_phase_a_batch,
 )
+from earnbench.phase_b_batch import (
+    PhaseBBatchConfig,
+    resolve_metadata_path,
+    run_phase_b_batch,
+)
 from earnbench.provenance import Provenance, build_provenance
 from earnbench.registry import RegistryError
 from earnbench.registry import get as get_perturbation
@@ -728,6 +733,68 @@ def cmd_phase_a_run(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_phase_b_run(args: argparse.Namespace) -> None:
+    """Run Phase B planted exploit batch experiment."""
+    exploit_dir = Path(args.exploit_dir)
+    if not exploit_dir.is_dir():
+        raise CLIError(f"--exploit-dir not found: {exploit_dir}")
+
+    try:
+        metadata_path = resolve_metadata_path(
+            Path(args.metadata_parquet) if args.metadata_parquet else None,
+        )
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
+
+    output_dir = (
+        Path(args.output).resolve()
+        if args.output
+        else (Path.cwd() / "phase_b").resolve()
+    )
+
+    suffix = metadata_path.suffix.lower()
+    if suffix not in {".parquet", ".json"}:
+        raise CLIError(
+            f"--metadata-parquet must be a .parquet or .json file, got: {metadata_path}"
+        )
+
+    try:
+        run_config = resolve_swebench_run_config_from_args(args)
+    except (FileNotFoundError, ValueError) as exc:
+        raise CLIError(str(exc)) from exc
+
+    configure_structured_logging(verbose=not args.quiet)
+    print_swebench_execution_summary(
+        command="phase-b run",
+        config=run_config,
+        output_dir=output_dir,
+        instance_count=0,
+    )
+
+    config = PhaseBBatchConfig(
+        exploit_dir=exploit_dir.resolve(),
+        metadata_path=metadata_path,
+        output_dir=output_dir,
+        workers=args.workers if args.workers is not None else run_config.workers,
+        resume=args.resume,
+        run_config=run_config,
+        run_id=args.run_id or f"phase_b_{output_dir.name}",
+        dataset_revision=args.dataset_revision,
+        build_missing_images=args.build_missing_images,
+    )
+
+    try:
+        summary = run_phase_b_batch(config)
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(summary, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
 def cmd_registry_validate(args: argparse.Namespace) -> None:
     """Validate registry manifest against built-in specs."""
     del args
@@ -1283,6 +1350,64 @@ def build_parser() -> argparse.ArgumentParser:
         help="Structured logs only; do not print scheduler summary JSON to stdout",
     )
 
+    phase_b_parser = subparsers.add_parser(
+        "phase-b",
+        help="Phase B planted exploit criterion battery",
+    )
+    phase_b_subparsers = phase_b_parser.add_subparsers(
+        dest="phase_b_command",
+        required=True,
+    )
+
+    phase_b_run_parser = phase_b_subparsers.add_parser(
+        "run",
+        help="Run Phase B exploit batch (nominal → π sequential → EF)",
+    )
+    phase_b_run_parser.add_argument(
+        "--exploit-dir",
+        required=True,
+        help="Directory containing exploit YAML specs and patches/ subdirectory",
+    )
+    phase_b_run_parser.add_argument(
+        "--metadata-parquet",
+        default="",
+        help=(
+            "SWE-bench Verified metadata (.parquet or .json). "
+            "Default: $EARNBENCH_METADATA_PARQUET or ../paper/vendor/swe_verified_test.parquet"
+        ),
+    )
+    phase_b_run_parser.add_argument(
+        "--output",
+        default="",
+        help="Batch output directory (default: phase_b/)",
+    )
+    add_swebench_performance_arguments(phase_b_run_parser)
+    phase_b_run_parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Skip completed exploits and stages recorded on disk",
+    )
+    phase_b_run_parser.add_argument(
+        "--run-id",
+        default="",
+        help="Batch run identifier stored in run_manifest.json and summary.csv",
+    )
+    phase_b_run_parser.add_argument(
+        "--dataset-revision",
+        default="unpinned",
+        help="Dataset revision label stored in adapter config digest inputs",
+    )
+    phase_b_run_parser.add_argument(
+        "--build-missing-images",
+        action="store_true",
+        help="Build missing SWE-bench harness images during preflight",
+    )
+    phase_b_run_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Progress on stderr only; do not print batch summary JSON to stdout",
+    )
+
     return parser
 
 
@@ -1339,6 +1464,11 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_phase_a_schedule(args)
             else:
                 parser.error(f"unknown phase-a command: {args.phase_a_command}")
+        elif args.command == "phase-b":
+            if args.phase_b_command == "run":
+                cmd_phase_b_run(args)
+            else:
+                parser.error(f"unknown phase-b command: {args.phase_b_command}")
         else:
             parser.error(f"unknown command: {args.command}")
     except CLIError as exc:

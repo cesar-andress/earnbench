@@ -118,9 +118,7 @@ class PerturbationResult:
         channel: str = "",
         message: str = "",
     ) -> PerturbationResult:
-        outcome = (
-            PerturbationOutcome.SUCCESS if success else PerturbationOutcome.FAIL
-        )
+        outcome = PerturbationOutcome.SUCCESS if success else PerturbationOutcome.FAIL
         return cls(
             perturbation_id=perturbation_id,
             outcome=outcome,

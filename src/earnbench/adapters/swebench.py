@@ -33,6 +33,7 @@ from earnbench.adapters.swebench_patch import (
     DEFAULT_PROTECTED_GLOBS,
     ProdPatchResult,
     extract_prod_patch,
+    sha256_hex,
     validate_protected_path_stripping,
 )
 from earnbench.registry.pi_verif_v1 import PI_VERIF_V1_ID
@@ -290,6 +291,106 @@ def prepare_smoke(
     _write_json(instance_dir / "meta.json", meta)
     _write_json(instance_dir / "plan.json", plan)
 
+    return plan
+
+
+def prepare_exploit(
+    *,
+    metadata_path: Path,
+    instance_id: str,
+    exploit_id: str,
+    patch_content: str,
+    output_dir: Path,
+    run_id: str | None = None,
+    dataset_revision: str = "unpinned",
+    patch_class: str = "exploit_planted",
+    y0_policy: str = "prod_only",
+    channel: str = "",
+    family: str = "",
+    template_id: str = "",
+    predicted_fail_pi: str = "",
+) -> dict[str, Any]:
+    """Prepare exploit-run artifacts without executing Docker.
+
+    Writes ``<output>/<instance_id>/`` with exploit patch files, ``meta.json``,
+    and ``plan.json`` mirroring ``prepare_smoke`` layout.
+    """
+    record = load_verified_instance(metadata_path, instance_id)
+    prod_result = extract_prod_patch(patch_content)
+    validate_protected_path_stripping(prod_result)
+    if not patch_content.strip():
+        msg = f"{exploit_id}: exploit patch is empty"
+        raise ValueError(msg)
+    if prod_result.empty_after_strip:
+        if y0_policy == "prod_only":
+            prod_result = ProdPatchResult(
+                prod_patch=patch_content if patch_content.endswith("\n") else patch_content + "\n",
+                prod_paths=prod_result.prod_paths or ("earnbench_planted/",),
+                stripped_paths=prod_result.stripped_paths,
+                stripped_hunks=prod_result.stripped_hunks,
+                empty_after_strip=False,
+                raw_patch_sha256=prod_result.raw_patch_sha256,
+                prod_patch_sha256=sha256_hex(
+                    patch_content if patch_content.endswith("\n") else patch_content + "\n"
+                ),
+            )
+        elif y0_policy == "raw_full":
+            pass
+        else:
+            msg = (
+                f"{exploit_id}: prod-only patch is empty after protected-path stripping"
+            )
+            raise ValueError(msg)
+
+    effective_run_id = run_id or f"phase_b_{exploit_id}"
+    config = AdapterConfig(
+        dataset_revision=dataset_revision,
+        holdout_salt=DEFAULT_HOLDOUT_SALT,
+    )
+    pi_verif_bundle = build_pi_verif_prepare_bundle(
+        record=record,
+        prod_result=prod_result,
+        config=config,
+        run_id=effective_run_id,
+    )
+    plan = build_execution_plan(
+        record=record,
+        prod_result=prod_result,
+        pi_verif_bundle=pi_verif_bundle,
+    )
+
+    instance_dir = output_dir / instance_id
+    patch_dir = instance_dir / "patch"
+    patch_dir.mkdir(parents=True, exist_ok=True)
+
+    (patch_dir / "raw.patch").write_text(patch_content, encoding="utf-8")
+    (patch_dir / "prod_only.patch").write_text(prod_result.prod_patch, encoding="utf-8")
+
+    meta = {
+        "instance_id": record.instance_id,
+        "exploit_id": exploit_id,
+        "repo": record.repo,
+        "base_commit": record.base_commit,
+        "dataset_name": record.dataset_name,
+        "fail_to_pass": list(record.fail_to_pass),
+        "pass_to_pass": list(record.pass_to_pass),
+        "metadata_source": str(metadata_path),
+        "raw_patch_sha256": prod_result.raw_patch_sha256,
+        "prod_patch_sha256": prod_result.prod_patch_sha256,
+        "stripped_paths": list(prod_result.stripped_paths),
+        "prod_paths": list(prod_result.prod_paths),
+        "empty_after_strip": prod_result.empty_after_strip,
+        "run_id": effective_run_id,
+        "config_digest": config.config_digest,
+        "patch_class": patch_class,
+        "y0_policy": y0_policy or "prod_only",
+        "channel": channel,
+        "family": family,
+        "template_id": template_id,
+        "predicted_fail_pi": predicted_fail_pi,
+    }
+    _write_json(instance_dir / "meta.json", meta)
+    _write_json(instance_dir / "plan.json", plan)
     return plan
 
 

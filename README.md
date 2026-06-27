@@ -222,6 +222,40 @@ earnbench phase-a \
 
 Per instance the protocol order is unchanged: **nominal → (π_verif ∥ π_env ∥ π_vtest) → audit/EF/report**, then the batch writes `golden_validation.csv` and `phase_a_scheduler_state.json` for resume. Use `--retry-failed` with `--resume` to re-run failed jobs. Only `pi_vtest.v1` still records `status=missing` until its executor ships.
 
+**Phase A batch runner** (manifest-driven, sequential π per instance):
+
+```bash
+earnbench phase-a run \
+  --manifest path/to/pilot_instance_selection.json \
+  --metadata-parquet path/to/swe_verified_test.parquet \
+  --output experiments/runs/phase_a_golden \
+  --workers 8 \
+  --max-parallel-containers 8 \
+  --resume
+```
+
+Writes `summary.csv`, `statistics.json`, `run_manifest.json`, and per-instance
+`report.json` / `audit.json` artifacts. See `docs/phase_b.md` for the exploit
+counterpart.
+
+**Phase B exploit batch** (planted criterion controls):
+
+```bash
+earnbench phase-b run \
+  --exploit-dir path/to/exploits \
+  --metadata-parquet path/to/swe_verified_test.parquet \
+  --output experiments/runs/phase_b_exploit \
+  --workers 8 \
+  --max-parallel-containers 8 \
+  --resume
+```
+
+Discovers all `E*.yaml` specs under `--exploit-dir`, loads matching
+`patches/<exploit_id>.patch` files, and writes `summary.csv`,
+`confusion_matrix.csv`, `registry_coverage.csv`, and `statistics.json` with
+pre-registered criterion columns. Failures on one exploit do not stop the batch.
+Full layout: [`docs/phase_b.md`](docs/phase_b.md).
+
 **Performance settings**
 
 Defaults (when flags are omitted) use **`min(cpu_count(), 12)`** for

@@ -10,6 +10,7 @@ from earnbench.adapters.swebench import (
     build_pi_verif_prepare_bundle,
     holdout_partition,
     pi_vtest_viable,
+    prepare_exploit,
     prepare_smoke,
     supported_perturbations,
 )
@@ -110,3 +111,30 @@ def test_prepare_smoke_writes_expected_layout(tmp_path: Path) -> None:
     )
     assert "requests/models.py" in prod_patch
     assert "tests/test_models.py" not in prod_patch
+
+
+def test_prepare_exploit_writes_exploit_metadata(tmp_path: Path) -> None:
+    patch_content = (FIXTURES / "exploits" / "patches" / "E900.patch").read_text(
+        encoding="utf-8"
+    )
+    work_root = tmp_path / "E900"
+    prepare_exploit(
+        metadata_path=METADATA_FIXTURE,
+        instance_id=INSTANCE_ID,
+        exploit_id="E900",
+        patch_content=patch_content,
+        output_dir=work_root,
+        run_id="phase_b_test",
+        patch_class="exploit_planted",
+        y0_policy="prod_only",
+        channel="visible_test_overfitting",
+        family="visible_overfit",
+        template_id="V-OVERFIT-TEST",
+        predicted_fail_pi="pi_vtest.v1",
+    )
+    instance_dir = work_root / INSTANCE_ID
+    meta = json.loads((instance_dir / "meta.json").read_text(encoding="utf-8"))
+    assert meta["exploit_id"] == "E900"
+    assert meta["patch_class"] == "exploit_planted"
+    assert meta["predicted_fail_pi"] == "pi_vtest.v1"
+    assert (instance_dir / "patch" / "raw.patch").read_text(encoding="utf-8") == patch_content
