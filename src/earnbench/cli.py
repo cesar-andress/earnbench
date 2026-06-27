@@ -35,6 +35,7 @@ from earnbench.audit import AuditRecord
 from earnbench.classification import PerturbationOutcome
 from earnbench.exploits.catalog import ExploitCatalogError, get_exploit, list_exploits
 from earnbench.exploits.validate import validate_path
+from earnbench.injection_validity import generate_injection_validity_report
 from earnbench.injections import (
     InjectionCatalogError,
     get_injection,
@@ -797,6 +798,45 @@ def cmd_report_rank_stability(args: argparse.Namespace) -> None:
             ),
             "report_md": str(result.report_md),
             "report_json": str(result.report_json),
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
+def cmd_report_injection_validity(args: argparse.Namespace) -> None:
+    """Generate blinded injection validity report artifacts."""
+    results_path = Path(args.results).resolve()
+    specs_dir = Path(args.specs).resolve()
+    output_dir = Path(args.output).resolve()
+    try:
+        result = generate_injection_validity_report(
+            results_path,
+            specs_dir,
+            output_dir,
+        )
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(
+        {
+            "output_dir": str(result.output_dir),
+            "summary_csv": str(result.summary_csv),
+            "channel_attribution_matrix_csv": str(
+                result.channel_attribution_matrix_csv,
+            ),
+            "false_earned_false_unearned_csv": str(
+                result.false_earned_false_unearned_csv,
+            ),
+            "invalid_asymmetry_csv": str(result.invalid_asymmetry_csv),
+            "report_md": str(result.report_md),
         },
         sys.stdout,
         indent=2,
@@ -1640,6 +1680,30 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write artifacts only; do not print JSON summary to stdout",
     )
+    report_injection_validity_parser = report_subparsers.add_parser(
+        "injection-validity",
+        help="Analyze blinded mechanism injection construct validity",
+    )
+    report_injection_validity_parser.add_argument(
+        "--results",
+        required=True,
+        help="CSV with per-injection harness outcomes",
+    )
+    report_injection_validity_parser.add_argument(
+        "--specs",
+        required=True,
+        help="Directory of injection spec files (.json, .yaml, .yml)",
+    )
+    report_injection_validity_parser.add_argument(
+        "--output",
+        required=True,
+        help="Directory for injection_validity_* artifacts",
+    )
+    report_injection_validity_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write artifacts only; do not print JSON summary to stdout",
+    )
 
     investigate_parser = subparsers.add_parser(
         "investigate",
@@ -1746,6 +1810,8 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_report_phase_a(args)
             elif args.report_command == "rank-stability":
                 cmd_report_rank_stability(args)
+            elif args.report_command == "injection-validity":
+                cmd_report_injection_validity(args)
             else:
                 parser.error(f"unknown report command: {args.report_command}")
         elif args.command == "investigate":

@@ -344,6 +344,33 @@ Required fields per spec:
 | `template_id` | Versioned injection template id |
 | `notes` | Optional free text |
 
+**Injection validity report** (B-blind construct-validity analysis):
+
+```bash
+earnbench report injection-validity \
+  --results path/to/injection_results.csv \
+  --specs path/to/injection_specs \
+  --output experiments/reports/injection_validity
+```
+
+Results CSV is long format (one row per injection run). Pair clean controls use
+`{injection_id}__clean` rows for EF separation. Required result columns:
+`injection_id`, `instance_id`, `y0`, `ef_exclude_invalid`, `ef_invalid_as_fail`,
+`failed_mechanisms`, `invalid_pi_count`, `pi_vtest_status`, `pi_verif_status`,
+`pi_env_status`.
+
+Writes:
+
+- `injection_validity_summary.csv`
+- `channel_attribution_matrix.csv`
+- `false_earned_false_unearned.csv`
+- `invalid_asymmetry.csv`
+- `injection_validity_report.md`
+
+Metrics include targeted channel detection rate, off-target failure rate,
+EF separation (clean vs injected), false earned/unearned rates, invalid rate
+by channel, in-registry vs out-of-registry detection, and sensitivity gap.
+
 **Performance settings**
 
 Defaults (when flags are omitted) use **`min(cpu_count(), 12)`** for

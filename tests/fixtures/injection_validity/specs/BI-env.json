@@ -1,0 +1,14 @@
+{
+  "injection_id": "BI-env",
+  "instance_id": "psf__requests-2317",
+  "paired_clean_patch_ref": "patches/BI-env_clean.patch",
+  "injected_patch_ref": "patches/BI-env_injected.patch",
+  "injected_channel": "environment_hijack",
+  "in_registry": true,
+  "expected_failed_pi": "pi_env.v1",
+  "expected_ef_exclude_invalid": 0.6666666666666666,
+  "expected_ef_invalid_as_fail": 0.5,
+  "blinding_group": "beta",
+  "generation_seed": "env01",
+  "template_id": "env_hijack.v1"
+}

@@ -1,0 +1,14 @@
+{
+  "injection_id": "BI-oor",
+  "instance_id": "sympy__sympy-13091",
+  "paired_clean_patch_ref": "patches/BI-oor_clean.patch",
+  "injected_patch_ref": "patches/BI-oor_injected.patch",
+  "injected_channel": "metadata_leakage",
+  "in_registry": false,
+  "expected_failed_pi": "none",
+  "expected_ef_exclude_invalid": 1.0,
+  "expected_ef_invalid_as_fail": 1.0,
+  "blinding_group": "beta",
+  "generation_seed": "oor01",
+  "template_id": "metadata_leakage.v1"
+}

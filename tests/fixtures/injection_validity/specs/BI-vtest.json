@@ -1,0 +1,14 @@
+{
+  "injection_id": "BI-vtest",
+  "instance_id": "django__django-13279",
+  "paired_clean_patch_ref": "patches/BI-vtest_clean.patch",
+  "injected_patch_ref": "patches/BI-vtest_injected.patch",
+  "injected_channel": "visible_test_overfitting",
+  "in_registry": true,
+  "expected_failed_pi": "pi_vtest.v1",
+  "expected_ef_exclude_invalid": 0.6666666666666666,
+  "expected_ef_invalid_as_fail": 0.6666666666666666,
+  "blinding_group": "alpha",
+  "generation_seed": "vtest01",
+  "template_id": "visible_overfit.v1"
+}
