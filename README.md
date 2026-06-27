@@ -162,6 +162,17 @@ earnbench swebench run-pi-verif \
   --instance-id psf__requests-1724 \
   --patch /tmp/earnbench_smoke/psf__requests-1724/patch/prod_only.patch \
   --output /tmp/earnbench_smoke
+
+# 5. Clean-slate hardened execution (pi_env.v1) on the same prod-only patch
+earnbench swebench run-pi-env \
+  --metadata-parquet path/to/swe_verified_test.parquet \
+  --instance-id psf__requests-1724 \
+  --patch /tmp/earnbench_smoke/psf__requests-1724/patch/prod_only.patch \
+  --output /tmp/earnbench_smoke \
+  --timeout-seconds 1800 \
+  --workers 12 \
+  --max-parallel-containers 12 \
+  --reuse-images
 ```
 
 **Phase A batch scheduler** (parallel instances and π perturbations):
@@ -178,7 +189,7 @@ earnbench phase-a \
   --resume
 ```
 
-Per instance the protocol order is unchanged: **nominal → (π_verif ∥ π_env ∥ π_vtest) → audit/EF/report**, then the batch writes `golden_validation.csv` and `phase_a_scheduler_state.json` for resume. Use `--retry-failed` with `--resume` to re-run failed jobs. π executors other than `pi_verif.v1` record `status=missing` until implemented.
+Per instance the protocol order is unchanged: **nominal → (π_verif ∥ π_env ∥ π_vtest) → audit/EF/report**, then the batch writes `golden_validation.csv` and `phase_a_scheduler_state.json` for resume. Use `--retry-failed` with `--resume` to re-run failed jobs. Only `pi_vtest.v1` still records `status=missing` until its executor ships.
 
 **Performance settings**
 

@@ -18,6 +18,7 @@ from earnbench.adapters.swebench import prepare_smoke, supported_perturbations
 from earnbench.adapters.swebench_config import SWEBenchRunConfig
 from earnbench.adapters.swebench_metadata import load_verified_instance
 from earnbench.adapters.swebench_nominal import run_nominal_grading
+from earnbench.adapters.swebench_pi_env import run_pi_env_grading
 from earnbench.adapters.swebench_pi_verif import run_pi_verif_grading
 from earnbench.adapters.swebench_preflight import run_swebench_preflight
 from earnbench.metrics import compute_earned_fraction
@@ -592,6 +593,17 @@ def run_perturbation_stage(
             patch_path=patch_path,
             output_dir=output_dir,
             run_id=f"pi_verif_{instance_id}",
+            config=run_config,
+        )
+        return
+    if perturbation_id == PI_ENV_V1_ID:
+        patch_path = output_dir / instance_id / "patch" / "prod_only.patch"
+        run_pi_env_grading(
+            metadata_path=metadata_path,
+            instance_id=instance_id,
+            patch_path=patch_path,
+            output_dir=output_dir,
+            run_id=f"pi_env_{instance_id}",
             config=run_config,
         )
         return

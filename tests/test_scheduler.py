@@ -106,7 +106,9 @@ def _scheduler_config(tmp_path: Path, *, resume: bool = False) -> PhaseASchedule
 @patch("earnbench.scheduler.run_swebench_preflight")
 @patch("earnbench.scheduler.run_nominal_grading")
 @patch("earnbench.scheduler.run_pi_verif_grading")
+@patch("earnbench.scheduler.run_pi_env_grading")
 def test_run_phase_a_scheduler_writes_csv_and_state(
+    mock_pi_env,
     mock_pi_verif,
     mock_nominal,
     mock_preflight,
@@ -115,6 +117,7 @@ def test_run_phase_a_scheduler_writes_csv_and_state(
     mock_preflight.return_value = {"status": "ok"}
     mock_nominal.side_effect = lambda **kwargs: _write_nominal_artifacts(**kwargs)
     mock_pi_verif.side_effect = lambda **kwargs: _write_pi_verif_artifacts(**kwargs)
+    mock_pi_env.side_effect = lambda **kwargs: _write_pi_env_artifacts(**kwargs)
 
     summary = run_phase_a_scheduler(_scheduler_config(tmp_path))
 
@@ -129,8 +132,8 @@ def test_run_phase_a_scheduler_writes_csv_and_state(
     assert rows[0]["instance_id"] == INSTANCE_ID
     assert rows[0]["y0"] == "True"
     assert rows[0]["pi_verif_status"] == "ok"
+    assert rows[0]["pi_env_status"] == "ok"
     assert rows[0]["pi_vtest_status"] == "missing"
-    assert rows[0]["pi_env_status"] == "missing"
     assert (tmp_path / INSTANCE_ID / "report.json").is_file()
 
 
@@ -152,11 +155,41 @@ def _write_pi_verif_artifacts(**kwargs) -> dict[str, object]:
     )
 
 
+def _write_pi_env_artifacts(**kwargs) -> dict[str, object]:
+    from earnbench.adapters.swebench_pi_env import run_pi_env_grading
+
+    return run_pi_env_grading(
+        runner=_mock_pi_env_runner,
+        **kwargs,
+    )
+
+
+def _mock_pi_env_runner(request):
+    from earnbench.adapters.swebench_pi_env import (
+        HARDENING_FLAG_NAMES,
+        PiEnvHarnessResult,
+    )
+
+    return PiEnvHarnessResult(
+        outcome=_mock_pi_verif_runner(request),
+        hardening_flags_requested=HARDENING_FLAG_NAMES,
+        hardening_flags_enforced=(
+            "network_disabled",
+            "python_nousersite",
+            "pip_no_index",
+        ),
+        hardening_flags_not_enforced=("tests_mount_readonly",),
+        image_digest="sha256:mock-instance-image",
+    )
+
+
 @patch("earnbench.scheduler.ProcessPoolExecutor", _InlineProcessPool)
 @patch("earnbench.scheduler.run_swebench_preflight")
 @patch("earnbench.scheduler.run_nominal_grading")
 @patch("earnbench.scheduler.run_pi_verif_grading")
+@patch("earnbench.scheduler.run_pi_env_grading")
 def test_resume_skips_completed_jobs(
+    mock_pi_env,
     mock_pi_verif,
     mock_nominal,
     mock_preflight,
@@ -165,6 +198,7 @@ def test_resume_skips_completed_jobs(
     mock_preflight.return_value = {"status": "ok"}
     mock_nominal.side_effect = lambda **kwargs: _write_nominal_artifacts(**kwargs)
     mock_pi_verif.side_effect = lambda **kwargs: _write_pi_verif_artifacts(**kwargs)
+    mock_pi_env.side_effect = lambda **kwargs: _write_pi_env_artifacts(**kwargs)
 
     config = _scheduler_config(tmp_path)
     run_phase_a_scheduler(config)
@@ -173,6 +207,7 @@ def test_resume_skips_completed_jobs(
     run_phase_a_scheduler(_scheduler_config(tmp_path, resume=True))
     assert mock_nominal.call_count == 1
     assert mock_pi_verif.call_count == 1
+    assert mock_pi_env.call_count == 1
 
 
 def test_build_job_graph_is_deterministic() -> None:
@@ -215,7 +250,9 @@ def test_build_csv_row_matches_golden_gate_columns() -> None:
 @patch("earnbench.scheduler.run_swebench_preflight")
 @patch("earnbench.scheduler.run_nominal_grading")
 @patch("earnbench.scheduler.run_pi_verif_grading")
+@patch("earnbench.scheduler.run_pi_env_grading")
 def test_scheduler_persists_state_after_run(
+    mock_pi_env,
     mock_pi_verif,
     mock_nominal,
     mock_preflight,
@@ -224,6 +261,7 @@ def test_scheduler_persists_state_after_run(
     mock_preflight.return_value = {"status": "ok"}
     mock_nominal.side_effect = lambda **kwargs: _write_nominal_artifacts(**kwargs)
     mock_pi_verif.side_effect = lambda **kwargs: _write_pi_verif_artifacts(**kwargs)
+    mock_pi_env.side_effect = lambda **kwargs: _write_pi_env_artifacts(**kwargs)
 
     run_phase_a_scheduler(_scheduler_config(tmp_path))
     state = load_scheduler_state(tmp_path)

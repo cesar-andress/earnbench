@@ -144,6 +144,7 @@ def test_run_preflight_build_missing_images_success(tmp_path: Path) -> None:
 
 
 def test_default_build_instance_images_passes_latest_tags(monkeypatch) -> None:
+    pytest.importorskip("swebench")
     from earnbench.adapters.swebench_config import SWEBenchRunConfig
     from earnbench.adapters.swebench_preflight import default_build_instance_images
 

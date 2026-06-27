@@ -214,10 +214,15 @@ def instance_workspace_root(output_dir: Path, instance_id: str) -> Path:
     return output_dir / instance_id
 
 
-def prepare_swebench_workdir(workspace_root: Path, config: SWEBenchRunConfig) -> Path:
+def prepare_swebench_workdir(
+    workspace_root: Path,
+    config: SWEBenchRunConfig,
+    *,
+    work_dir_name: str = ".swebench_work",
+) -> Path:
     """Create work cwd and link harness ``logs/`` into the cache directory."""
     workspace_root.mkdir(parents=True, exist_ok=True)
-    work_cwd = workspace_root / ".swebench_work"
+    work_cwd = workspace_root / work_dir_name
     work_cwd.mkdir(parents=True, exist_ok=True)
 
     cache_root = effective_cache_dir(config, workspace_root)
