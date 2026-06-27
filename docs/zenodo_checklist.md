@@ -10,7 +10,7 @@ Related: [artifact contract in private paper repo](https://github.com/earnbench/
 
 - [x] Top-level layout: `src/earnbench/`, `tests/`, `docs/`, `examples/`, `scripts/`
 - [x] Importable Python package under `src/earnbench/`
-- [ ] `CHANGELOG.md` with release notes per version
+- [x] `CHANGELOG.md` with release notes per version (see [release policy](release_policy.md))
 - [ ] `docs/` index linking all user-facing guides (beyond this checklist)
 - [ ] No secrets, credentials, or large binary blobs in git history
 - [ ] `.gitignore` covers build artifacts, caches, generated reports (`examples/*.report.json`)

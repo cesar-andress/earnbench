@@ -62,3 +62,5 @@ See [CITATION.cff](CITATION.cff).
 ## Zenodo release
 
 Before archiving on Zenodo, complete [docs/zenodo_checklist.md](docs/zenodo_checklist.md).
+
+See also the [release and versioning policy](docs/release_policy.md) and [CHANGELOG.md](CHANGELOG.md).
