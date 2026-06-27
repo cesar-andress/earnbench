@@ -53,6 +53,11 @@ SUMMARY_COLUMNS = (
     "pi_env_status",
     "valid_pi_count",
     "ef_pi",
+    "ef_exclude_invalid",
+    "ef_invalid_as_fail",
+    "invalid_pi_count",
+    "invalid_pi_rate",
+    "ef_sensitivity_gap",
     "ef_status",
     "false_unearned",
     "retained",
@@ -219,7 +224,9 @@ def resolve_batch_paths(
 
     resolved_output = output_dir
     if resolved_output is None:
-        output_raw = meta.get("output_dir") or meta.get("output") or DEFAULT_BATCH_OUTPUT_DIR
+        output_raw = (
+            meta.get("output_dir") or meta.get("output") or DEFAULT_BATCH_OUTPUT_DIR
+        )
         resolved_output = Path(str(output_raw))
         if not resolved_output.is_absolute():
             resolved_output = _resolve_relative(resolved_output, base_dir=base_dir)
@@ -255,8 +262,8 @@ def resolve_batch_paths(
             return resolved_metadata, resolved_output
 
     searched = [
-        *( [str(manifest_metadata)] if manifest_metadata else [] ),
-        *( [env_metadata] if env_metadata else [] ),
+        *([str(manifest_metadata)] if manifest_metadata else []),
+        *([env_metadata] if env_metadata else []),
         *[
             str(_resolve_relative(Path(candidate), base_dir=base_dir))
             for candidate in DEFAULT_METADATA_CANDIDATES
@@ -527,6 +534,19 @@ def build_statistics(summary_rows: dict[str, dict[str, Any]]) -> dict[str, Any]:
     ]
     ef_values = [float(row["ef_pi"]) for row in ef_defined_rows]
     ef_mean = sum(ef_values) / len(ef_values) if ef_values else None
+    gap_values = [
+        float(row["ef_sensitivity_gap"])
+        for row in summary_rows.values()
+        if row.get("ef_sensitivity_gap") not in ("", None)
+    ]
+    invalid_counts = [
+        int(row.get("invalid_pi_count", 0) or 0) for row in summary_rows.values()
+    ]
+    invalid_rates = [
+        float(row["invalid_pi_rate"])
+        for row in summary_rows.values()
+        if row.get("invalid_pi_rate") not in ("", None)
+    ]
     return {
         "instance_count": total,
         "retained_count": retained,
@@ -536,6 +556,14 @@ def build_statistics(summary_rows: dict[str, dict[str, Any]]) -> dict[str, Any]:
         "ef_mean": ef_mean,
         "ef_min": min(ef_values) if ef_values else None,
         "ef_max": max(ef_values) if ef_values else None,
+        "invalid_pi_total": sum(invalid_counts),
+        "invalid_pi_rate_mean": (
+            sum(invalid_rates) / len(invalid_rates) if invalid_rates else None
+        ),
+        "ef_sensitivity_gap_mean": (
+            sum(gap_values) / len(gap_values) if gap_values else None
+        ),
+        "ef_sensitivity_gap_max": max(gap_values) if gap_values else None,
         "generated_at_utc": utc_timestamp(),
     }
 
@@ -611,9 +639,7 @@ def run_phase_a_batch(config: PhaseABatchConfig) -> dict[str, Any]:
     repos = {str(row["instance_id"]): str(row.get("repo", "")) for row in manifest_rows}
 
     started_at = utc_timestamp()
-    summary_rows = (
-        _load_csv_rows(output_dir / SUMMARY_CSV) if config.resume else {}
-    )
+    summary_rows = _load_csv_rows(output_dir / SUMMARY_CSV) if config.resume else {}
     failure_rows = (
         _load_failure_rows(output_dir / FAILURES_CSV) if config.resume else []
     )

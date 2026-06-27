@@ -44,6 +44,11 @@ CSV_COLUMNS = (
     "pi_env_status",
     "valid_pi_count",
     "ef_pi",
+    "ef_exclude_invalid",
+    "ef_invalid_as_fail",
+    "invalid_pi_count",
+    "invalid_pi_rate",
+    "ef_sensitivity_gap",
     "ef_status",
     "false_unearned",
     "retained",
@@ -448,6 +453,22 @@ def build_csv_row(
     ef_status = str(report_payload.get("status", EarnedFractionStatus.UNDEFINED.value))
     ef_pi_raw = report_payload.get("earned_fraction")
     ef_pi = None if ef_pi_raw is None else float(ef_pi_raw)
+    ef_exclude_raw = report_payload.get("ef_exclude_invalid", ef_pi_raw)
+    ef_exclude_invalid = None if ef_exclude_raw is None else float(ef_exclude_raw)
+    ef_fail_raw = report_payload.get("ef_invalid_as_fail")
+    ef_invalid_as_fail = None if ef_fail_raw is None else float(ef_fail_raw)
+    invalid_pi_count = int(report_payload.get("invalid_count", 0))
+    invalid_rate_raw = report_payload.get("invalid_rate")
+    invalid_pi_rate = None if invalid_rate_raw is None else float(invalid_rate_raw)
+    gap_raw = report_payload.get("ef_sensitivity_gap")
+    if (
+        gap_raw is None
+        and ef_exclude_invalid is not None
+        and ef_invalid_as_fail is not None
+    ):
+        ef_sensitivity_gap = ef_exclude_invalid - ef_invalid_as_fail
+    else:
+        ef_sensitivity_gap = None if gap_raw is None else float(gap_raw)
     valid_pi_count = int(report_payload.get("valid_count", 0))
     false_unearned = ef_status == EarnedFractionStatus.DEFINED.value and (
         ef_pi is not None and ef_pi < 1.0
@@ -473,6 +494,11 @@ def build_csv_row(
         "pi_env_status": pi_statuses.get(PI_ENV_V1_ID, OutcomeStatus.MISSING.value),
         "valid_pi_count": valid_pi_count,
         "ef_pi": ef_pi,
+        "ef_exclude_invalid": ef_exclude_invalid,
+        "ef_invalid_as_fail": ef_invalid_as_fail,
+        "invalid_pi_count": invalid_pi_count,
+        "invalid_pi_rate": invalid_pi_rate,
+        "ef_sensitivity_gap": ef_sensitivity_gap,
         "ef_status": ef_status,
         "false_unearned": false_unearned,
         "retained": retained,

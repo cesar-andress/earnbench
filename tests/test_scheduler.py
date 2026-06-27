@@ -241,7 +241,12 @@ def test_build_csv_row_matches_golden_gate_columns() -> None:
             "nominal_success": True,
             "status": "defined",
             "earned_fraction": 1.0,
+            "ef_exclude_invalid": 1.0,
+            "ef_invalid_as_fail": 1.0,
             "valid_count": 1,
+            "invalid_count": 0,
+            "invalid_rate": 0.0,
+            "ef_sensitivity_gap": 0.0,
             "reason": "",
         },
         pi_statuses={

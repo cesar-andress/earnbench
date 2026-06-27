@@ -78,6 +78,19 @@ Example input:
 Prints an `EarnedFractionReport` as JSON on stdout, including a nested
 `provenance` object (see [Provenance](#provenance)).
 
+Every report includes **INVALID sensitivity analysis** with three EF variants:
+
+| Field | Definition |
+|-------|------------|
+| `ef_exclude_invalid` | Headline EF: INVALID π excluded from the denominator (same as `earned_fraction`). |
+| `ef_invalid_as_fail` | INVALID π counted as valid failures in the denominator. |
+| `ef_invalid_as_missing` | Same as exclude-invalid unless `invalid_rate` exceeds the threshold (default `0.0`), in which case it is undefined. |
+| `invalid_count` / `invalid_rate` | Number and fraction of INVALID perturbation outcomes. |
+| `ef_sensitivity_gap` | `ef_exclude_invalid − ef_invalid_as_fail` when both are defined. |
+
+Phase A `summary.csv` and `statistics.json` mirror these fields (`ef_exclude_invalid`,
+`ef_invalid_as_fail`, `invalid_pi_count`, `invalid_pi_rate`, `ef_sensitivity_gap`).
+
 Optional input fields for provenance overrides:
 
 ```json

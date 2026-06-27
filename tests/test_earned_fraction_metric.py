@@ -89,9 +89,35 @@ def test_invalid_perturbation_excluded() -> None:
     )
     assert report.is_defined
     assert report.earned_fraction == 1.0
+    assert report.ef_exclude_invalid == 1.0
+    assert report.ef_invalid_as_fail == 0.5
+    assert report.ef_sensitivity_gap == pytest.approx(0.5)
+    assert report.invalid_count == 1
+    assert report.invalid_rate == pytest.approx(0.5)
     assert report.valid_count == 1
     assert report.successful_count == 1
     assert any("excluded 1 non-measurement" in w for w in report.warnings)
+
+
+def test_requests_1724_invalid_sensitivity_analysis() -> None:
+    """Regression: pi_env invalid excluded vs counted-as-fail sensitivity gap."""
+    report = compute_earned_fraction(
+        NominalOutcome(run_id="run-1", task_id="psf__requests-1724", success=True),
+        [
+            PerturbationResult.ok("pi_verif.v1", success=True, channel="verif"),
+            PerturbationResult.ok("pi_vtest.v1", success=True, channel="vtest"),
+            PerturbationResult.invalid("pi_env.v1", channel="env"),
+        ],
+    )
+    assert report.is_defined
+    assert report.ef_exclude_invalid == pytest.approx(1.0)
+    assert report.ef_invalid_as_fail == pytest.approx(2 / 3)
+    assert report.invalid_count == 1
+    assert report.invalid_rate == pytest.approx(1 / 3)
+    assert report.ef_sensitivity_gap == pytest.approx(1 / 3)
+    assert report.ef_invalid_as_missing is None
+    assert report.invalid_as_missing_status is EarnedFractionStatus.UNDEFINED
+    assert report.invalid_as_missing_reason == "invalid_rate_exceeds_threshold"
 
 
 def test_no_valid_perturbations_undefined_with_warning() -> None:
@@ -116,6 +142,10 @@ def test_report_to_dict_includes_new_fields() -> None:
     )
     payload = report.to_dict()
     assert payload["nominal_success"] is True
+    assert payload["ef_exclude_invalid"] == 1.0
+    assert payload["ef_invalid_as_fail"] == 1.0
+    assert payload["invalid_count"] == 0
+    assert payload["ef_sensitivity_gap"] == 0.0
     assert payload["failed_mechanisms"] == []
     assert payload["survived_mechanisms"] == ["vtest"]
     assert payload["warnings"] == []
