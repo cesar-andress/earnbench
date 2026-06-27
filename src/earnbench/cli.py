@@ -12,6 +12,10 @@ from earnbench.audit import AuditRecord
 from earnbench.metrics import compute_earned_fraction
 from earnbench.outcomes import NominalOutcome, OutcomeStatus, PerturbationResult
 from earnbench.provenance import Provenance, build_provenance
+from earnbench.registry import RegistryError
+from earnbench.registry import get as get_perturbation
+from earnbench.registry import list as list_perturbations
+from earnbench.registry import validate as validate_registry
 
 
 class CLIError(Exception):
@@ -210,6 +214,38 @@ def cmd_run(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_registry_list(args: argparse.Namespace) -> None:
+    """Print registered perturbation ids and names."""
+    del args
+    payload = {
+        "perturbations": [spec.to_dict() for spec in list_perturbations()],
+    }
+    json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
+def cmd_registry_show(args: argparse.Namespace) -> None:
+    """Print one perturbation spec as JSON."""
+    try:
+        spec = get_perturbation(args.perturbation_id)
+    except RegistryError as exc:
+        raise CLIError(str(exc)) from exc
+    json.dump(spec.to_dict(), sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
+def cmd_registry_validate(args: argparse.Namespace) -> None:
+    """Validate registry manifest against built-in specs."""
+    del args
+    errors = validate_registry()
+    if errors:
+        for error in errors:
+            print(f"error: {error}", file=sys.stderr)
+        raise CLIError("registry validation failed", exit_code=1)
+    json.dump({"status": "ok"}, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="earnbench",
@@ -262,6 +298,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to run_config.yaml",
     )
 
+    registry_parser = subparsers.add_parser(
+        "registry",
+        help="Inspect the versioned perturbation registry",
+    )
+    registry_subparsers = registry_parser.add_subparsers(
+        dest="registry_command",
+        required=True,
+    )
+    registry_subparsers.add_parser(
+        "list",
+        help="List registered perturbations",
+    )
+    registry_show_parser = registry_subparsers.add_parser(
+        "show",
+        help="Show one perturbation spec",
+    )
+    registry_show_parser.add_argument(
+        "perturbation_id",
+        help="Perturbation id (e.g. pi_vtest.v1)",
+    )
+    registry_subparsers.add_parser(
+        "validate",
+        help="Validate manifest against built-in registry specs",
+    )
+
     return parser
 
 
@@ -276,6 +337,15 @@ def main(argv: list[str] | None = None) -> int:
             cmd_validate_audit(args)
         elif args.command == "run":
             cmd_run(args)
+        elif args.command == "registry":
+            if args.registry_command == "list":
+                cmd_registry_list(args)
+            elif args.registry_command == "show":
+                cmd_registry_show(args)
+            elif args.registry_command == "validate":
+                cmd_registry_validate(args)
+            else:
+                parser.error(f"unknown registry command: {args.registry_command}")
         else:
             parser.error(f"unknown command: {args.command}")
     except CLIError as exc:

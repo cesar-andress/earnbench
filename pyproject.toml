@@ -42,6 +42,9 @@ Documentation = "https://github.com/earnbench/earnbench/tree/main/docs"
 [tool.hatch.build.targets.wheel]
 packages = ["src/earnbench"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"src/earnbench/registry/manifest.json" = "earnbench/registry/manifest.json"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

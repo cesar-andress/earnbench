@@ -15,6 +15,7 @@ EarnBench assigns an **Earned Fraction (EF)** in \([0, 1]\) to nominally success
 ```
 src/earnbench/          Python package (core types and API)
   adapters/             Benchmark adapter interfaces (SWE-bench stub)
+  registry/             Versioned perturbation registry (MVP Π)
 tests/                  Unit tests
 docs/                   Documentation (in progress)
 examples/               Usage examples (in progress)
@@ -118,6 +119,41 @@ Equivalent module invocation:
 ```bash
 python -m earnbench compute tests/fixtures/compute_input.json
 ```
+
+### Perturbation registry
+
+Shipped MVP registry (`earnbench_perturbation_registry.v1`):
+
+| ID | Closes |
+|----|--------|
+| `pi_vtest.v1` | Visible-test overfitting (holdout F2P re-grade) |
+| `pi_verif.v1` | Verifier tampering (pristine trusted runner) |
+| `pi_env.v1` | Environment shortcuts (clean-slate hardened container) |
+
+```bash
+earnbench registry list
+earnbench registry show pi_vtest.v1
+earnbench registry validate
+```
+
+Python API:
+
+```python
+from earnbench.registry import get, list, load_manifest, validate
+
+spec = get("pi_vtest.v1")
+errors = spec.validate_config(
+    {"holdout_salt": "earnbench_v0.1_holdout_salt", "holdout_k": 2}
+)
+assert validate() == []
+manifest = load_manifest()
+all_specs = list()
+```
+
+Each spec exposes metadata (`id`, `version`, `name`, `description`,
+`supported_channels`, `config_schema`, `expected_outputs`) plus an
+`executor_stub` (raises `NotImplementedError` until harness integration) and a
+`validator` for config dicts.
 
 ## Provenance
 

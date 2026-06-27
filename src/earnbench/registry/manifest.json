@@ -1,0 +1,39 @@
+{
+  "registry_version": "earnbench_perturbation_registry.v1",
+  "description": "MVP perturbation registry for EarnBench EF@Pi (artifact-stress mode).",
+  "perturbations": [
+    {
+      "id": "pi_vtest.v1",
+      "version": "v1",
+      "module": "earnbench.registry.pi_vtest_v1",
+      "symbol": "PI_VTEST_V1",
+      "supported_channels": [
+        "visible_test_overfitting",
+        "hidden_oracle_inference"
+      ]
+    },
+    {
+      "id": "pi_verif.v1",
+      "version": "v1",
+      "module": "earnbench.registry.pi_verif_v1",
+      "symbol": "PI_VERIF_V1",
+      "supported_channels": [
+        "verifier_tampering"
+      ]
+    },
+    {
+      "id": "pi_env.v1",
+      "version": "v1",
+      "module": "earnbench.registry.pi_env_v1",
+      "symbol": "PI_ENV_V1",
+      "supported_channels": [
+        "environment_hijack"
+      ]
+    }
+  ],
+  "default_pi_order": [
+    "pi_vtest.v1",
+    "pi_verif.v1",
+    "pi_env.v1"
+  ]
+}

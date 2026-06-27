@@ -198,3 +198,39 @@ def test_validate_run_arguments_rejects_empty_instance(tmp_path: Path) -> None:
             perturbation="pi_vtest.v1",
             config=config,
         )
+
+
+def test_registry_list_cli(capsys) -> None:
+    exit_code = main(["registry", "list"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    payload = json.loads(captured.out)
+    ids = [item["id"] for item in payload["perturbations"]]
+    assert ids == ["pi_vtest.v1", "pi_verif.v1", "pi_env.v1"]
+
+
+def test_registry_show_cli(capsys) -> None:
+    exit_code = main(["registry", "show", "pi_vtest.v1"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    payload = json.loads(captured.out)
+    assert payload["id"] == "pi_vtest.v1"
+    assert "visible_test_overfitting" in payload["supported_channels"]
+
+
+def test_registry_show_unknown_exits_nonzero(capsys) -> None:
+    exit_code = main(["registry", "show", "pi_missing.v1"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "unknown perturbation" in captured.err
+
+
+def test_registry_validate_cli(capsys) -> None:
+    exit_code = main(["registry", "validate"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert json.loads(captured.out)["status"] == "ok"
