@@ -125,6 +125,7 @@ class PhaseBBatchConfig:
     run_id: str
     dataset_revision: str = "unpinned"
     build_missing_images: bool = False
+    exploit_ids: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -195,6 +196,31 @@ def resolve_metadata_path(
         f"{METADATA_ENV_VAR}"
     )
     raise FileNotFoundError(msg)
+
+
+def resolve_selected_exploits(
+    exploit_dir: Path,
+    exploit_ids: tuple[str, ...] | None = None,
+) -> list[ExploitSpec]:
+    """Return exploit specs in catalog order, optionally filtered by id."""
+    try:
+        all_specs = list_exploits(exploit_dir)
+    except ExploitCatalogError as exc:
+        msg = str(exc)
+        raise ValueError(msg) from exc
+
+    if not exploit_ids:
+        return all_specs
+
+    catalog_ids = {spec.exploit_id for spec in all_specs}
+    missing = sorted(set(exploit_ids) - catalog_ids)
+    if missing:
+        known = ", ".join(spec.exploit_id for spec in all_specs)
+        msg = f"unknown exploit id(s): {', '.join(missing)} (known: {known})"
+        raise ValueError(msg)
+
+    selected = set(exploit_ids)
+    return [spec for spec in all_specs if spec.exploit_id in selected]
 
 
 def resolve_exploit_patch(exploit_dir: Path, exploit_id: str) -> Path:
@@ -850,12 +876,7 @@ def run_phase_b_batch(config: PhaseBBatchConfig) -> dict[str, Any]:
     (output_dir / "reports").mkdir(parents=True, exist_ok=True)
     (output_dir / "audits").mkdir(parents=True, exist_ok=True)
 
-    try:
-        specs = list_exploits(config.exploit_dir)
-    except ExploitCatalogError as exc:
-        msg = str(exc)
-        raise ValueError(msg) from exc
-
+    specs = resolve_selected_exploits(config.exploit_dir, config.exploit_ids)
     exploit_ids = [spec.exploit_id for spec in specs]
     spec_by_id = {spec.exploit_id: spec for spec in specs}
 
@@ -1027,6 +1048,7 @@ __all__ = [
     "enrich_summary_row",
     "resolve_exploit_patch",
     "resolve_metadata_path",
+    "resolve_selected_exploits",
     "run_exploit_batch_pipeline",
     "run_phase_b_batch",
     "write_confusion_matrix_csv",

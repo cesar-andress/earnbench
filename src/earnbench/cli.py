@@ -906,6 +906,16 @@ def cmd_phase_b_run(args: argparse.Namespace) -> None:
             f"--metadata-parquet must be a .parquet or .json file, got: {metadata_path}"
         )
 
+    exploit_ids: tuple[str, ...] | None = None
+    if args.exploit_ids:
+        exploit_ids = tuple(
+            item.strip()
+            for item in args.exploit_ids.split(",")
+            if item.strip()
+        )
+        if not exploit_ids:
+            raise CLIError("--exploit-ids must list at least one exploit id")
+
     try:
         run_config = resolve_swebench_run_config_from_args(args)
     except (FileNotFoundError, ValueError) as exc:
@@ -929,6 +939,7 @@ def cmd_phase_b_run(args: argparse.Namespace) -> None:
         run_id=args.run_id or f"phase_b_{output_dir.name}",
         dataset_revision=args.dataset_revision,
         build_missing_images=args.build_missing_images,
+        exploit_ids=exploit_ids,
     )
 
     try:
@@ -1593,6 +1604,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--exploit-dir",
         required=True,
         help="Directory containing exploit YAML specs and patches/ subdirectory",
+    )
+    phase_b_run_parser.add_argument(
+        "--exploit-ids",
+        default="",
+        help=(
+            "Comma-separated exploit ids to run (default: all specs in --exploit-dir). "
+            "Order follows the catalog, not this list."
+        ),
     )
     phase_b_run_parser.add_argument(
         "--metadata-parquet",
