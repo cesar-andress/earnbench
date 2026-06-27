@@ -36,6 +36,7 @@ from earnbench.classification import PerturbationOutcome
 from earnbench.exploit_validator import validate_runtime_run
 from earnbench.exploits.catalog import ExploitCatalogError, get_exploit, list_exploits
 from earnbench.exploits.validate import validate_path
+from earnbench.external_exploits import validate_external_exploit_catalog
 from earnbench.injection_batch import InjectionBatchConfig, run_injection_batch
 from earnbench.injection_unblind import BlindUnblindError, unblind_injection_run
 from earnbench.injection_validity import generate_injection_validity_report
@@ -1272,6 +1273,28 @@ def cmd_injection_unblind(args: argparse.Namespace) -> None:
         sys.stdout.write("\n")
 
 
+def cmd_external_exploit_validate_catalog(args: argparse.Namespace) -> None:
+    """Validate a Phase B-ext external exploit catalog CSV."""
+    result = validate_external_exploit_catalog(Path(args.catalog))
+    if not result.ok:
+        for error in result.errors:
+            print(f"error: {error}", file=sys.stderr)
+        raise CLIError("external exploit catalog validation failed", exit_code=1)
+    if args.quiet:
+        return
+    json.dump(
+        {
+            "status": "ok",
+            "catalog": str(result.path),
+            "row_count": result.row_count,
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="earnbench",
@@ -1547,6 +1570,28 @@ def build_parser() -> argparse.ArgumentParser:
         "--quiet",
         action="store_true",
         help="Do not print unblind summary JSON on success",
+    )
+
+    external_exploit_parser = subparsers.add_parser(
+        "external-exploit",
+        help="Phase B-ext external exploit catalog tools",
+    )
+    external_exploit_subparsers = external_exploit_parser.add_subparsers(
+        dest="external_exploit_command",
+        required=True,
+    )
+    external_validate_catalog_parser = external_exploit_subparsers.add_parser(
+        "validate-catalog",
+        help="Validate external exploit catalog CSV schema",
+    )
+    external_validate_catalog_parser.add_argument(
+        "catalog",
+        help="Path to external_exploit_catalog.csv",
+    )
+    external_validate_catalog_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print validation summary JSON on success",
     )
 
     swebench_parser = subparsers.add_parser(
@@ -2254,6 +2299,13 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_injection_unblind(args)
             else:
                 parser.error(f"unknown injection command: {args.injection_command}")
+        elif args.command == "external-exploit":
+            if args.external_exploit_command == "validate-catalog":
+                cmd_external_exploit_validate_catalog(args)
+            else:
+                parser.error(
+                    f"unknown external-exploit command: {args.external_exploit_command}"
+                )
         elif args.command == "swebench":
             if args.swebench_command == "prepare-smoke":
                 cmd_swebench_prepare_smoke(args)
