@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from earnbench.adapters.swebench import prepare_smoke
+from earnbench.adapters.swebench_metadata import MetadataLoadError
 from earnbench.audit import AuditRecord
 from earnbench.metrics import compute_earned_fraction
 from earnbench.outcomes import NominalOutcome, OutcomeStatus, PerturbationResult
@@ -234,6 +236,36 @@ def cmd_registry_show(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_swebench_prepare_smoke(args: argparse.Namespace) -> None:
+    """Prepare Phase A smoke artifacts without Docker execution."""
+    metadata_path = Path(args.metadata_parquet)
+    output_dir = Path(args.output)
+    suffix = metadata_path.suffix.lower()
+    if suffix not in {".parquet", ".json"}:
+        raise CLIError(
+            f"--metadata-parquet must be a .parquet or .json file, got: {metadata_path}"
+        )
+
+    try:
+        plan = prepare_smoke(
+            metadata_path=metadata_path,
+            instance_id=args.instance_id,
+            output_dir=output_dir,
+            run_id=args.run_id,
+            dataset_revision=args.dataset_revision,
+        )
+    except MetadataLoadError as exc:
+        raise CLIError(str(exc)) from exc
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(plan, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
 def cmd_registry_validate(args: argparse.Namespace) -> None:
     """Validate registry manifest against built-in specs."""
     del args
@@ -323,6 +355,49 @@ def build_parser() -> argparse.ArgumentParser:
         help="Validate manifest against built-in registry specs",
     )
 
+    swebench_parser = subparsers.add_parser(
+        "swebench",
+        help="SWE-bench Verified adapter commands",
+    )
+    swebench_subparsers = swebench_parser.add_subparsers(
+        dest="swebench_command",
+        required=True,
+    )
+    prepare_smoke_parser = swebench_subparsers.add_parser(
+        "prepare-smoke",
+        help="Dry-run Phase A smoke preparation (no Docker)",
+    )
+    prepare_smoke_parser.add_argument(
+        "--metadata-parquet",
+        required=True,
+        help="Path to SWE-bench Verified metadata (.parquet or test .json fixture)",
+    )
+    prepare_smoke_parser.add_argument(
+        "--instance-id",
+        required=True,
+        help="SWE-bench instance id (e.g. psf__requests-1724)",
+    )
+    prepare_smoke_parser.add_argument(
+        "--output",
+        required=True,
+        help="Output directory for smoke artifacts",
+    )
+    prepare_smoke_parser.add_argument(
+        "--run-id",
+        default="",
+        help="Optional run id recorded in meta.json and plan.json",
+    )
+    prepare_smoke_parser.add_argument(
+        "--dataset-revision",
+        default="unpinned",
+        help="Dataset revision label stored in adapter config digest inputs",
+    )
+    prepare_smoke_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write artifacts only; do not print plan.json to stdout",
+    )
+
     return parser
 
 
@@ -346,6 +421,11 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_registry_validate(args)
             else:
                 parser.error(f"unknown registry command: {args.registry_command}")
+        elif args.command == "swebench":
+            if args.swebench_command == "prepare-smoke":
+                cmd_swebench_prepare_smoke(args)
+            else:
+                parser.error(f"unknown swebench command: {args.swebench_command}")
         else:
             parser.error(f"unknown command: {args.command}")
     except CLIError as exc:

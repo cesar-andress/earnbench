@@ -234,3 +234,47 @@ def test_registry_validate_cli(capsys) -> None:
 
     assert exit_code == 0
     assert json.loads(captured.out)["status"] == "ok"
+
+
+def test_swebench_prepare_smoke_cli(capsys, tmp_path: Path) -> None:
+    output_dir = tmp_path / "out"
+    exit_code = main(
+        [
+            "swebench",
+            "prepare-smoke",
+            "--metadata-parquet",
+            str(FIXTURES / "swebench_smoke_metadata.json"),
+            "--instance-id",
+            "psf__requests-1724",
+            "--output",
+            str(output_dir),
+            "--run-id",
+            "cli-smoke",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    plan = json.loads(captured.out)
+    assert plan["instance_id"] == "psf__requests-1724"
+    assert plan["dry_run"] is True
+    assert (output_dir / "psf__requests-1724" / "plan.json").is_file()
+
+
+def test_swebench_prepare_smoke_missing_instance(capsys, tmp_path: Path) -> None:
+    exit_code = main(
+        [
+            "swebench",
+            "prepare-smoke",
+            "--metadata-parquet",
+            str(FIXTURES / "swebench_smoke_metadata.json"),
+            "--instance-id",
+            "missing__instance-1",
+            "--output",
+            str(tmp_path / "out"),
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "not found" in captured.err.lower()
