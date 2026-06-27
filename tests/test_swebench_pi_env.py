@@ -80,9 +80,14 @@ def test_default_hardening_config_requests_all_flags() -> None:
 
 
 def test_hardened_container_create_applies_docker_flags() -> None:
+    pytest.importorskip("swebench")
+    from swebench.harness import docker_build
+
     client = MagicMock()
     created = MagicMock()
     client.containers.create.return_value = created
+    test_spec = MagicMock(instance_id="test_instance")
+    logger = MagicMock()
 
     hardening = PiEnvHardeningConfig()
     with hardened_container_create(client, hardening) as (
@@ -90,16 +95,18 @@ def test_hardened_container_create_applies_docker_flags() -> None:
         not_enforced,
         warnings,
     ):
-        client.containers.create(
-            image="swebench/test:latest",
-            environment={"PATH": "/usr/bin"},
+        docker_build.build_container(
+            test_spec,
+            client,
+            "run_id",
+            logger,
+            nocache=False,
         )
 
     kwargs = client.containers.create.call_args.kwargs
     assert kwargs["network_mode"] == "none"
     assert kwargs["environment"]["PYTHONNOUSERSITE"] == "1"
     assert kwargs["environment"]["PIP_NO_INDEX"] == "1"
-    assert kwargs["environment"]["PATH"] == "/usr/bin"
     assert "network_disabled" in enforced
     assert "python_nousersite" in enforced
     assert "pip_no_index" in enforced

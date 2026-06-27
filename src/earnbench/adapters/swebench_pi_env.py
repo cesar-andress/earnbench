@@ -115,31 +115,38 @@ def _serialize_docker_env(environment: dict[str, str] | list[str] | None) -> Any
     return environment
 
 
+def _apply_docker_hardening_kwargs(
+    kwargs: dict[str, Any],
+    hardening: PiEnvHardeningConfig,
+    enforced: list[str],
+) -> None:
+    """Mutate Docker ``containers.create`` kwargs and record enforced flags."""
+    if hardening.network_disabled:
+        kwargs["network_mode"] = "none"
+        if "network_disabled" not in enforced:
+            enforced.append("network_disabled")
+    if hardening.python_nousersite or hardening.pip_no_index:
+        env = _normalize_docker_env(kwargs.get("environment"))
+        if hardening.python_nousersite:
+            env["PYTHONNOUSERSITE"] = "1"
+            if "python_nousersite" not in enforced:
+                enforced.append("python_nousersite")
+        if hardening.pip_no_index:
+            env["PIP_NO_INDEX"] = "1"
+            if "pip_no_index" not in enforced:
+                enforced.append("pip_no_index")
+        kwargs["environment"] = _serialize_docker_env(env)
+
+
 @contextmanager
 def hardened_container_create(
     client: Any,
     hardening: PiEnvHardeningConfig,
 ) -> Iterator[tuple[list[str], list[str], list[str]]]:
-    """Patch ``client.containers.create`` to apply supported hardening flags."""
+    """Patch SWE-bench ``build_container`` to apply supported hardening flags."""
     enforced: list[str] = []
     not_enforced: list[str] = []
     warnings: list[str] = []
-    original_create = client.containers.create
-
-    def patched_create(*args: Any, **kwargs: Any) -> Any:
-        if hardening.network_disabled:
-            kwargs["network_mode"] = "none"
-            enforced.append("network_disabled")
-        if hardening.python_nousersite or hardening.pip_no_index:
-            env = _normalize_docker_env(kwargs.get("environment"))
-            if hardening.python_nousersite:
-                env["PYTHONNOUSERSITE"] = "1"
-                enforced.append("python_nousersite")
-            if hardening.pip_no_index:
-                env["PIP_NO_INDEX"] = "1"
-                enforced.append("pip_no_index")
-            kwargs["environment"] = _serialize_docker_env(env)
-        return original_create(*args, **kwargs)
 
     if hardening.tests_mount_readonly:
         not_enforced.append("tests_mount_readonly")
@@ -150,11 +157,42 @@ def hardened_container_create(
             )
         )
 
-    client.containers.create = patched_create  # type: ignore[method-assign]
+    from swebench.harness import docker_build
+
+    original_build_container = docker_build.build_container
+
+    def patched_build_container(
+        test_spec: Any,
+        client_arg: Any,
+        run_id: str,
+        logger: Any,
+        nocache: bool,
+        force_rebuild: bool = False,
+    ) -> Any:
+        original_create = client_arg.containers.create
+
+        def patched_create(*args: Any, **kwargs: Any) -> Any:
+            _apply_docker_hardening_kwargs(kwargs, hardening, enforced)
+            return original_create(*args, **kwargs)
+
+        client_arg.containers.create = patched_create  # type: ignore[method-assign]
+        try:
+            return original_build_container(
+                test_spec,
+                client_arg,
+                run_id,
+                logger,
+                nocache,
+                force_rebuild,
+            )
+        finally:
+            client_arg.containers.create = original_create  # type: ignore[method-assign]
+
+    docker_build.build_container = patched_build_container
     try:
         yield enforced, not_enforced, warnings
     finally:
-        client.containers.create = original_create  # type: ignore[method-assign]
+        docker_build.build_container = original_build_container
 
 
 def resolve_instance_image_digest(client: Any, image_name: str) -> str | None:
@@ -314,6 +352,7 @@ def default_pi_env_runner(
     outcome: dict[str, Any] = {"completed": False, "resolved": False}
     report: dict[str, Any] = {}
 
+    container_hardening_applied = False
     try:
         with hardened_container_create(client, effective_hardening) as hardening_state:
             enforced, not_enforced, warnings = hardening_state
@@ -335,8 +374,16 @@ def default_pi_env_runner(
             )
             if report_path.is_file():
                 report = json.loads(report_path.read_text(encoding="utf-8"))
+            container_hardening_applied = bool(enforced)
     finally:
         client.close()
+
+    if bool(outcome.get("completed")) and not container_hardening_applied:
+        for flag in ("network_disabled", "python_nousersite", "pip_no_index"):
+            if getattr(effective_hardening, flag) and flag not in enforced:
+                warnings.append(
+                    f"{flag}: requested but create hook did not record enforcement"
+                )
 
     log_dir = (
         Path.cwd()

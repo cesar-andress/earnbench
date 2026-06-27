@@ -55,6 +55,11 @@ _LOG_PATTERNS: dict[str, re.Pattern[str]] = {
         r"requests\.exceptions\.ConnectionError|No route to host",
         re.IGNORECASE,
     ),
+    "http_external_test_failure": re.compile(
+        r"failed for scheme HTTP://|failed for scheme https://|"
+        r"assert 502 == 200|httpbin\(",
+        re.IGNORECASE,
+    ),
     "missing_dependency": re.compile(
         r"ModuleNotFoundError|ImportError: No module named|"
         r"command not found: pip|PackageNotFoundError",
@@ -201,6 +206,95 @@ def _analyze_log_signals(log_text: str) -> dict[str, list[str]]:
     }
 
 
+def _parse_embedded_harness_report(
+    log_text: str,
+    instance_id: str,
+) -> dict[str, Any] | None:
+    """Parse the SWE-bench ``report: {...}`` line embedded in harness logs."""
+    import ast
+
+    prefix = "report:"
+    for line in log_text.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith(prefix):
+            continue
+        payload_text = stripped[len(prefix) :].strip()
+        try:
+            payload = ast.literal_eval(payload_text)
+        except (SyntaxError, ValueError):
+            continue
+        if isinstance(payload, dict) and instance_id in payload:
+            return payload
+    report_marker = "===== report.json ====="
+    if report_marker in log_text:
+        section = log_text.split(report_marker, maxsplit=1)[1]
+        try:
+            payload = json.loads(section)
+        except json.JSONDecodeError:
+            return None
+        if isinstance(payload, dict) and instance_id in payload:
+            return payload
+    return None
+
+
+def _harness_test_bucket_summary(
+    report: dict[str, Any] | None,
+    instance_id: str,
+) -> dict[str, Any] | None:
+    if not report or instance_id not in report:
+        return None
+    entry = report[instance_id]
+    tests_status = entry.get("tests_status")
+    if not isinstance(tests_status, dict):
+        return None
+    summary: dict[str, Any] = {
+        "resolved": entry.get("resolved"),
+        "patch_successfully_applied": entry.get("patch_successfully_applied"),
+    }
+    for bucket_name in ("FAIL_TO_PASS", "PASS_TO_PASS", "FAIL_TO_FAIL", "PASS_TO_FAIL"):
+        bucket = tests_status.get(bucket_name)
+        if isinstance(bucket, dict):
+            summary[bucket_name] = {
+                "success": list(bucket.get("success") or []),
+                "failure": list(bucket.get("failure") or []),
+            }
+    return summary
+
+
+def _effective_hardening_enforced(
+    docker_env: dict[str, Any],
+    pi_env_grade: dict[str, Any],
+) -> tuple[list[str], bool]:
+    """Return enforced flags, inferring docker flags from requested when unrecorded."""
+    enforced = list(docker_env.get("pi_env_hardening_flags_enforced") or [])
+    if enforced:
+        return enforced, False
+    requested = list(
+        docker_env.get("pi_env_hardening_flags_requested")
+        or pi_env_grade.get("hardening_flags_requested")
+        or []
+    )
+    inferrable = (
+        "network_disabled",
+        "python_nousersite",
+        "pip_no_index",
+    )
+    inferred = [flag for flag in inferrable if flag in requested]
+    return inferred, bool(inferred)
+
+
+def _pi_env_pass_to_pass_only_failure(
+    report_summary: dict[str, Any] | None,
+) -> tuple[bool, list[str]]:
+    if not report_summary:
+        return False, []
+    f2p = report_summary.get("FAIL_TO_PASS") or {}
+    p2p = report_summary.get("PASS_TO_PASS") or {}
+    f2p_failures = list(f2p.get("failure") or [])
+    p2p_failures = list(p2p.get("failure") or [])
+    return not f2p_failures and bool(p2p_failures), p2p_failures
+
+
 def _compare_test_lists(
     record: SWEBenchVerifiedRecord,
     nominal_grade: dict[str, Any],
@@ -309,8 +403,22 @@ def _classify_failure(
     nominal_signals: dict[str, list[str]],
     pi_env_signals: dict[str, list[str]],
     pi_env_grade: dict[str, Any],
+    report_summary: dict[str, Any] | None,
 ) -> tuple[str, list[str]]:
     evidence: list[str] = []
+    enforced, inferred_enforced = _effective_hardening_enforced(
+        docker_env, pi_env_grade
+    )
+    requested = list(
+        docker_env.get("pi_env_hardening_flags_requested")
+        or pi_env_grade.get("hardening_flags_requested")
+        or []
+    )
+    if inferred_enforced:
+        evidence.append(
+            "Docker hardening flags inferred from pi_env grade request list "
+            f"(enforced field empty): {enforced}"
+        )
 
     if nominal_success and pi_env_success:
         return "unknown", [
@@ -337,17 +445,25 @@ def _classify_failure(
         evidence.append("Nominal grade fail_to_pass list does not match metadata.")
         return "test_selection_difference", evidence
 
+    p2p_only_failure, p2p_failures = _pi_env_pass_to_pass_only_failure(report_summary)
+    if p2p_only_failure:
+        evidence.append(
+            "Harness report shows FAIL_TO_PASS successes with "
+            "PASS_TO_PASS failures only."
+        )
+        if p2p_failures:
+            evidence.append(f"PASS_TO_PASS failures: {p2p_failures[:3]}")
+
     if pi_env_signals["pip_no_index"]:
         evidence.extend(
             f"pi_env log: {line}" for line in pi_env_signals["pip_no_index"][:3]
         )
-        if "pip_no_index" in (docker_env.get("pi_env_hardening_flags_enforced") or []):
+        if "pip_no_index" in enforced:
             evidence.append("PIP_NO_INDEX was enforced for pi_env.v1.")
         return "dependency_blocked_by_pip_no_index", evidence
 
     if pi_env_signals["missing_dependency"] and (
-        "pip_no_index" in (docker_env.get("pi_env_hardening_flags_enforced") or [])
-        or pi_env_signals["pip_no_index"]
+        "pip_no_index" in enforced or pi_env_signals["pip_no_index"]
     ):
         evidence.extend(
             f"pi_env log: {line}" for line in pi_env_signals["missing_dependency"][:3]
@@ -358,29 +474,36 @@ def _classify_failure(
         evidence.extend(
             f"pi_env log: {line}" for line in pi_env_signals["python_nousersite"][:3]
         )
-        if "python_nousersite" in (
-            docker_env.get("pi_env_hardening_flags_enforced") or []
-        ):
+        if "python_nousersite" in enforced:
             evidence.append("PYTHONNOUSERSITE=1 was enforced for pi_env.v1.")
         return "python_nousersite_changed_runtime", evidence
+
+    network_signals = (
+        pi_env_signals["network_failure"] + pi_env_signals["http_external_test_failure"]
+    )
+    if network_signals or (
+        p2p_only_failure
+        and pi_env_signals["test_failure"]
+        and not nominal_signals["test_failure"]
+    ):
+        if network_signals:
+            evidence.extend(f"pi_env log: {line}" for line in network_signals[:3])
+        if "network_disabled" in enforced:
+            evidence.append("network_disabled was enforced for pi_env.v1.")
+        elif "network_disabled" in requested:
+            evidence.append(
+                "network_disabled was requested for pi_env.v1 "
+                "(external/http tests failed while nominal passed)."
+            )
+        return "network_blocked_required_test", evidence
 
     if pi_env_signals["network_failure"]:
         evidence.extend(
             f"pi_env log: {line}" for line in pi_env_signals["network_failure"][:3]
         )
-        if "network_disabled" in (
-            docker_env.get("pi_env_hardening_flags_enforced") or []
-        ):
+        if "network_disabled" in enforced:
             evidence.append("network_disabled was enforced for pi_env.v1.")
         return "network_blocked_required_test", evidence
-
-    not_enforced = docker_env.get("pi_env_hardening_flags_not_enforced") or []
-    if "tests_mount_readonly" in not_enforced and pi_env_signals["test_failure"]:
-        evidence.append(
-            "tests_mount_readonly was requested but not enforced; "
-            "test failures may reflect harness gap rather than patch quality."
-        )
-        return "readonly_not_enforced", evidence
 
     if docker_env.get("harness_command_match") is False:
         nominal_cmd = docker_env.get("nominal_harness_command")
@@ -398,11 +521,18 @@ def _classify_failure(
 
     if pi_env_signals["test_failure"] and not nominal_signals["test_failure"]:
         evidence.append("pi_env log contains test failures absent from nominal log.")
-        enforced = docker_env.get("pi_env_hardening_flags_enforced") or []
         if enforced:
             evidence.append(f"pi_env hardening enforced: {enforced}")
             return "harness_difference", evidence
         return "unknown", evidence
+
+    not_enforced = docker_env.get("pi_env_hardening_flags_not_enforced") or []
+    if "tests_mount_readonly" in not_enforced and pi_env_signals["test_failure"]:
+        evidence.append(
+            "tests_mount_readonly was requested but not enforced; "
+            "test failures may reflect harness gap rather than patch quality."
+        )
+        return "readonly_not_enforced", evidence
 
     hardening_not_enforced = pi_env_grade.get("hardening_flags_not_enforced") or []
     if hardening_not_enforced:
@@ -521,6 +651,13 @@ def diagnose_pi_env(
     )
     nominal_signals = _analyze_log_signals(nominal_log)
     pi_env_signals = _analyze_log_signals(pi_env_log)
+    pi_env_report = _parse_embedded_harness_report(pi_env_log, instance_id)
+    nominal_report = _parse_embedded_harness_report(nominal_log, instance_id)
+    pi_env_report_summary = _harness_test_bucket_summary(pi_env_report, instance_id)
+    nominal_report_summary = _harness_test_bucket_summary(
+        nominal_report,
+        instance_id,
+    )
 
     grade_diffs = _differing_fields(nominal_grade, pi_env_grade)
     audit_diffs: list[str] = []
@@ -540,6 +677,7 @@ def diagnose_pi_env(
         nominal_signals=nominal_signals,
         pi_env_signals=pi_env_signals,
         pi_env_grade=pi_env_grade,
+        report_summary=pi_env_report_summary,
     )
 
     should_mark_invalid = (
@@ -572,6 +710,10 @@ def diagnose_pi_env(
         "docker_and_environment": docker_env,
         "patch_comparison": patch_compare,
         "test_lists": test_compare,
+        "harness_report_summary": {
+            "nominal": nominal_report_summary,
+            "pi_env": pi_env_report_summary,
+        },
         "audit_warnings": {
             "nominal": list(nominal_audit.warnings) if nominal_audit else [],
             "pi_env": list(pi_env_audit.warnings) if pi_env_audit else [],

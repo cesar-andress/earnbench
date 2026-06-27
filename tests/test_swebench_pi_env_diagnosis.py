@@ -203,6 +203,7 @@ def test_diagnose_network_blocked_failure(tmp_path: Path) -> None:
     _write_nominal_artifacts(nominal_dir)
     _write_pi_env_artifacts(
         pi_env_dir,
+        hardening_enforced=[],
         log_text=(
             "network_mode=none\n"
             "Temporary failure in name resolution\n"
@@ -220,6 +221,51 @@ def test_diagnose_network_blocked_failure(tmp_path: Path) -> None:
 
     assert diagnosis["likely_failure_category"] == "network_blocked_required_test"
     assert diagnosis["should_pi_env_be_marked_invalid"] is True
+
+
+def test_diagnose_requests_1724_p2p_http_failure(tmp_path: Path) -> None:
+    """Regression: P2P httpbin failure with empty enforced must not be readonly."""
+    nominal_dir = tmp_path / "nominal"
+    pi_env_dir = tmp_path / "pi_env.v1"
+    _write_nominal_artifacts(
+        nominal_dir, log_text="APPLY_PATCH_PASS\nall tests passed\n"
+    )
+    p2p_failure = (
+        "test_requests.py::RequestsTestCase::test_mixed_case_scheme_acceptable"
+    )
+    report_line = (
+        "report: {'psf__requests-1724': {'resolved': False, 'tests_status': "
+        "{'FAIL_TO_PASS': {'success': ['tests.test_models.TestCase.test_redirect'], "
+        "'failure': []}, 'PASS_TO_PASS': {'success': [], "
+        "'failure': ['"
+        + p2p_failure
+        + "']}}}}"
+    )
+    _write_pi_env_artifacts(
+        pi_env_dir,
+        hardening_enforced=[],
+        log_text=(
+            "APPLY_PATCH_PASS\n"
+            f"{report_line}\n"
+            "AssertionError: failed for scheme HTTP://\n"
+            "assert 502 == 200\n"
+        ),
+    )
+
+    diagnosis = diagnose_pi_env(
+        metadata_path=METADATA_FIXTURE,
+        instance_id=INSTANCE_ID,
+        patch_path=_patch_file(tmp_path),
+        nominal_dir=nominal_dir,
+        pi_env_dir=pi_env_dir,
+    )
+
+    assert diagnosis["likely_failure_category"] == "network_blocked_required_test"
+    assert diagnosis["should_pi_env_be_marked_invalid"] is True
+    assert diagnosis["likely_failure_category"] != "readonly_not_enforced"
+    summary = diagnosis["inspection"]["harness_report_summary"]["pi_env"]
+    assert summary["FAIL_TO_PASS"]["failure"] == []
+    assert "test_mixed_case_scheme_acceptable" in summary["PASS_TO_PASS"]["failure"][0]
 
 
 def test_write_pi_env_diagnosis_writes_files(tmp_path: Path) -> None:
