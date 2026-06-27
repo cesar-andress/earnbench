@@ -60,6 +60,12 @@ from earnbench.phase_b_batch import (
     resolve_metadata_path,
     run_phase_b_batch,
 )
+from earnbench.phase_c_agents import (
+    PhaseCError,
+    prepare_phase_c,
+    run_phase_c,
+    summarize_phase_c,
+)
 from earnbench.provenance import Provenance, build_provenance
 from earnbench.rank_stability import generate_rank_stability_report
 from earnbench.registry import RegistryError
@@ -981,6 +987,76 @@ def cmd_phase_b_run(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_phase_c_prepare(args: argparse.Namespace) -> None:
+    """Prepare Phase C agent collection manifest and directory layout."""
+    instances_path = Path(args.instances) if args.instances else None
+    try:
+        result = prepare_phase_c(
+            phase_a_run=Path(args.phase_a_run),
+            output_dir=Path(args.output),
+            arms_path=Path(args.agent_arms),
+            instances_path=instances_path,
+        )
+    except PhaseCError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    payload = {
+        "manifest_path": str(result.manifest_path),
+        "task_count": result.task_count,
+        "instance_count": result.instance_count,
+        "arm_count": result.arm_count,
+    }
+    json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
+def cmd_phase_c_run(args: argparse.Namespace) -> None:
+    """Run Phase C patch collection for all manifest tasks."""
+    output_dir = Path(args.output) if args.output else None
+    try:
+        result = run_phase_c(
+            manifest_path=Path(args.manifest),
+            output_dir=output_dir,
+            workers=args.workers,
+            resume=args.resume,
+        )
+    except PhaseCError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    payload = {
+        "output_dir": str(result.output_dir),
+        "attempt_count": result.attempt_count,
+        "ok_count": result.ok_count,
+        "no_patch_count": result.no_patch_count,
+        "error_count": result.error_count,
+        "skipped_count": result.skipped_count,
+        "attempts_csv": str(result.attempts_csv),
+        "failures_path": str(result.failures_path),
+    }
+    json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
+def cmd_phase_c_summarize(args: argparse.Namespace) -> None:
+    """Summarize a completed Phase C run directory."""
+    try:
+        summary = summarize_phase_c(output_dir=Path(args.run))
+    except PhaseCError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(summary.to_dict(), sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
 def cmd_registry_validate(args: argparse.Namespace) -> None:
     """Validate registry manifest against built-in specs."""
     del args
@@ -1730,6 +1806,94 @@ def build_parser() -> argparse.ArgumentParser:
         help="Progress on stderr only; do not print batch summary JSON to stdout",
     )
 
+    phase_c_parser = subparsers.add_parser(
+        "phase-c",
+        help="Phase C agent patch collection (no EF computation)",
+    )
+    phase_c_subparsers = phase_c_parser.add_subparsers(
+        dest="phase_c_command",
+        required=True,
+    )
+
+    phase_c_prepare_parser = phase_c_subparsers.add_parser(
+        "prepare",
+        help="Prepare Phase C manifest from a Phase A run and agent arms",
+    )
+    phase_c_prepare_parser.add_argument(
+        "--phase-a-run",
+        required=True,
+        help="Completed Phase A batch directory (run_manifest.json + summary.csv)",
+    )
+    phase_c_prepare_parser.add_argument(
+        "--output",
+        required=True,
+        help="Phase C output directory",
+    )
+    phase_c_prepare_parser.add_argument(
+        "--agent-arms",
+        required=True,
+        help="YAML file listing agent arms (arms.yaml)",
+    )
+    phase_c_prepare_parser.add_argument(
+        "--instances",
+        default="",
+        help=(
+            "Optional CSV or JSON instance-id list; "
+            "default: retained instances from Phase A summary.csv"
+        ),
+    )
+    phase_c_prepare_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print prepare summary JSON to stdout",
+    )
+
+    phase_c_run_parser = phase_c_subparsers.add_parser(
+        "run",
+        help="Collect patch attempts for all manifest tasks",
+    )
+    phase_c_run_parser.add_argument(
+        "--manifest",
+        required=True,
+        help="Prepared run_manifest.json path (typically OUT/run_manifest.json)",
+    )
+    phase_c_run_parser.add_argument(
+        "--output",
+        default="",
+        help="Override output directory from manifest (default: manifest output_dir)",
+    )
+    phase_c_run_parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Concurrent collection workers (default: 1)",
+    )
+    phase_c_run_parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Skip tasks already recorded in attempts.jsonl",
+    )
+    phase_c_run_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print run summary JSON to stdout",
+    )
+
+    phase_c_summarize_parser = phase_c_subparsers.add_parser(
+        "summarize",
+        help="Summarize a completed Phase C run directory",
+    )
+    phase_c_summarize_parser.add_argument(
+        "--run",
+        required=True,
+        help="Phase C output directory",
+    )
+    phase_c_summarize_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print summary JSON to stdout",
+    )
+
     report_parser = subparsers.add_parser(
         "report",
         help="Generate publication reports from completed batch outputs",
@@ -1916,6 +2080,15 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_phase_b_run(args)
             else:
                 parser.error(f"unknown phase-b command: {args.phase_b_command}")
+        elif args.command == "phase-c":
+            if args.phase_c_command == "prepare":
+                cmd_phase_c_prepare(args)
+            elif args.phase_c_command == "run":
+                cmd_phase_c_run(args)
+            elif args.phase_c_command == "summarize":
+                cmd_phase_c_summarize(args)
+            else:
+                parser.error(f"unknown phase-c command: {args.phase_c_command}")
         elif args.command == "report":
             if args.report_command == "phase-a":
                 cmd_report_phase_a(args)

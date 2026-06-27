@@ -1,0 +1,28 @@
+arms:
+  - id: ollama_qwen3_coder_30b
+    provider: ollama
+    model: qwen3-coder:30b
+    replicates: 3
+    temperature: 0.2
+  - id: ollama_qwen25_coder_32b
+    provider: ollama
+    model: qwen2.5-coder:32b
+    replicates: 3
+    temperature: 0.2
+  - id: ollama_deepseek_coder_v2_lite
+    provider: ollama
+    model: deepseek-coder-v2:lite
+    replicates: 3
+    temperature: 0.2
+  - id: claude_code
+    provider: external_cli
+    command: "TODO"
+    replicates: 3
+  - id: codex
+    provider: external_cli
+    command: "TODO"
+    replicates: 3
+  - id: gemini
+    provider: external_cli
+    command: "TODO"
+    replicates: 3
