@@ -897,6 +897,8 @@ def cmd_report_injection_validity(args: argparse.Namespace) -> None:
             "report_md": str(result.report_md),
             "summary_json": str(result.summary_json),
             "diagnostic_md": str(result.diagnostic_md),
+            "error_taxonomy_md": str(result.error_taxonomy_md),
+            "pair_diagnostic_csv": str(result.pair_diagnostic_csv),
         },
         sys.stdout,
         indent=2,

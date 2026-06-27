@@ -13,6 +13,10 @@ from earnbench.injection_diagnostic import (
     BLIND_INJECTION_DIAGNOSTIC_MD,
     BLIND_INJECTION_SUMMARY_JSON,
 )
+from earnbench.injection_error_taxonomy import (
+    BLIND_INJECTION_ERROR_TAXONOMY_MD,
+    BLIND_INJECTION_PAIR_DIAGNOSTIC_CSV,
+)
 from earnbench.injection_validity import (
     CHANNEL_ATTRIBUTION_MATRIX_CSV,
     FALSE_EARNED_FALSE_UNEARNED_CSV,
@@ -88,6 +92,8 @@ def test_generate_injection_validity_report_writes_artifacts(tmp_path: Path) -> 
     assert result.report_md.name == INJECTION_VALIDITY_REPORT_MD
     assert result.summary_json.name == BLIND_INJECTION_SUMMARY_JSON
     assert result.diagnostic_md.name == BLIND_INJECTION_DIAGNOSTIC_MD
+    assert result.error_taxonomy_md.name == BLIND_INJECTION_ERROR_TAXONOMY_MD
+    assert result.pair_diagnostic_csv.name == BLIND_INJECTION_PAIR_DIAGNOSTIC_CSV
 
     for artifact in (
         result.summary_csv,
@@ -97,6 +103,8 @@ def test_generate_injection_validity_report_writes_artifacts(tmp_path: Path) -> 
         result.report_md,
         result.summary_json,
         result.diagnostic_md,
+        result.error_taxonomy_md,
+        result.pair_diagnostic_csv,
     ):
         assert artifact.is_file()
 
@@ -127,6 +135,8 @@ def test_cli_report_injection_validity(capsys, tmp_path: Path) -> None:
     assert Path(payload["summary_csv"]).is_file()
     assert Path(payload["summary_json"]).is_file()
     assert Path(payload["diagnostic_md"]).is_file()
+    assert Path(payload["error_taxonomy_md"]).is_file()
+    assert Path(payload["pair_diagnostic_csv"]).is_file()
 
 
 def _make_spec(

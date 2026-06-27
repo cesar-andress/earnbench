@@ -80,6 +80,8 @@ class InjectionValidityResult:
     report_md: Path
     summary_json: Path
     diagnostic_md: Path
+    error_taxonomy_md: Path
+    pair_diagnostic_csv: Path
 
 
 def _as_bool(value: object) -> bool:
@@ -833,6 +835,9 @@ def generate_injection_validity_report(
 ) -> InjectionValidityResult:
     """Load results and specs, then write injection validity artifacts."""
     from earnbench.injection_diagnostic import write_blind_injection_diagnostic_artifacts
+    from earnbench.injection_error_taxonomy import (
+        write_blind_injection_error_taxonomy_artifacts,
+    )
 
     results = load_injection_results(results_path)
     if specs is None:
@@ -855,6 +860,14 @@ def generate_injection_validity_report(
         specs,
         output_dir,
     )
+    pair_diagnostic_csv_path, taxonomy_md_path = (
+        write_blind_injection_error_taxonomy_artifacts(
+            payload,
+            results,
+            specs,
+            output_dir,
+        )
+    )
 
     _write_csv(summary_path, SUMMARY_COLUMNS, payload["summary_rows"])
     _write_csv(matrix_path, MATRIX_COLUMNS, payload["matrix_rows"])
@@ -873,6 +886,8 @@ def generate_injection_validity_report(
         report_md=report_path,
         summary_json=summary_json_path,
         diagnostic_md=diagnostic_md_path,
+        error_taxonomy_md=taxonomy_md_path,
+        pair_diagnostic_csv=pair_diagnostic_csv_path,
     )
 
 
