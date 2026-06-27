@@ -1,4 +1,4 @@
-"""Certified correct control study (construct-validity anchor)."""
+"""Maintainer-certified correctness anchor (external validity)."""
 
 from earnbench.certified_controls.manifest import (
     CERTIFICATION_STATUSES,
@@ -8,10 +8,10 @@ from earnbench.certified_controls.manifest import (
     validate_certified_controls_manifest,
 )
 from earnbench.certified_controls.report import (
-    CERTIFIED_CONTROLS_EF_DISTRIBUTION_CSV,
-    CERTIFIED_CONTROLS_FALSE_UNEARNED_CSV,
-    CERTIFIED_CONTROLS_REPORT_MD,
-    CERTIFIED_CONTROLS_SUMMARY_JSON,
+    MAINTAINER_CERTIFIED_EF_DISTRIBUTION_CSV,
+    MAINTAINER_CERTIFIED_FALSE_UNEARNED_CSV,
+    MAINTAINER_CERTIFIED_REPORT_MD,
+    MAINTAINER_CERTIFIED_SUMMARY_JSON,
     CertifiedControlsReportResult,
     analyze_certified_controls,
     generate_certified_controls_report,
@@ -20,10 +20,10 @@ from earnbench.certified_controls.report import (
 
 __all__ = [
     "CERTIFICATION_STATUSES",
-    "CERTIFIED_CONTROLS_EF_DISTRIBUTION_CSV",
-    "CERTIFIED_CONTROLS_FALSE_UNEARNED_CSV",
-    "CERTIFIED_CONTROLS_REPORT_MD",
-    "CERTIFIED_CONTROLS_SUMMARY_JSON",
+    "MAINTAINER_CERTIFIED_EF_DISTRIBUTION_CSV",
+    "MAINTAINER_CERTIFIED_FALSE_UNEARNED_CSV",
+    "MAINTAINER_CERTIFIED_REPORT_MD",
+    "MAINTAINER_CERTIFIED_SUMMARY_JSON",
     "REQUIRED_COLUMNS",
     "CertifiedControlsReportResult",
     "ManifestValidationResult",

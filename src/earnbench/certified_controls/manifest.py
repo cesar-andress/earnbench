@@ -1,8 +1,9 @@
-"""Certified correct control manifest validation."""
+"""Maintainer-certified correctness control manifest validation."""
 
 from __future__ import annotations
 
 import csv
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,23 +11,26 @@ REQUIRED_COLUMNS = (
     "control_id",
     "instance_id",
     "repo",
-    "patch_source",
-    "patch_ref",
     "upstream_commit",
-    "issue_ref",
-    "certification_basis",
+    "upstream_pr",
+    "upstream_issue",
+    "patch_source",
+    "patch_sha256",
+    "merged_by_maintainer",
+    "issue_closed",
     "production_only",
     "touches_tests",
     "touches_verifier",
+    "touches_ci",
     "touches_environment",
-    "minimality_score",
-    "issue_alignment_score",
+    "nominal_success",
     "certification_status",
-    "undecidable_reason",
+    "exclusion_reason",
     "notes",
 )
 
 CERTIFICATION_STATUSES = frozenset({"certified_correct", "rejected", "undecidable"})
+SHA256_PATTERN = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,7 +56,7 @@ def _parse_bool(value: object, *, prefix: str) -> tuple[bool | None, str | None]
 
 
 def validate_certified_controls_manifest(path: Path) -> ManifestValidationResult:
-    """Validate a certified correct controls manifest CSV."""
+    """Validate a maintainer-certified controls manifest CSV."""
     resolved = path.resolve()
     if not resolved.is_file():
         return ManifestValidationResult(
@@ -103,62 +107,74 @@ def validate_certified_controls_manifest(path: Path) -> ManifestValidationResult
                     f"{sorted(CERTIFICATION_STATUSES)}, got {status!r}"
                 )
 
-            production_only, prod_error = _parse_bool(
-                raw.get("production_only"),
-                prefix=f"{prefix}:production_only",
-            )
-            if prod_error:
-                errors.append(prod_error)
-
-            touches_tests, tests_error = _parse_bool(
-                raw.get("touches_tests"),
-                prefix=f"{prefix}:touches_tests",
-            )
-            if tests_error:
-                errors.append(tests_error)
-
-            touches_verifier, verif_error = _parse_bool(
-                raw.get("touches_verifier"),
-                prefix=f"{prefix}:touches_verifier",
-            )
-            if verif_error:
-                errors.append(verif_error)
-
-            touches_environment, env_error = _parse_bool(
-                raw.get("touches_environment"),
-                prefix=f"{prefix}:touches_environment",
-            )
-            if env_error:
-                errors.append(env_error)
+            bool_fields = {
+                "merged_by_maintainer": "merged_by_maintainer",
+                "issue_closed": "issue_closed",
+                "production_only": "production_only",
+                "touches_tests": "touches_tests",
+                "touches_verifier": "touches_verifier",
+                "touches_ci": "touches_ci",
+                "touches_environment": "touches_environment",
+                "nominal_success": "nominal_success",
+            }
+            parsed: dict[str, bool | None] = {}
+            for key, column in bool_fields.items():
+                value, error = _parse_bool(raw.get(column), prefix=f"{prefix}:{column}")
+                if error:
+                    errors.append(error)
+                parsed[key] = value
 
             if status == "certified_correct":
-                if touches_tests is True:
+                required_true = (
+                    ("merged_by_maintainer", parsed["merged_by_maintainer"]),
+                    ("issue_closed", parsed["issue_closed"]),
+                    ("production_only", parsed["production_only"]),
+                    ("nominal_success", parsed["nominal_success"]),
+                )
+                for field_name, field_value in required_true:
+                    if field_value is not True:
+                        errors.append(
+                            f"{prefix}: certified_correct row must have "
+                            f"{field_name}=True"
+                        )
+
+                required_false = (
+                    ("touches_tests", parsed["touches_tests"]),
+                    ("touches_verifier", parsed["touches_verifier"]),
+                    ("touches_ci", parsed["touches_ci"]),
+                    ("touches_environment", parsed["touches_environment"]),
+                )
+                for field_name, field_value in required_false:
+                    if field_value is not False:
+                        errors.append(
+                            f"{prefix}: certified_correct row must have "
+                            f"{field_name}=False"
+                        )
+
+                upstream_commit = str(raw.get("upstream_commit", "")).strip()
+                if not upstream_commit:
                     errors.append(
-                        f"{prefix}: certified_correct row must not have "
-                        "touches_tests=True"
+                        f"{prefix}: certified_correct row must have non-empty "
+                        "upstream_commit"
                     )
-                if touches_verifier is True:
+
+                patch_sha256 = str(raw.get("patch_sha256", "")).strip()
+                if not patch_sha256:
                     errors.append(
-                        f"{prefix}: certified_correct row must not have "
-                        "touches_verifier=True"
+                        f"{prefix}: certified_correct row must have non-empty "
+                        "patch_sha256"
                     )
-                if touches_environment is True:
+                elif not SHA256_PATTERN.match(patch_sha256):
                     errors.append(
-                        f"{prefix}: certified_correct row must not have "
-                        "touches_environment=True"
-                    )
-                if production_only is False:
-                    errors.append(
-                        f"{prefix}: certified_correct row must have "
-                        "production_only=True"
+                        f"{prefix}: patch_sha256 must be 64 hex characters"
                     )
 
             if status == "undecidable":
-                reason = str(raw.get("undecidable_reason", "")).strip()
+                reason = str(raw.get("exclusion_reason", "")).strip()
                 if not reason:
                     errors.append(
                         f"{prefix}: undecidable row must have non-empty "
-                        "undecidable_reason"
+                        "exclusion_reason"
                     )
 
     return ManifestValidationResult(

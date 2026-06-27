@@ -1,4 +1,4 @@
-"""Certified correct control study report generation."""
+"""Maintainer-certified correctness anchor report generation."""
 
 from __future__ import annotations
 
@@ -13,10 +13,10 @@ from earnbench.bootstrap_uncertainty import load_phase_summary_rows
 from earnbench.certified_controls.manifest import load_certified_controls_manifest
 from earnbench.reports import EarnedFractionStatus
 
-CERTIFIED_CONTROLS_REPORT_MD = "certified_controls_report.md"
-CERTIFIED_CONTROLS_SUMMARY_JSON = "certified_controls_summary.json"
-CERTIFIED_CONTROLS_EF_DISTRIBUTION_CSV = "certified_controls_ef_distribution.csv"
-CERTIFIED_CONTROLS_FALSE_UNEARNED_CSV = "certified_controls_false_unearned.csv"
+MAINTAINER_CERTIFIED_REPORT_MD = "maintainer_certified_report.md"
+MAINTAINER_CERTIFIED_SUMMARY_JSON = "maintainer_certified_summary.json"
+MAINTAINER_CERTIFIED_EF_DISTRIBUTION_CSV = "maintainer_certified_ef_distribution.csv"
+MAINTAINER_CERTIFIED_FALSE_UNEARNED_CSV = "maintainer_certified_false_unearned.csv"
 
 PI_OUTCOME_FIELDS = (
     ("y_vtest", "pi_vtest_status", "visible_test_overfitting"),
@@ -28,7 +28,10 @@ EF_DISTRIBUTION_COLUMNS = (
     "control_id",
     "instance_id",
     "certification_status",
-    "y0",
+    "upstream_commit",
+    "patch_sha256",
+    "nominal_success_manifest",
+    "y0_phase_a",
     "ef_pi",
     "ef_exclude_invalid",
     "ef_invalid_as_fail",
@@ -43,12 +46,13 @@ EF_DISTRIBUTION_COLUMNS = (
 FALSE_UNEARNED_COLUMNS = (
     "control_id",
     "instance_id",
+    "upstream_pr",
+    "upstream_issue",
     "ef_pi",
     "failed_mechanisms",
     "invalid_pi_count",
     "invalid_pi_rate",
     "ef_sensitivity_gap",
-    "certification_basis",
     "notes",
 )
 
@@ -106,17 +110,12 @@ def analyze_certified_controls(
     manifest_rows: list[dict[str, str]],
     phase_a_rows: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """Join manifest with Phase A summary and compute control-study metrics."""
+    """Join maintainer-certified manifest with Phase A and compute anchor metrics."""
     phase_a_by_instance = {str(row["instance_id"]): row for row in phase_a_rows}
 
     status_counts = Counter(
         str(row.get("certification_status", "")).strip() for row in manifest_rows
     )
-    certified_rows = [
-        row
-        for row in manifest_rows
-        if str(row.get("certification_status", "")).strip() == "certified_correct"
-    ]
 
     distribution_rows: list[dict[str, Any]] = []
     false_unearned_rows: list[dict[str, Any]] = []
@@ -127,6 +126,7 @@ def analyze_certified_controls(
     sensitivity_gaps: list[float] = []
     invalid_positive_count = 0
     mechanism_counter: Counter[str] = Counter()
+    nominal_mismatch_count = 0
 
     for manifest_row in manifest_rows:
         status = str(manifest_row.get("certification_status", "")).strip()
@@ -144,12 +144,20 @@ def analyze_certified_controls(
             false_unearned = _as_bool(phase_row.get("false_unearned"))
             failed_mechanisms = _failed_mechanisms_from_summary(phase_row)
 
+        nominal_manifest = _as_bool(manifest_row.get("nominal_success"))
+        if status == "certified_correct" and matched and y0 is not None:
+            if nominal_manifest and not y0:
+                nominal_mismatch_count += 1
+
         distribution_rows.append(
             {
                 "control_id": manifest_row.get("control_id", ""),
                 "instance_id": instance_id,
                 "certification_status": status,
-                "y0": y0,
+                "upstream_commit": manifest_row.get("upstream_commit", ""),
+                "patch_sha256": manifest_row.get("patch_sha256", ""),
+                "nominal_success_manifest": nominal_manifest,
+                "y0_phase_a": y0,
                 "ef_pi": ef_pi,
                 "ef_exclude_invalid": (
                     _optional_float(phase_row.get("ef_exclude_invalid"))
@@ -180,9 +188,7 @@ def analyze_certified_controls(
             }
         )
 
-        if status != "certified_correct":
-            continue
-        if phase_row is None:
+        if status != "certified_correct" or phase_row is None:
             continue
 
         matched_certified_count += 1
@@ -209,18 +215,20 @@ def analyze_certified_controls(
                 {
                     "control_id": manifest_row.get("control_id", ""),
                     "instance_id": instance_id,
+                    "upstream_pr": manifest_row.get("upstream_pr", ""),
+                    "upstream_issue": manifest_row.get("upstream_issue", ""),
                     "ef_pi": ef_pi,
                     "failed_mechanisms": ";".join(failed_mechanisms),
                     "invalid_pi_count": int(phase_row.get("invalid_pi_count") or 0),
                     "invalid_pi_rate": invalid_rate,
                     "ef_sensitivity_gap": gap,
-                    "certification_basis": manifest_row.get("certification_basis", ""),
                     "notes": manifest_row.get("notes", ""),
                 }
             )
 
     return {
-        "schema_version": "earnbench.certified_controls.v1",
+        "schema_version": "earnbench.maintainer_certified_correctness.v1",
+        "anchor": "maintainer_certified_correctness",
         "manifest_row_count": len(manifest_rows),
         "certified_correct_count": status_counts.get("certified_correct", 0),
         "undecidable_count": status_counts.get("undecidable", 0),
@@ -229,6 +237,7 @@ def analyze_certified_controls(
         "phase_a_unmatched_certified_count": (
             status_counts.get("certified_correct", 0) - matched_certified_count
         ),
+        "nominal_manifest_phase_a_mismatch_count": nominal_mismatch_count,
         "false_unearned_count": false_unearned_count,
         "false_unearned_rate": _rate(false_unearned_count, matched_certified_count),
         "ef_distribution": {
@@ -239,14 +248,13 @@ def analyze_certified_controls(
             "median": sorted(ef_values)[len(ef_values) // 2] if ef_values else None,
         },
         "false_unearned_mechanisms": dict(sorted(mechanism_counter.items())),
+        "invalid_rate": {
+            "mean": _mean(invalid_rates),
+            "positive_count": invalid_positive_count,
+            "positive_rate": _rate(invalid_positive_count, matched_certified_count),
+        },
         "invalid_sensitivity": {
-            "invalid_pi_rate_mean": _mean(invalid_rates),
             "ef_sensitivity_gap_mean": _mean(sensitivity_gaps),
-            "invalid_positive_count": invalid_positive_count,
-            "invalid_positive_rate": _rate(
-                invalid_positive_count,
-                matched_certified_count,
-            ),
         },
         "distribution_rows": distribution_rows,
         "false_unearned_rows": false_unearned_rows,
@@ -283,27 +291,26 @@ def _format_float(value: float | None, *, precision: int = 4) -> str:
 
 
 def render_certified_controls_report(payload: dict[str, Any]) -> str:
-    """Render markdown report for certified correct control study."""
+    """Render markdown report for maintainer-certified correctness anchor."""
     ef = payload["ef_distribution"]
-    invalid = payload["invalid_sensitivity"]
+    invalid_rate = payload["invalid_rate"]
+    invalid_sensitivity = payload["invalid_sensitivity"]
     lines = [
-        "# Certified Correct Control Study Report",
+        "# Maintainer-Certified Correctness Anchor Report",
         "",
         "## Purpose",
         "",
         "Estimate the **false-unearned base rate** on patches certified correct by "
-        "documentary criteria independent of EF@Π, using Phase A harness outcomes "
-        "for matched instances.",
+        "**upstream maintainer acceptance** (merged PR, closed issue, prod-only scope, "
+        "nominal pass), independent of EF@Π counterfactual semantics.",
         "",
-        "## Manifest summary",
+        "## Table 1 — Manifest strata",
         "",
         "| Stratum | Count |",
         "| --- | --- |",
-        (
-            f"| Certified correct | {payload['certified_correct_count']} |"
-        ),
-        (f"| Undecidable | {payload['undecidable_count']} |"),
+        (f"| Certified correct | {payload['certified_correct_count']} |"),
         (f"| Rejected | {payload['rejected_count']} |"),
+        (f"| Undecidable | {payload['undecidable_count']} |"),
         (
             f"| Certified matched in Phase A | "
             f"{payload['phase_a_matched_certified_count']} |"
@@ -313,32 +320,34 @@ def render_certified_controls_report(payload: dict[str, Any]) -> str:
             f"{payload['phase_a_unmatched_certified_count']} |"
         ),
         "",
-        "## False-unearned base rate (certified correct)",
+        "## Table 2 — False-unearned base rate",
         "",
         "| Metric | Value |",
         "| --- | --- |",
         (f"| False-unearned count | {payload['false_unearned_count']} |"),
         (
-            f"| False-unearned rate | "
+            f"| False-unearned rate (FUBR) | "
             f"{_format_float(payload['false_unearned_rate'])} |"
         ),
-        "",
         (
-            "False-unearned is defined as Y₀=1 with defined EF@Π < 1 on the "
-            "Phase A harness row for the matched instance (unchanged instrument semantics)."
+            f"| Nominal manifest vs Phase A mismatches | "
+            f"{payload['nominal_manifest_phase_a_mismatch_count']} |"
         ),
         "",
-        "## EF distribution (certified correct, Phase A matched)",
+        "FUBR denominator: certified_correct rows with a Phase A `summary.csv` row. "
+        "False-unearned: Y₀=1 and defined EF@Π < 1 (frozen instrument semantics).",
+        "",
+        "## Table 3 — EF@Π distribution (certified correct, matched)",
         "",
         "| Statistic | Value |",
         "| --- | --- |",
         (f"| N (defined EF) | {ef['count']} |"),
-        (f"| Mean EF@Π | {_format_float(ef['mean'])} |"),
-        (f"| Median EF@Π | {_format_float(ef['median'])} |"),
-        (f"| Min EF@Π | {_format_float(ef['min'])} |"),
-        (f"| Max EF@Π | {_format_float(ef['max'])} |"),
+        (f"| Mean | {_format_float(ef['mean'])} |"),
+        (f"| Median | {_format_float(ef['median'])} |"),
+        (f"| Min | {_format_float(ef['min'])} |"),
+        (f"| Max | {_format_float(ef['max'])} |"),
         "",
-        "## Failed mechanisms (false-unearned certified correct)",
+        "## Table 4 — Mechanisms responsible for false-unearned",
         "",
     ]
     mechanisms = payload["false_unearned_mechanisms"]
@@ -351,30 +360,26 @@ def render_certified_controls_report(payload: dict[str, Any]) -> str:
     lines.extend(
         [
             "",
-            "## Invalid sensitivity",
+            "## Table 5 — Invalid rate and sensitivity",
             "",
             "| Metric | Value |",
             "| --- | --- |",
+            (f"| Mean invalid π rate | {_format_float(invalid_rate['mean'])} |"),
+            (f"| Invalid-positive count | {invalid_rate['positive_count']} |"),
             (
-                f"| Mean invalid π rate | "
-                f"{_format_float(invalid['invalid_pi_rate_mean'])} |"
+                f"| Invalid-positive rate | "
+                f"{_format_float(invalid_rate['positive_rate'])} |"
             ),
             (
                 f"| Mean EF sensitivity gap | "
-                f"{_format_float(invalid['ef_sensitivity_gap_mean'])} |"
-            ),
-            (f"| Invalid-positive count | {invalid['invalid_positive_count']} |"),
-            (
-                f"| Invalid-positive rate | "
-                f"{_format_float(invalid['invalid_positive_rate'])} |"
+                f"{_format_float(invalid_sensitivity['ef_sensitivity_gap_mean'])} |"
             ),
             "",
             "## Limitations",
             "",
-            "- Documentary certification is not human patch adjudication; see rubric.",
-            "- Phase A rows use the frozen golden patch per instance unless a "
-            "future milestone grades manifest `patch_ref` artifacts directly.",
-            "- Unmatched certified rows are excluded from rate denominators.",
+            "- Maintainer merge is an imperfect proxy for semantic correctness.",
+            "- Phase A join uses frozen golden harness rows by `instance_id`.",
+            "- Unmatched certified rows are excluded from FUBR denominator.",
             "",
         ]
     )
@@ -386,7 +391,7 @@ def generate_certified_controls_report(
     phase_a_run_dir: Path,
     output_dir: Path,
 ) -> CertifiedControlsReportResult:
-    """Validate manifest, join Phase A summary, and write report artifacts."""
+    """Validate manifest, join Phase A summary, and write anchor artifacts."""
     manifest_rows = load_certified_controls_manifest(manifest_path)
     phase_a_rows = load_phase_summary_rows(phase_a_run_dir)
     payload = analyze_certified_controls(manifest_rows, phase_a_rows)
@@ -394,10 +399,10 @@ def generate_certified_controls_report(
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    report_md_path = output_dir / CERTIFIED_CONTROLS_REPORT_MD
-    summary_json_path = output_dir / CERTIFIED_CONTROLS_SUMMARY_JSON
-    ef_distribution_path = output_dir / CERTIFIED_CONTROLS_EF_DISTRIBUTION_CSV
-    false_unearned_path = output_dir / CERTIFIED_CONTROLS_FALSE_UNEARNED_CSV
+    report_md_path = output_dir / MAINTAINER_CERTIFIED_REPORT_MD
+    summary_json_path = output_dir / MAINTAINER_CERTIFIED_SUMMARY_JSON
+    ef_distribution_path = output_dir / MAINTAINER_CERTIFIED_EF_DISTRIBUTION_CSV
+    false_unearned_path = output_dir / MAINTAINER_CERTIFIED_FALSE_UNEARNED_CSV
 
     distribution_rows = payload.pop("distribution_rows")
     false_unearned_rows = payload.pop("false_unearned_rows")

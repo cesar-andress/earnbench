@@ -1309,8 +1309,8 @@ def cmd_controls_validate_manifest(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
-def cmd_report_certified_controls(args: argparse.Namespace) -> None:
-    """Generate certified correct control study report."""
+def cmd_report_controls(args: argparse.Namespace) -> None:
+    """Generate maintainer-certified correctness anchor report."""
     try:
         result = generate_certified_controls_report(
             Path(args.manifest),
@@ -1338,6 +1338,9 @@ def cmd_report_certified_controls(args: argparse.Namespace) -> None:
         sort_keys=True,
     )
     sys.stdout.write("\n")
+
+
+cmd_report_certified_controls = cmd_report_controls
 
 
 def cmd_validation_bootstrap(args: argparse.Namespace) -> None:
@@ -1807,7 +1810,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     controls_validate_parser.add_argument(
         "manifest",
-        help="Path to certified_correct_controls_manifest.csv",
+        help="Path to maintainer_certified_controls.csv",
     )
     controls_validate_parser.add_argument(
         "--quiet",
@@ -2661,14 +2664,38 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write artifacts only; do not print JSON summary to stdout",
     )
+    report_controls_parser = report_subparsers.add_parser(
+        "controls",
+        help="Maintainer-certified correctness anchor report (false-unearned base rate)",
+    )
+    report_controls_parser.add_argument(
+        "--manifest",
+        required=True,
+        help="Path to maintainer_certified_controls.csv",
+    )
+    report_controls_parser.add_argument(
+        "--phase-a-run",
+        required=True,
+        help="Completed Phase A batch directory (contains summary.csv)",
+    )
+    report_controls_parser.add_argument(
+        "--output",
+        required=True,
+        help="Directory for maintainer_certified_* artifacts",
+    )
+    report_controls_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write artifacts only; do not print JSON summary to stdout",
+    )
     report_certified_controls_parser = report_subparsers.add_parser(
         "certified-controls",
-        help="Certified correct control study report (false-unearned base rate)",
+        help="Alias for report controls (maintainer-certified anchor)",
     )
     report_certified_controls_parser.add_argument(
         "--manifest",
         required=True,
-        help="Path to certified_correct_controls_manifest.csv",
+        help="Path to maintainer_certified_controls.csv",
     )
     report_certified_controls_parser.add_argument(
         "--phase-a-run",
@@ -2678,7 +2705,7 @@ def build_parser() -> argparse.ArgumentParser:
     report_certified_controls_parser.add_argument(
         "--output",
         required=True,
-        help="Directory for certified_controls_* artifacts",
+        help="Directory for maintainer_certified_* artifacts",
     )
     report_certified_controls_parser.add_argument(
         "--quiet",
@@ -2860,6 +2887,8 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_report_rank_stability(args)
             elif args.report_command == "injection-validity":
                 cmd_report_injection_validity(args)
+            elif args.report_command == "controls":
+                cmd_report_controls(args)
             elif args.report_command == "certified-controls":
                 cmd_report_certified_controls(args)
             else:

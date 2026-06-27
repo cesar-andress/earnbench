@@ -1,4 +1,4 @@
-"""Tests for certified correct control manifest and report."""
+"""Tests for maintainer-certified correctness anchor."""
 
 from __future__ import annotations
 
@@ -20,19 +20,21 @@ MANIFEST_HEADER = (
     "control_id",
     "instance_id",
     "repo",
-    "patch_source",
-    "patch_ref",
     "upstream_commit",
-    "issue_ref",
-    "certification_basis",
+    "upstream_pr",
+    "upstream_issue",
+    "patch_source",
+    "patch_sha256",
+    "merged_by_maintainer",
+    "issue_closed",
     "production_only",
     "touches_tests",
     "touches_verifier",
+    "touches_ci",
     "touches_environment",
-    "minimality_score",
-    "issue_alignment_score",
+    "nominal_success",
     "certification_status",
-    "undecidable_reason",
+    "exclusion_reason",
     "notes",
 )
 
@@ -61,6 +63,40 @@ SUMMARY_HEADER = (
     "config_digest",
 )
 
+VALID_SHA256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+
+def _certified_row(
+    control_id: str,
+    instance_id: str,
+    *,
+    touches_tests: str = "no",
+    nominal_success: str = "yes",
+    status: str = "certified_correct",
+    exclusion_reason: str = "",
+) -> list[str]:
+    return [
+        control_id,
+        instance_id,
+        "org/repo",
+        "abc123def4567890",
+        "https://example.org/pull/1",
+        "https://example.org/issues/1",
+        "upstream_merge",
+        VALID_SHA256,
+        "yes",
+        "yes",
+        "yes",
+        touches_tests,
+        "no",
+        "no",
+        "no",
+        nominal_success,
+        status,
+        exclusion_reason,
+        "",
+    ]
+
 
 def _write_manifest(path: Path, rows: list[list[str]]) -> None:
     with path.open("w", encoding="utf-8", newline="") as handle:
@@ -78,117 +114,71 @@ def _write_phase_a_summary(path: Path, rows: list[list[str]]) -> None:
 
 def test_validate_certified_correct_row_ok(tmp_path: Path) -> None:
     manifest = tmp_path / "manifest.csv"
-    _write_manifest(
-        manifest,
-        [
-            [
-                "CC001",
-                "inst-1",
-                "org/repo",
-                "upstream_merge",
-                "abc123",
-                "abc123",
-                "https://example.org/1",
-                "merged_upstream_pr;issue_linked;prod_only_extract",
-                "yes",
-                "no",
-                "no",
-                "no",
-                "0.9",
-                "0.95",
-                "certified_correct",
-                "",
-                "",
-            ],
-        ],
-    )
+    _write_manifest(manifest, [_certified_row("MC001", "inst-1")])
     result = validate_certified_controls_manifest(manifest)
     assert result.ok
 
 
-def test_validate_certified_correct_rejects_test_touch(tmp_path: Path) -> None:
+def test_validate_certified_correct_rejects_touches_tests(tmp_path: Path) -> None:
+    manifest = tmp_path / "manifest.csv"
+    _write_manifest(
+        manifest,
+        [_certified_row("MC001", "inst-1", touches_tests="yes")],
+    )
+    result = validate_certified_controls_manifest(manifest)
+    assert not result.ok
+    assert any("touches_tests=False" in error for error in result.errors)
+
+
+def test_validate_certified_correct_requires_nominal_success(tmp_path: Path) -> None:
+    manifest = tmp_path / "manifest.csv"
+    _write_manifest(
+        manifest,
+        [_certified_row("MC001", "inst-1", nominal_success="no")],
+    )
+    result = validate_certified_controls_manifest(manifest)
+    assert not result.ok
+    assert any("nominal_success=True" in error for error in result.errors)
+
+
+def test_validate_undecidable_requires_exclusion_reason(tmp_path: Path) -> None:
     manifest = tmp_path / "manifest.csv"
     _write_manifest(
         manifest,
         [
-            [
-                "CC001",
+            _certified_row(
+                "MC-U1",
                 "inst-1",
-                "org/repo",
-                "upstream_merge",
-                "abc123",
-                "abc123",
-                "https://example.org/1",
-                "merged_upstream_pr;issue_linked;prod_only_extract",
-                "yes",
-                "yes",
-                "no",
-                "no",
-                "0.9",
-                "0.95",
-                "certified_correct",
-                "",
-                "",
-            ],
+                status="undecidable",
+            ),
         ],
     )
     result = validate_certified_controls_manifest(manifest)
     assert not result.ok
-    assert any("touches_tests=True" in error for error in result.errors)
-
-
-def test_validate_undecidable_requires_reason(tmp_path: Path) -> None:
-    manifest = tmp_path / "manifest.csv"
-    _write_manifest(
-        manifest,
-        [
-            [
-                "CC-U1",
-                "inst-1",
-                "org/repo",
-                "upstream_merge",
-                "abc123",
-                "abc123",
-                "https://example.org/1",
-                "merged_upstream_pr",
-                "yes",
-                "no",
-                "no",
-                "no",
-                "0.5",
-                "0.5",
-                "undecidable",
-                "",
-                "",
-            ],
-        ],
-    )
-    result = validate_certified_controls_manifest(manifest)
-    assert not result.ok
-    assert any("undecidable_reason" in error for error in result.errors)
+    assert any("exclusion_reason" in error for error in result.errors)
 
 
 def test_analyze_false_unearned_rate() -> None:
     manifest_rows = [
         {
-            "control_id": "CC001",
+            "control_id": "MC001",
             "instance_id": "inst-1",
             "certification_status": "certified_correct",
-            "certification_basis": "merged_upstream_pr",
+            "nominal_success": "yes",
             "notes": "",
         },
         {
-            "control_id": "CC002",
+            "control_id": "MC002",
             "instance_id": "inst-2",
             "certification_status": "certified_correct",
-            "certification_basis": "merged_upstream_pr",
+            "nominal_success": "yes",
             "notes": "",
         },
         {
-            "control_id": "CC-U1",
+            "control_id": "MC-U1",
             "instance_id": "inst-3",
             "certification_status": "undecidable",
-            "certification_basis": "",
+            "nominal_success": "no",
             "notes": "",
         },
     ]
@@ -236,34 +226,12 @@ def test_analyze_false_unearned_rate() -> None:
     assert payload["false_unearned_count"] == 1
     assert payload["false_unearned_rate"] == pytest.approx(0.5)
     assert payload["false_unearned_mechanisms"]["visible_test_overfitting"] == 1
+    assert payload["schema_version"] == "earnbench.maintainer_certified_correctness.v1"
 
 
-def test_generate_certified_controls_report(tmp_path: Path) -> None:
+def test_generate_report(tmp_path: Path) -> None:
     manifest = tmp_path / "manifest.csv"
-    _write_manifest(
-        manifest,
-        [
-            [
-                "CC001",
-                "inst-1",
-                "org/repo",
-                "upstream_merge",
-                "abc123",
-                "abc123",
-                "https://example.org/1",
-                "merged_upstream_pr;issue_linked;prod_only_extract",
-                "yes",
-                "no",
-                "no",
-                "no",
-                "0.9",
-                "0.95",
-                "certified_correct",
-                "",
-                "",
-            ],
-        ],
-    )
+    _write_manifest(manifest, [_certified_row("MC001", "inst-1")])
     phase_a = tmp_path / "phase_a"
     phase_a.mkdir()
     _write_phase_a_summary(
@@ -297,12 +265,11 @@ def test_generate_certified_controls_report(tmp_path: Path) -> None:
     )
     out = tmp_path / "report"
     result = generate_certified_controls_report(manifest, phase_a, out)
-    assert result.report_md.is_file()
     summary = json.loads(result.summary_json.read_text(encoding="utf-8"))
-    assert summary["schema_version"] == "earnbench.certified_controls.v1"
     assert summary["false_unearned_count"] == 0
-    body = result.report_md.read_text(encoding="utf-8")
-    assert "Certified Correct Control Study Report" in body
+    assert "Maintainer-Certified Correctness Anchor Report" in result.report_md.read_text(
+        encoding="utf-8"
+    )
 
 
 def test_cli_validate_manifest_success(capsys) -> None:
@@ -313,32 +280,9 @@ def test_cli_validate_manifest_success(capsys) -> None:
     assert payload["status"] == "ok"
 
 
-def test_cli_report_certified_controls(capsys, tmp_path: Path) -> None:
+def test_cli_report_controls(capsys, tmp_path: Path) -> None:
     manifest = tmp_path / "manifest.csv"
-    _write_manifest(
-        manifest,
-        [
-            [
-                "CC001",
-                "inst-1",
-                "org/repo",
-                "upstream_merge",
-                "abc123",
-                "abc123",
-                "https://example.org/1",
-                "merged_upstream_pr;issue_linked;prod_only_extract",
-                "yes",
-                "no",
-                "no",
-                "no",
-                "0.9",
-                "0.95",
-                "certified_correct",
-                "",
-                "",
-            ],
-        ],
-    )
+    _write_manifest(manifest, [_certified_row("MC001", "inst-1")])
     phase_a = tmp_path / "phase_a"
     phase_a.mkdir()
     _write_phase_a_summary(
@@ -374,7 +318,7 @@ def test_cli_report_certified_controls(capsys, tmp_path: Path) -> None:
     exit_code = main(
         [
             "report",
-            "certified-controls",
+            "controls",
             "--manifest",
             str(manifest),
             "--phase-a-run",
