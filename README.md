@@ -249,6 +249,18 @@ from the batch directory and writes `phase_a_report.md` with summary tables,
 EF and invalid histograms, sensitivity-gap analysis, retained/excluded instance
 lists, top failures, and publication-ready prose.
 
+**Phase A instance investigation** (confound / failure diagnosis):
+
+```bash
+earnbench investigate \
+  --phase-a-run experiments/runs/phase_a_golden \
+  --instance-id psf__requests-1921
+```
+
+Writes `investigation.json` and `investigation.md` under the instance directory
+with stage-level failure modes, harness test buckets, pi_env diagnosis (when
+available), and a suggested confound-register row.
+
 **Phase B exploit batch** (planted criterion controls):
 
 ```bash

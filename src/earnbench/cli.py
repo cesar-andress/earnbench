@@ -42,6 +42,7 @@ from earnbench.phase_a_batch import (
     resolve_batch_paths,
     run_phase_a_batch,
 )
+from earnbench.investigate import write_phase_a_investigation
 from earnbench.phase_a_report import generate_phase_a_report
 from earnbench.phase_b_batch import (
     PhaseBBatchConfig,
@@ -759,6 +760,42 @@ def cmd_report_phase_a(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_investigate(args: argparse.Namespace) -> None:
+    """Investigate one Phase A batch instance."""
+    phase_a_run = Path(args.phase_a_run).resolve()
+    metadata_path = (
+        Path(args.metadata_parquet).resolve() if args.metadata_parquet else None
+    )
+    output_dir = Path(args.output).resolve() if args.output else None
+    try:
+        result = write_phase_a_investigation(
+            phase_a_run=phase_a_run,
+            instance_id=args.instance_id,
+            metadata_path=metadata_path,
+            output_dir=output_dir,
+        )
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(
+        {
+            "instance_id": result.instance_id,
+            "phase_a_run": str(result.phase_a_run),
+            "investigation_json": str(result.investigation_json),
+            "investigation_md": str(result.investigation_md),
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
 def cmd_phase_b_run(args: argparse.Namespace) -> None:
     """Run Phase B planted exploit batch experiment."""
     exploit_dir = Path(args.exploit_dir)
@@ -1456,6 +1493,36 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write report only; do not print JSON summary to stdout",
     )
 
+    investigate_parser = subparsers.add_parser(
+        "investigate",
+        help="Investigate a Phase A batch instance outcome",
+    )
+    investigate_parser.add_argument(
+        "--phase-a-run",
+        required=True,
+        help="Path to completed Phase A batch output directory",
+    )
+    investigate_parser.add_argument(
+        "--instance-id",
+        required=True,
+        help="SWE-bench instance id to investigate",
+    )
+    investigate_parser.add_argument(
+        "--metadata-parquet",
+        default="",
+        help="Optional metadata override for pi_env diagnosis",
+    )
+    investigate_parser.add_argument(
+        "--output",
+        default="",
+        help="Directory for investigation files (default: <phase-a-run>/<instance-id>)",
+    )
+    investigate_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write investigation files only; do not print JSON to stdout",
+    )
+
     return parser
 
 
@@ -1522,6 +1589,8 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_report_phase_a(args)
             else:
                 parser.error(f"unknown report command: {args.report_command}")
+        elif args.command == "investigate":
+            cmd_investigate(args)
         else:
             parser.error(f"unknown command: {args.command}")
     except CLIError as exc:
