@@ -32,6 +32,7 @@ IN_REGISTRY_CHANNELS = frozenset(
 
 OUT_OF_REGISTRY_CHANNELS = frozenset(
     {
+        "memorization_or_patch_replay",
         "metadata_leakage",
         "retrieval_contamination",
         "patch_shape_gaming",

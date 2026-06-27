@@ -33,9 +33,11 @@ from earnbench.adapters.swebench_preflight import (
 )
 from earnbench.audit import AuditRecord
 from earnbench.classification import PerturbationOutcome
+from earnbench.exploit_validator import validate_runtime_run
 from earnbench.exploits.catalog import ExploitCatalogError, get_exploit, list_exploits
 from earnbench.exploits.validate import validate_path
-from earnbench.exploit_validator import validate_runtime_run
+from earnbench.injection_batch import InjectionBatchConfig, run_injection_batch
+from earnbench.injection_unblind import BlindUnblindError, unblind_injection_run
 from earnbench.injection_validity import generate_injection_validity_report
 from earnbench.injections import (
     InjectionCatalogError,
@@ -44,6 +46,10 @@ from earnbench.injections import (
 )
 from earnbench.injections import (
     validate_path as validate_injection_path,
+)
+from earnbench.injections.manifests import (
+    BlindInjectionError,
+    prepare_injection_manifests,
 )
 from earnbench.investigate import write_phase_a_investigation
 from earnbench.metrics import compute_earned_fraction
@@ -54,12 +60,12 @@ from earnbench.phase_a_batch import (
     run_phase_a_batch,
 )
 from earnbench.phase_a_report import generate_phase_a_report
-from earnbench.phase_b_report import generate_phase_b_report
 from earnbench.phase_b_batch import (
     PhaseBBatchConfig,
     resolve_metadata_path,
     run_phase_b_batch,
 )
+from earnbench.phase_b_report import generate_phase_b_report
 from earnbench.phase_c_agents import (
     PhaseCError,
     prepare_phase_c,
@@ -1167,6 +1173,105 @@ def cmd_injection_validate(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_injection_prepare(args: argparse.Namespace) -> None:
+    """Build injector/evaluator manifests and blind lockfile from specs."""
+    spec_dir = Path(args.spec_dir)
+    if not spec_dir.is_dir():
+        raise CLIError(f"--spec-dir not found: {spec_dir}")
+    output_dir = Path(args.output).resolve()
+    errors = validate_injection_path(spec_dir)
+    if errors:
+        for error in errors:
+            print(f"error: {error}", file=sys.stderr)
+        raise CLIError("injection spec validation failed", exit_code=1)
+    try:
+        result = prepare_injection_manifests(spec_dir, output_dir)
+    except BlindInjectionError as exc:
+        raise CLIError(str(exc)) from exc
+    payload = {
+        "status": "ok",
+        "pair_count": result.pair_count,
+        "artifact_count": result.artifact_count,
+        "injector_manifest": str(result.injector_manifest),
+        "evaluator_manifest": str(result.evaluator_manifest),
+        "blind_lockfile": str(result.blind_lockfile),
+    }
+    if not args.quiet:
+        json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+        sys.stdout.write("\n")
+
+
+def cmd_injection_run(args: argparse.Namespace) -> None:
+    """Run blind injection grading from evaluator manifest only."""
+    evaluator_manifest = Path(args.evaluator_manifest)
+    if not evaluator_manifest.is_file():
+        raise CLIError(f"--evaluator-manifest not found: {evaluator_manifest}")
+    try:
+        metadata_path = resolve_metadata_path(
+            Path(args.metadata_parquet) if args.metadata_parquet else None,
+        )
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
+    output_dir = (
+        Path(args.output).resolve()
+        if args.output
+        else (Path.cwd() / "blind_injection_run").resolve()
+    )
+    try:
+        run_config = resolve_swebench_run_config_from_args(args)
+    except (FileNotFoundError, ValueError) as exc:
+        raise CLIError(str(exc)) from exc
+    configure_structured_logging(verbose=not args.quiet)
+    print_swebench_execution_summary(
+        command="injection run",
+        config=run_config,
+        output_dir=output_dir,
+        instance_count=0,
+    )
+    batch_config = InjectionBatchConfig(
+        evaluator_manifest_path=evaluator_manifest.resolve(),
+        metadata_path=metadata_path,
+        output_dir=output_dir,
+        run_config=run_config,
+        workers=run_config.workers,
+        resume=bool(args.resume),
+        run_id=args.run_id or "blind_injection",
+        dataset_revision=args.dataset_revision,
+        build_missing_images=bool(args.build_missing_images),
+    )
+    payload = run_injection_batch(batch_config)
+    if not args.quiet:
+        json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+        sys.stdout.write("\n")
+
+
+def cmd_injection_unblind(args: argparse.Namespace) -> None:
+    """Verify lockfile and merge ground truth for injection validity analysis."""
+    run_dir = Path(args.run).resolve()
+    injector_manifest = Path(args.injector_manifest).resolve()
+    lockfile = Path(args.lockfile).resolve()
+    output_dir = Path(args.output).resolve() if args.output else run_dir
+    try:
+        result = unblind_injection_run(
+            run_dir=run_dir,
+            injector_manifest_path=injector_manifest,
+            lockfile_path=lockfile,
+            output_dir=output_dir,
+        )
+    except (BlindUnblindError, BlindInjectionError) as exc:
+        raise CLIError(str(exc)) from exc
+    payload = {
+        "status": "ok",
+        "output_dir": str(result.output_dir),
+        "injection_validity_report_md": str(result.report_md),
+        "channel_attribution_matrix_csv": str(result.channel_attribution_matrix_csv),
+        "injection_validity_summary_csv": str(result.summary_csv),
+    }
+    if not args.quiet:
+        json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+        sys.stdout.write("\n")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="earnbench",
@@ -1350,6 +1455,98 @@ def build_parser() -> argparse.ArgumentParser:
         "--quiet",
         action="store_true",
         help="Do not print validation summary JSON on success",
+    )
+    injection_prepare_parser = injection_subparsers.add_parser(
+        "prepare",
+        help="Build injector/evaluator manifests and blind lockfile",
+    )
+    injection_prepare_parser.add_argument(
+        "--spec-dir",
+        required=True,
+        help="Directory containing BI*.yaml injection specs and patches/",
+    )
+    injection_prepare_parser.add_argument(
+        "--output",
+        required=True,
+        help="Output directory for manifests and lockfile",
+    )
+    injection_prepare_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print prepare summary JSON on success",
+    )
+    injection_run_parser = injection_subparsers.add_parser(
+        "run",
+        help="Run blind injection harness grading from evaluator manifest",
+    )
+    injection_run_parser.add_argument(
+        "--evaluator-manifest",
+        required=True,
+        help="Path to evaluator_manifest.json (blinded artifact list)",
+    )
+    injection_run_parser.add_argument(
+        "--metadata-parquet",
+        default="",
+        help="SWE-bench Verified metadata (.parquet or .json)",
+    )
+    injection_run_parser.add_argument(
+        "--output",
+        default="",
+        help="Batch output directory (default: blind_injection_run/)",
+    )
+    injection_run_parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Skip completed artifact stages recorded on disk",
+    )
+    injection_run_parser.add_argument(
+        "--run-id",
+        default="",
+        help="Run identifier stored in run_manifest.json",
+    )
+    injection_run_parser.add_argument(
+        "--dataset-revision",
+        default="unpinned",
+        help="Dataset revision label for adapter config digest",
+    )
+    injection_run_parser.add_argument(
+        "--build-missing-images",
+        action="store_true",
+        help="Build missing SWE-bench harness images during preflight",
+    )
+    injection_run_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Progress on stderr only; omit batch summary JSON on stdout",
+    )
+    injection_unblind_parser = injection_subparsers.add_parser(
+        "unblind",
+        help="Verify lockfile and produce injection validity analysis",
+    )
+    injection_unblind_parser.add_argument(
+        "--run",
+        required=True,
+        help="Blind run output directory from injection run",
+    )
+    injection_unblind_parser.add_argument(
+        "--injector-manifest",
+        required=True,
+        help="Ground-truth injector_manifest.json from prepare step",
+    )
+    injection_unblind_parser.add_argument(
+        "--lockfile",
+        required=True,
+        help="blind_lockfile.json from prepare step",
+    )
+    injection_unblind_parser.add_argument(
+        "--output",
+        default="",
+        help="Analysis output directory (default: same as --run)",
+    )
+    injection_unblind_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print unblind summary JSON on success",
     )
 
     swebench_parser = subparsers.add_parser(
@@ -2049,6 +2246,12 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_injection_show(args)
             elif args.injection_command == "validate":
                 cmd_injection_validate(args)
+            elif args.injection_command == "prepare":
+                cmd_injection_prepare(args)
+            elif args.injection_command == "run":
+                cmd_injection_run(args)
+            elif args.injection_command == "unblind":
+                cmd_injection_unblind(args)
             else:
                 parser.error(f"unknown injection command: {args.injection_command}")
         elif args.command == "swebench":

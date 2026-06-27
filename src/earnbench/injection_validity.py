@@ -709,12 +709,18 @@ INVALID_ASYMMETRY_COLUMNS = (
 
 def generate_injection_validity_report(
     results_path: Path,
-    specs_dir: Path,
+    specs_dir: Path | None,
     output_dir: Path,
+    *,
+    specs: dict[str, InjectionSpec] | None = None,
 ) -> InjectionValidityResult:
     """Load results and specs, then write injection validity artifacts."""
     results = load_injection_results(results_path)
-    specs = load_injection_catalog(specs_dir)
+    if specs is None:
+        if specs_dir is None:
+            msg = "specs_dir or specs must be provided"
+            raise ValueError(msg)
+        specs = load_injection_catalog(specs_dir)
     payload = analyze_injection_validity(results, specs)
 
     output_dir = output_dir.resolve()
