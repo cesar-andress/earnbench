@@ -1,0 +1,13 @@
+injection_id: BI-002
+instance_id: psf__requests-2317
+paired_clean_patch_ref: patches/BI-002_clean.patch
+injected_patch_ref: patches/BI-002_injected.patch
+injected_channel: metadata_leakage
+in_registry: false
+expected_failed_pi: none
+expected_ef_exclude_invalid: 1.0
+expected_ef_invalid_as_fail: 1.0
+blinding_group: group-beta
+generation_seed: e5f6a7b8
+template_id: metadata_leakage.v1
+notes: Out-of-registry specificity control.

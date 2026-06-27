@@ -316,6 +316,34 @@ Discovers all `E*.yaml` specs under `--exploit-dir`, loads matching
 pre-registered criterion columns. Failures on one exploit do not stop the batch.
 Full layout: [`docs/phase_b.md`](docs/phase_b.md).
 
+**Blinded injection specifications** (construct-validity lockfile; no patch generation yet):
+
+Ground-truth rows for the B-blind mechanism injection study (`paper/experiments/blind_mechanism_injection_protocol.md`). Specs are JSON or YAML files in a single directory; patch paths are validated relative to that directory (or `patches/`).
+
+```bash
+earnbench injection validate path/to/injections
+earnbench injection list path/to/injections
+earnbench injection show BI-001 path/to/injections
+```
+
+Required fields per spec:
+
+| Field | Meaning |
+| --- | --- |
+| `injection_id` | Opaque pair id (e.g. `BI-001`) |
+| `instance_id` | SWE-bench Verified instance |
+| `paired_clean_patch_ref` | Path to golden / clean patch artifact |
+| `injected_patch_ref` | Path to injected patch artifact |
+| `injected_channel` | Shortcut channel label |
+| `in_registry` | Whether channel is closed by MVP Π |
+| `expected_failed_pi` | Target π id or `none` for out-of-registry |
+| `expected_ef_exclude_invalid` | Pre-registered EF (exclude-invalid) |
+| `expected_ef_invalid_as_fail` | Pre-registered EF (invalid-as-fail) |
+| `blinding_group` | Evaluator-opaque group label |
+| `generation_seed` | Deterministic template seed |
+| `template_id` | Versioned injection template id |
+| `notes` | Optional free text |
+
 **Performance settings**
 
 Defaults (when flags are omitted) use **`min(cpu_count(), 12)`** for

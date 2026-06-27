@@ -35,6 +35,15 @@ from earnbench.audit import AuditRecord
 from earnbench.classification import PerturbationOutcome
 from earnbench.exploits.catalog import ExploitCatalogError, get_exploit, list_exploits
 from earnbench.exploits.validate import validate_path
+from earnbench.injections import (
+    InjectionCatalogError,
+    get_injection,
+    list_injections,
+)
+from earnbench.injections import (
+    validate_path as validate_injection_path,
+)
+from earnbench.investigate import write_phase_a_investigation
 from earnbench.metrics import compute_earned_fraction
 from earnbench.outcomes import NominalOutcome, OutcomeStatus, PerturbationResult
 from earnbench.phase_a_batch import (
@@ -42,15 +51,14 @@ from earnbench.phase_a_batch import (
     resolve_batch_paths,
     run_phase_a_batch,
 )
-from earnbench.investigate import write_phase_a_investigation
 from earnbench.phase_a_report import generate_phase_a_report
-from earnbench.rank_stability import generate_rank_stability_report
 from earnbench.phase_b_batch import (
     PhaseBBatchConfig,
     resolve_metadata_path,
     run_phase_b_batch,
 )
 from earnbench.provenance import Provenance, build_provenance
+from earnbench.rank_stability import generate_rank_stability_report
 from earnbench.registry import RegistryError
 from earnbench.registry import get as get_perturbation
 from earnbench.registry import list as list_perturbations
@@ -943,6 +951,42 @@ def cmd_exploit_validate(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_injection_list(args: argparse.Namespace) -> None:
+    """List blinded injection specifications in a directory."""
+    directory = Path(args.directory)
+    try:
+        specs = list_injections(directory)
+    except InjectionCatalogError as exc:
+        raise CLIError(str(exc)) from exc
+    payload = {"injections": [spec.to_dict() for spec in specs]}
+    json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
+def cmd_injection_show(args: argparse.Namespace) -> None:
+    """Print one blinded injection specification as JSON."""
+    directory = Path(args.directory)
+    try:
+        spec = get_injection(directory, args.injection_id)
+    except InjectionCatalogError as exc:
+        raise CLIError(str(exc)) from exc
+    json.dump(spec.to_dict(), sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
+def cmd_injection_validate(args: argparse.Namespace) -> None:
+    """Validate one injection spec file or a directory of specs."""
+    errors = validate_injection_path(Path(args.path))
+    if errors:
+        for error in errors:
+            print(f"error: {error}", file=sys.stderr)
+        raise CLIError("injection validation failed", exit_code=1)
+    if args.quiet:
+        return
+    json.dump({"status": "ok"}, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="earnbench",
@@ -1057,6 +1101,48 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exploit spec file or directory of specs",
     )
     exploit_validate_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print validation summary JSON on success",
+    )
+
+    injection_parser = subparsers.add_parser(
+        "injection",
+        help="Inspect and validate blinded injection specifications",
+    )
+    injection_subparsers = injection_parser.add_subparsers(
+        dest="injection_command",
+        required=True,
+    )
+    injection_list_parser = injection_subparsers.add_parser(
+        "list",
+        help="List injection specs in a directory",
+    )
+    injection_list_parser.add_argument(
+        "directory",
+        help="Directory containing injection spec files (.json, .yaml, .yml)",
+    )
+    injection_show_parser = injection_subparsers.add_parser(
+        "show",
+        help="Show one injection spec",
+    )
+    injection_show_parser.add_argument(
+        "injection_id",
+        help="Injection id (injection_id field)",
+    )
+    injection_show_parser.add_argument(
+        "directory",
+        help="Directory containing injection spec files",
+    )
+    injection_validate_parser = injection_subparsers.add_parser(
+        "validate",
+        help="Validate an injection spec file or directory",
+    )
+    injection_validate_parser.add_argument(
+        "path",
+        help="Injection spec file or directory of specs",
+    )
+    injection_validate_parser.add_argument(
         "--quiet",
         action="store_true",
         help="Do not print validation summary JSON on success",
@@ -1617,6 +1703,15 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_exploit_validate(args)
             else:
                 parser.error(f"unknown exploit command: {args.exploit_command}")
+        elif args.command == "injection":
+            if args.injection_command == "list":
+                cmd_injection_list(args)
+            elif args.injection_command == "show":
+                cmd_injection_show(args)
+            elif args.injection_command == "validate":
+                cmd_injection_validate(args)
+            else:
+                parser.error(f"unknown injection command: {args.injection_command}")
         elif args.command == "swebench":
             if args.swebench_command == "prepare-smoke":
                 cmd_swebench_prepare_smoke(args)
