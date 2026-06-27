@@ -93,6 +93,7 @@ from earnbench.phase_c_agents import (
     summarize_phase_c,
 )
 from earnbench.provenance import Provenance, build_provenance
+from earnbench.policy_ef import generate_policy_ef_report
 from earnbench.rank_stability import generate_rank_stability_report
 from earnbench.registry import RegistryError
 from earnbench.registry import get as get_perturbation
@@ -821,6 +822,37 @@ def cmd_report_phase_b(args: argparse.Namespace) -> None:
         {
             "report_path": str(result.report_path),
             "output_dir": str(result.output_dir),
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
+def cmd_report_policy_ef(args: argparse.Namespace) -> None:
+    """Generate policy-level EF analysis for stochastic agent attempts."""
+    try:
+        result = generate_policy_ef_report(
+            Path(args.agent_results),
+            Path(args.output),
+            bootstrap_draws=args.bootstrap,
+        )
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(
+        {
+            "output_dir": str(result.output_dir),
+            "by_agent_csv": str(result.by_agent_csv),
+            "variance_csv": str(result.variance_csv),
+            "bootstrap_json": str(result.bootstrap_json),
+            "report_md": str(result.report_md),
         },
         sys.stdout,
         indent=2,
@@ -2754,6 +2786,31 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write artifacts only; do not print JSON summary to stdout",
     )
+    report_policy_ef_parser = report_subparsers.add_parser(
+        "policy-ef",
+        help="Policy-level EF analysis for stochastic agent replicates",
+    )
+    report_policy_ef_parser.add_argument(
+        "--agent-results",
+        required=True,
+        help="Long-format CSV with agent, instance_id, replicate, y0, ef_pi, ...",
+    )
+    report_policy_ef_parser.add_argument(
+        "--output",
+        required=True,
+        help="Directory for policy_ef_* artifacts",
+    )
+    report_policy_ef_parser.add_argument(
+        "--bootstrap",
+        type=int,
+        default=10_000,
+        help="Bootstrap resamples over instances (replicates kept within instance)",
+    )
+    report_policy_ef_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write artifacts only; do not print JSON summary to stdout",
+    )
     report_injection_validity_parser = report_subparsers.add_parser(
         "injection-validity",
         help="Analyze blinded mechanism injection construct validity",
@@ -3054,6 +3111,8 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_report_phase_b(args)
             elif args.report_command == "rank-stability":
                 cmd_report_rank_stability(args)
+            elif args.report_command == "policy-ef":
+                cmd_report_policy_ef(args)
             elif args.report_command == "injection-validity":
                 cmd_report_injection_validity(args)
             elif args.report_command == "controls":
