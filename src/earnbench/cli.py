@@ -35,6 +35,7 @@ from earnbench.audit import AuditRecord
 from earnbench.classification import PerturbationOutcome
 from earnbench.exploits.catalog import ExploitCatalogError, get_exploit, list_exploits
 from earnbench.exploits.validate import validate_path
+from earnbench.exploit_validator import validate_runtime_run
 from earnbench.injection_validity import generate_injection_validity_report
 from earnbench.injections import (
     InjectionCatalogError,
@@ -1028,6 +1029,32 @@ def cmd_exploit_validate(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_exploit_validate_runtime(args: argparse.Namespace) -> None:
+    """Validate completed Phase B runtime artifacts against scientific invariants."""
+    output_dir = Path(args.run).resolve()
+    exploit_dir = Path(args.exploit_dir).resolve() if args.exploit_dir else None
+    result = validate_runtime_run(
+        output_dir,
+        exploit_dir=exploit_dir,
+        exploit_ids=tuple(args.exploit_ids.split(",")) if args.exploit_ids else None,
+    )
+    payload = {
+        "status": "ok" if result.ok else "failed",
+        "output_dir": str(result.output_dir),
+        "exploit_dir": str(result.exploit_dir),
+        "validated_exploit_ids": list(result.validated_exploit_ids),
+        "error_count": len(result.errors),
+        "errors": list(result.errors),
+    }
+    if not args.quiet or not result.ok:
+        json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+        sys.stdout.write("\n")
+    if not result.ok:
+        for error in result.errors:
+            print(f"error: {error}", file=sys.stderr)
+        raise CLIError("runtime exploit validation failed", exit_code=1)
+
+
 def cmd_injection_list(args: argparse.Namespace) -> None:
     """List blinded injection specifications in a directory."""
     directory = Path(args.directory)
@@ -1178,6 +1205,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exploit spec file or directory of specs",
     )
     exploit_validate_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print validation summary JSON on success",
+    )
+    exploit_validate_runtime_parser = exploit_subparsers.add_parser(
+        "validate-runtime",
+        help="Validate Phase B runtime results against scientific invariants",
+    )
+    exploit_validate_runtime_parser.add_argument(
+        "--run",
+        required=True,
+        help="Completed Phase B batch output directory containing summary.csv",
+    )
+    exploit_validate_runtime_parser.add_argument(
+        "--exploit-dir",
+        default="",
+        help="Exploit spec directory (default: read from run_manifest.json)",
+    )
+    exploit_validate_runtime_parser.add_argument(
+        "--exploit-ids",
+        default="",
+        help="Comma-separated exploit ids to validate (default: all in run manifest)",
+    )
+    exploit_validate_runtime_parser.add_argument(
         "--quiet",
         action="store_true",
         help="Do not print validation summary JSON on success",
@@ -1823,6 +1874,8 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_exploit_show(args)
             elif args.exploit_command == "validate":
                 cmd_exploit_validate(args)
+            elif args.exploit_command == "validate-runtime":
+                cmd_exploit_validate_runtime(args)
             else:
                 parser.error(f"unknown exploit command: {args.exploit_command}")
         elif args.command == "injection":
