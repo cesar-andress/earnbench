@@ -4,13 +4,23 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 DEFAULT_TIMEOUT_SECONDS = 1800
-DEFAULT_WORKERS = 1
+MAX_WORKER_CAP = 12
+
+
+def default_workers(*, cpu_count: int | None = None) -> int:
+    """Return the default worker count: ``min(cpu_count(), 12)``."""
+    cores = cpu_count if cpu_count is not None else (os.cpu_count() or 1)
+    return max(1, min(cores, MAX_WORKER_CAP))
+
+
+DEFAULT_WORKERS = default_workers()
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,24 +28,61 @@ class SWEBenchRunConfig:
     """Resolved execution settings for SWE-bench preflight and grading."""
 
     workers: int
+    max_parallel_containers: int
+    max_parallel_builds: int
     reuse_images: bool
     allow_build: bool
     cache_dir: Path | None
     timeout_seconds: int
 
     @property
-    def effective_instance_workers(self) -> int:
-        """Instance-level parallelism reserved for future batch mode."""
-        return max(1, self.workers)
-
-    @property
-    def effective_harness_build_workers(self) -> int:
-        """Harness Docker build pool size for one instance (always serial)."""
-        return 1
-
-    @property
     def force_rebuild(self) -> bool:
         return not self.reuse_images
+
+    def effective_instance_workers(self, instance_count: int = 1) -> int:
+        """Parallel SWE-bench instance grading (batch mode)."""
+        if instance_count <= 1:
+            return 1
+        return max(
+            1,
+            min(self.workers, self.max_parallel_containers, instance_count),
+        )
+
+    def effective_harness_build_workers(self, build_jobs: int = 1) -> int:
+        """Parallel Docker image builds via the SWE-bench harness."""
+        if build_jobs <= 1:
+            return 1
+        return max(1, min(self.max_parallel_builds, build_jobs))
+
+    def effective_image_inspect_workers(self, image_count: int) -> int:
+        """Parallel ``docker image inspect`` calls (I/O-bound)."""
+        if image_count <= 1:
+            return 1
+        return max(
+            1,
+            min(self.workers, self.max_parallel_containers, image_count),
+        )
+
+    def parallelism_summary(self, *, instance_count: int = 1) -> dict[str, int]:
+        """Return effective parallelism for operator logs."""
+        image_jobs = 3 if instance_count >= 1 else 1
+        return {
+            "workers": self.workers,
+            "max_parallel_containers": self.max_parallel_containers,
+            "max_parallel_builds": self.max_parallel_builds,
+            "effective_instance_workers": self.effective_instance_workers(
+                instance_count
+            ),
+            "effective_container_workers": self.effective_instance_workers(
+                instance_count
+            ),
+            "effective_build_workers": self.effective_harness_build_workers(
+                build_jobs=self.max_parallel_builds,
+            ),
+            "effective_image_inspect_workers": self.effective_image_inspect_workers(
+                image_jobs,
+            ),
+        }
 
 
 def load_swebench_config_file(path: Path | None) -> dict[str, Any]:
@@ -52,19 +99,32 @@ def load_swebench_config_file(path: Path | None) -> dict[str, Any]:
     return data
 
 
+def _positive_int(name: str, value: int) -> int:
+    if value < 1:
+        msg = f"{name} must be >= 1, got {value}"
+        raise ValueError(msg)
+    return value
+
+
 def resolve_swebench_run_config(
     *,
     config_path: Path | None = None,
     workers: int | None = None,
+    max_parallel_containers: int | None = None,
+    max_parallel_builds: int | None = None,
     reuse_images: bool | None = None,
     no_build: bool = False,
     cache_dir: Path | None = None,
     timeout_seconds: int | None = None,
+    cpu_count: int | None = None,
 ) -> SWEBenchRunConfig:
     """Merge file defaults with CLI flags into one run configuration."""
     file_data = load_swebench_config_file(config_path)
+    baseline_workers = default_workers(cpu_count=cpu_count)
     merged: dict[str, Any] = {
-        "workers": DEFAULT_WORKERS,
+        "workers": baseline_workers,
+        "max_parallel_containers": baseline_workers,
+        "max_parallel_builds": baseline_workers,
         "reuse_images": True,
         "allow_build": True,
         "cache_dir": None,
@@ -76,6 +136,10 @@ def resolve_swebench_run_config(
 
     if workers is not None:
         merged["workers"] = workers
+    if max_parallel_containers is not None:
+        merged["max_parallel_containers"] = max_parallel_containers
+    if max_parallel_builds is not None:
+        merged["max_parallel_builds"] = max_parallel_builds
     if reuse_images is not None:
         merged["reuse_images"] = reuse_images
     if cache_dir is not None:
@@ -87,15 +151,24 @@ def resolve_swebench_run_config(
     elif "allow_build" in file_data and file_data["allow_build"] is False:
         merged["allow_build"] = False
 
-    resolved_workers = int(merged["workers"])
-    if resolved_workers < 1:
-        msg = f"--workers must be >= 1, got {resolved_workers}"
-        raise ValueError(msg)
+    if max_parallel_containers is None and "max_parallel_containers" not in file_data:
+        merged["max_parallel_containers"] = merged["workers"]
+    if max_parallel_builds is None and "max_parallel_builds" not in file_data:
+        merged["max_parallel_builds"] = merged["workers"]
 
-    resolved_timeout = int(merged["timeout_seconds"])
-    if resolved_timeout < 1:
-        msg = f"--timeout-seconds must be >= 1, got {resolved_timeout}"
-        raise ValueError(msg)
+    resolved_workers = _positive_int("--workers", int(merged["workers"]))
+    resolved_containers = _positive_int(
+        "--max-parallel-containers",
+        int(merged["max_parallel_containers"]),
+    )
+    resolved_builds = _positive_int(
+        "--max-parallel-builds",
+        int(merged["max_parallel_builds"]),
+    )
+    resolved_timeout = _positive_int(
+        "--timeout-seconds",
+        int(merged["timeout_seconds"]),
+    )
 
     cache_path: Path | None
     raw_cache = merged.get("cache_dir")
@@ -106,6 +179,8 @@ def resolve_swebench_run_config(
 
     return SWEBenchRunConfig(
         workers=resolved_workers,
+        max_parallel_containers=resolved_containers,
+        max_parallel_builds=resolved_builds,
         reuse_images=bool(merged["reuse_images"]),
         allow_build=bool(merged["allow_build"]),
         cache_dir=cache_path,
@@ -118,6 +193,8 @@ def resolve_swebench_run_config_from_args(args: Any) -> SWEBenchRunConfig:
     return resolve_swebench_run_config(
         config_path=getattr(args, "config", None),
         workers=getattr(args, "workers", None),
+        max_parallel_containers=getattr(args, "max_parallel_containers", None),
+        max_parallel_builds=getattr(args, "max_parallel_builds", None),
         reuse_images=getattr(args, "reuse_images", None),
         no_build=bool(getattr(args, "no_build", False)),
         cache_dir=getattr(args, "cache_dir", None),
@@ -185,25 +262,17 @@ def print_swebench_execution_summary(
 ) -> None:
     """Print effective parallelism and cache settings before execution."""
     cache_status = describe_image_cache_status(config, output_dir)
-    if instance_count <= 1:
-        harness_workers = config.effective_harness_build_workers
-        instance_workers = 1
-        parallelism_note = (
-            f"requested_workers={config.workers}, "
-            f"effective_instance_workers={instance_workers} "
-            f"(single-instance; batch reserve={config.effective_instance_workers}), "
-            f"harness_build_workers={harness_workers}"
-        )
-    else:
-        instance_workers = min(config.effective_instance_workers, instance_count)
-        harness_workers = config.effective_harness_build_workers
-        parallelism_note = (
-            f"requested_workers={config.workers}, "
-            f"effective_instance_workers={instance_workers}, "
-            f"harness_build_workers={harness_workers}"
-        )
-
-    print(f"earnbench swebench {command}: {parallelism_note}", file=sys.stderr)
+    parallel = config.parallelism_summary(instance_count=instance_count)
+    print(
+        f"earnbench swebench {command}: "
+        f"workers={parallel['workers']} "
+        f"max_parallel_containers={parallel['max_parallel_containers']} "
+        f"max_parallel_builds={parallel['max_parallel_builds']} "
+        f"effective_instance_workers={parallel['effective_instance_workers']} "
+        f"effective_build_workers={parallel['effective_build_workers']} "
+        f"effective_image_inspect_workers={parallel['effective_image_inspect_workers']}",
+        file=sys.stderr,
+    )
     print(
         "image cache: "
         f"dir={cache_status['cache_dir']} "
@@ -219,6 +288,9 @@ def print_swebench_execution_summary(
 
 def add_swebench_performance_arguments(parser: argparse.ArgumentParser) -> None:
     """Register shared performance flags on a subcommand parser."""
+    default_workers_help = (
+        f"default: min(cpu_count(), {MAX_WORKER_CAP}) = {DEFAULT_WORKERS}"
+    )
     parser.add_argument(
         "--config",
         type=Path,
@@ -230,8 +302,25 @@ def add_swebench_performance_arguments(parser: argparse.ArgumentParser) -> None:
         type=int,
         default=None,
         help=(
-            "Requested worker count for batch instance parallelism "
-            f"(default from config: {DEFAULT_WORKERS})"
+            "Top-level worker budget for instance/batch orchestration; "
+            + default_workers_help
+        ),
+    )
+    parser.add_argument(
+        "--max-parallel-containers",
+        type=int,
+        default=None,
+        help=(
+            "Cap on concurrent SWE-bench Docker grading containers; "
+            + default_workers_help
+        ),
+    )
+    parser.add_argument(
+        "--max-parallel-builds",
+        type=int,
+        default=None,
+        help=(
+            "Cap on concurrent SWE-bench harness image builds; " + default_workers_help
         ),
     )
     parser.add_argument(
@@ -265,8 +354,10 @@ def add_swebench_performance_arguments(parser: argparse.ArgumentParser) -> None:
 __all__ = [
     "DEFAULT_TIMEOUT_SECONDS",
     "DEFAULT_WORKERS",
+    "MAX_WORKER_CAP",
     "SWEBenchRunConfig",
     "add_swebench_performance_arguments",
+    "default_workers",
     "describe_image_cache_status",
     "effective_cache_dir",
     "load_swebench_config_file",

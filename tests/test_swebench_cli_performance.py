@@ -9,7 +9,8 @@ import pytest
 
 from earnbench.adapters.swebench_config import (
     DEFAULT_TIMEOUT_SECONDS,
-    DEFAULT_WORKERS,
+    MAX_WORKER_CAP,
+    default_workers,
     resolve_swebench_run_config,
     resolve_swebench_run_config_from_args,
 )
@@ -63,6 +64,24 @@ def _run_pi_verif_argv(*extra: str) -> list[str]:
         "/tmp/out",
     ]
     return base + list(extra)
+
+
+def test_preflight_parses_parallelism_flags() -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        _preflight_argv(
+            "--workers",
+            "8",
+            "--max-parallel-containers",
+            "6",
+            "--max-parallel-builds",
+            "4",
+        )
+    )
+
+    assert args.workers == 8
+    assert args.max_parallel_containers == 6
+    assert args.max_parallel_builds == 4
 
 
 def test_preflight_parses_performance_flags() -> None:
@@ -152,6 +171,8 @@ def test_resolve_config_uses_json_defaults(tmp_path: Path) -> None:
 
     assert config.timeout_seconds == 2400
     assert config.workers == 4
+    assert config.max_parallel_containers == 4
+    assert config.max_parallel_builds == 4
     assert config.reuse_images is False
     assert config.cache_dir == Path("/tmp/from-file")
     assert config.force_rebuild is True
@@ -184,16 +205,44 @@ def test_resolve_config_defaults_without_file() -> None:
     config = resolve_swebench_run_config(
         config_path=None,
         workers=None,
+        max_parallel_containers=None,
+        max_parallel_builds=None,
         reuse_images=None,
         no_build=False,
         cache_dir=None,
         timeout_seconds=None,
+        cpu_count=32,
     )
 
-    assert config.workers == DEFAULT_WORKERS
+    assert config.workers == MAX_WORKER_CAP
+    assert config.max_parallel_containers == MAX_WORKER_CAP
+    assert config.max_parallel_builds == MAX_WORKER_CAP
     assert config.timeout_seconds == DEFAULT_TIMEOUT_SECONDS
     assert config.reuse_images is True
     assert config.allow_build is True
+
+
+def test_default_workers_caps_at_twelve() -> None:
+    assert default_workers(cpu_count=64) == 12
+    assert default_workers(cpu_count=4) == 4
+    assert default_workers(cpu_count=0) == 1
+
+
+def test_effective_parallelism_for_batch() -> None:
+    from earnbench.adapters.swebench_config import SWEBenchRunConfig
+
+    config = SWEBenchRunConfig(
+        workers=12,
+        max_parallel_containers=8,
+        max_parallel_builds=6,
+        reuse_images=True,
+        allow_build=True,
+        cache_dir=None,
+        timeout_seconds=1800,
+    )
+    assert config.effective_instance_workers(20) == 8
+    assert config.effective_harness_build_workers(build_jobs=10) == 6
+    assert config.effective_image_inspect_workers(5) == 5
 
 
 def test_resolve_config_rejects_invalid_workers() -> None:
@@ -201,6 +250,8 @@ def test_resolve_config_rejects_invalid_workers() -> None:
         resolve_swebench_run_config(
             config_path=None,
             workers=0,
+            max_parallel_containers=None,
+            max_parallel_builds=None,
             reuse_images=None,
             no_build=False,
             cache_dir=None,

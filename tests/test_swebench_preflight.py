@@ -160,6 +160,8 @@ def test_default_build_instance_images_passes_latest_tags(monkeypatch) -> None:
 
     config = SWEBenchRunConfig(
         workers=8,
+        max_parallel_containers=8,
+        max_parallel_builds=4,
         reuse_images=True,
         allow_build=True,
         cache_dir=None,
@@ -170,7 +172,7 @@ def test_default_build_instance_images_passes_latest_tags(monkeypatch) -> None:
     assert ok is True
     assert captured["tag"] == "latest"
     assert captured["env_image_tag"] == "latest"
-    assert captured["max_workers"] == 1
+    assert captured["max_workers"] == 4
     assert captured["force_rebuild"] is False
     assert log == ""
 

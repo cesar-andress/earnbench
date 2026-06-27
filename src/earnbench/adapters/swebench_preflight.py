@@ -143,15 +143,28 @@ def default_image_inspector(client: Any) -> ImageInspector:
 def partition_images(
     required: RequiredImages,
     inspector: ImageInspector,
+    *,
+    parallel_workers: int = 1,
 ) -> tuple[list[str], list[str]]:
     """Split required image names into present and missing lists."""
-    present: list[str] = []
-    missing: list[str] = []
-    for image_name in required_images_to_mapping(required).values():
-        if inspector(image_name):
-            present.append(image_name)
-        else:
-            missing.append(image_name)
+    images = list(required_images_to_mapping(required).values())
+    if len(images) <= 1 or parallel_workers <= 1:
+        present: list[str] = []
+        missing: list[str] = []
+        for image_name in images:
+            if inspector(image_name):
+                present.append(image_name)
+            else:
+                missing.append(image_name)
+        return present, missing
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    workers = max(1, min(parallel_workers, len(images)))
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        outcomes = list(executor.map(lambda name: (name, inspector(name)), images))
+    present = [name for name, exists in outcomes if exists]
+    missing = [name for name, exists in outcomes if not exists]
     return present, missing
 
 
@@ -198,7 +211,9 @@ def default_build_instance_images(
                 client=client,
                 dataset=[row],
                 force_rebuild=config.force_rebuild,
-                max_workers=config.effective_harness_build_workers,
+                max_workers=config.effective_harness_build_workers(
+                    build_jobs=config.max_parallel_builds,
+                ),
                 tag=LATEST,
                 env_image_tag=LATEST,
             )
@@ -314,17 +329,18 @@ def run_swebench_preflight(
 
     run_config = config or SWEBenchRunConfig(
         workers=DEFAULT_WORKERS,
+        max_parallel_containers=DEFAULT_WORKERS,
+        max_parallel_builds=DEFAULT_WORKERS,
         reuse_images=True,
         allow_build=True,
         cache_dir=None,
         timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
     )
     prepare_swebench_workdir(output_dir, run_config)
+    parallel = run_config.parallelism_summary(instance_count=1)
     performance = {
         **describe_image_cache_status(run_config, output_dir),
-        "workers": run_config.workers,
-        "effective_instance_workers": 1,
-        "effective_harness_build_workers": run_config.effective_harness_build_workers,
+        **parallel,
         "timeout_seconds": run_config.timeout_seconds,
     }
 
@@ -334,8 +350,9 @@ def run_swebench_preflight(
     instance_dir.mkdir(parents=True, exist_ok=True)
     log_lines: list[str] = [
         f"cache_dir={effective_cache_dir(run_config, output_dir)}",
-        f"workers={run_config.workers} "
-        f"effective_harness_build_workers={run_config.effective_harness_build_workers}",
+        f"workers={parallel['workers']} "
+        f"max_parallel_builds={parallel['max_parallel_builds']} "
+        f"effective_build_workers={parallel['effective_build_workers']}",
         f"reuse_images={run_config.reuse_images} allow_build={run_config.allow_build}",
     ]
 
@@ -369,7 +386,13 @@ def run_swebench_preflight(
         else:
             inspect = inspector
 
-        present_images, missing_images = partition_images(required, inspect)
+        present_images, missing_images = partition_images(
+            required,
+            inspect,
+            parallel_workers=run_config.effective_image_inspect_workers(
+                len(required_images_to_mapping(required)),
+            ),
+        )
         log_lines.append(f"Present: {present_images or 'none'}")
         log_lines.append(f"Missing: {missing_images or 'none'}")
 
@@ -392,7 +415,13 @@ def run_swebench_preflight(
                 build_log = f"Build error: {exc}"
             if build_log.strip():
                 log_lines.append(build_log.rstrip())
-            present_images, missing_images = partition_images(required, inspect)
+            present_images, missing_images = partition_images(
+                required,
+                inspect,
+                parallel_workers=run_config.effective_image_inspect_workers(
+                    len(required_images_to_mapping(required)),
+                ),
+            )
             log_lines.append(f"After build present: {present_images or 'none'}")
             log_lines.append(f"After build missing: {missing_images or 'none'}")
         elif build_missing_images and missing_images and not run_config.allow_build:

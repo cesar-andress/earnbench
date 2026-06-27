@@ -147,7 +147,6 @@ earnbench swebench preflight \
   --metadata-parquet path/to/swe_verified_test.parquet \
   --instance-id psf__requests-1724 \
   --output /tmp/earnbench_smoke \
-  --workers 1 \
   --build-missing-images
 
 # 3. Nominal golden-patch grading (F2P + P2P)
@@ -155,52 +154,55 @@ earnbench swebench run-nominal \
   --metadata-parquet path/to/swe_verified_test.parquet \
   --instance-id psf__requests-1724 \
   --patch /tmp/earnbench_smoke/psf__requests-1724/patch/prod_only.patch \
-  --output /tmp/earnbench_smoke \
-  --workers 1
+  --output /tmp/earnbench_smoke
 
 # 4. Pristine trusted verifier (pi_verif.v1) on the same prod-only patch
 earnbench swebench run-pi-verif \
   --metadata-parquet path/to/swe_verified_test.parquet \
   --instance-id psf__requests-1724 \
   --patch /tmp/earnbench_smoke/psf__requests-1724/patch/prod_only.patch \
-  --output /tmp/earnbench_smoke \
-  --workers 1
-```
-
-Optional JSON config (defaults for `--timeout-seconds`, `--workers`, cache):
-
-```json
-{
-  "timeout_seconds": 1800,
-  "workers": 1,
-  "reuse_images": true,
-  "cache_dir": "/tmp/earnbench_swebench_cache"
-}
-```
-
-```bash
-earnbench swebench run-nominal --config swebench.json ...
+  --output /tmp/earnbench_smoke
 ```
 
 **Performance settings**
 
-| Scenario | Recommended `--workers` | Notes |
-|----------|-------------------------|-------|
-| Smoke / single instance | `1` | Single-instance commands keep harness build parallelism at 1 |
-| Phase A batch (high-CPU) | `8` or `12` | Reserved for future batch mode (instance-level parallelism) |
-| Docker memory rule | — | Avoid exceeding roughly **RAM / 8GB** concurrent containers |
+Defaults (when flags are omitted) use **`min(cpu_count(), 12)`** for
+`--workers`, `--max-parallel-containers`, and `--max-parallel-builds`.
+Override any of them explicitly or via JSON config:
 
-Shared flags for `preflight` and `run-nominal`:
+```json
+{
+  "workers": 12,
+  "max_parallel_containers": 8,
+  "max_parallel_builds": 6,
+  "timeout_seconds": 1800,
+  "cache_dir": "/tmp/earnbench_swebench_cache"
+}
+```
 
-- `--workers` — batch instance parallelism (single-instance runs stay serial)
-- `--reuse-images` / `--no-reuse-images` — reuse local Docker images vs force rebuild
-- `--no-build` — never build images (check only; preflight skips build)
-- `--cache-dir` — persistent harness build logs and artifacts (default: `<output>/.swebench_cache`)
-- `--timeout-seconds` — harness test timeout (default **1800** from config)
-- `--config` — JSON file supplying the defaults above
+| Flag | Role |
+|------|------|
+| `--workers` | Top-level orchestration budget (batch instances / future perturbation fan-out) |
+| `--max-parallel-containers` | Cap on concurrent SWE-bench grading containers |
+| `--max-parallel-builds` | Cap on concurrent harness Docker image builds (`preflight`) |
+| `--reuse-images` / `--no-reuse-images` | Reuse local images vs force rebuild |
+| `--no-build` | Never build images during preflight |
+| `--cache-dir` | Persistent harness build logs (default `<output>/.swebench_cache`) |
+| `--timeout-seconds` | Per-instance harness timeout (default **1800**) |
+| `--config` | JSON file with any of the above |
 
-Before execution, both commands print effective parallelism and image cache
-status to stderr.
+**Sizing guidance**
+
+| Scenario | Suggested settings | Notes |
+|----------|-------------------|-------|
+| High-CPU workstation (this repo default) | omit flags | Uses `min(cpu_count(), 12)` for all three caps |
+| Smoke / low memory | `--workers 1 --max-parallel-containers 1 --max-parallel-builds 1` | Serial Docker for easier debugging |
+| Phase A batch | `--workers 12 --max-parallel-containers 8 --max-parallel-builds 6` | Tune to **RAM / 8GB** concurrent containers |
+| Build-heavy preflight | raise `--max-parallel-builds` | Parallel base/env/instance image builds |
+
+Single-instance `run-nominal` / `run-pi-verif` still run **one grading container**;
+parallel caps apply to image inspection (I/O), image builds, and future batch modes.
+Before execution, commands print **effective** parallelism to stderr.
 
 Preflight writes `<output>/<instance_id>/preflight.json` and `preflight.log`
 with required Docker image names, local presence checks, and actionable build
@@ -214,8 +216,7 @@ earnbench swebench run-nominal \
   --metadata-parquet path/to/swe_verified_test.parquet \
   --instance-id psf__requests-1724 \
   --patch /tmp/earnbench_smoke/psf__requests-1724/patch/prod_only.patch \
-  --output /tmp/earnbench_smoke \
-  --workers 1
+  --output /tmp/earnbench_smoke
 ```
 
 Writes under `<output>/<instance_id>/nominal/`:

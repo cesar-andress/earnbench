@@ -255,6 +255,8 @@ def run_pi_verif_grading(
 
     run_config = config or SWEBenchRunConfig(
         workers=DEFAULT_WORKERS,
+        max_parallel_containers=DEFAULT_WORKERS,
+        max_parallel_builds=DEFAULT_WORKERS,
         reuse_images=True,
         allow_build=True,
         cache_dir=None,
