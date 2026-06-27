@@ -51,6 +51,7 @@ Failures on one exploit **do not** stop the batch.
 ├── confusion_matrix.csv
 ├── registry_coverage.csv
 ├── run_manifest.json
+├── phase_b_report.md          # from `earnbench report phase-b`
 ├── batch_state.json
 ├── reports/<exploit_id>.json
 ├── audits/<exploit_id>/
@@ -69,6 +70,19 @@ With `--resume`, an exploit is complete when
 `<output>/<exploit_id>/<instance_id>/report.json` exists. Individual stages
 (`prepare`, `preflight`, `nominal`, each π) resume independently when their
 artifact files are present.
+
+## Report generation
+
+After a batch completes, generate a deterministic markdown report:
+
+```bash
+earnbench report phase-b experiments/runs/phase_b_exploit
+```
+
+Writes `phase_b_report.md` in the batch directory with completed/failed counts,
+family-level tables, expected-vs-observed outcomes, confusion matrix, targeted-π
+failure rates, EF and invalid distributions, sensitivity-gap analysis, registry
+coverage, kill-condition checklist, and publication-ready summary text.
 
 ## Related
 

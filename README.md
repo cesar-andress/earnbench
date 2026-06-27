@@ -316,6 +316,19 @@ Discovers all `E*.yaml` specs under `--exploit-dir`, loads matching
 pre-registered criterion columns. Failures on one exploit do not stop the batch.
 Full layout: [`docs/phase_b.md`](docs/phase_b.md).
 
+**Phase B report** (deterministic markdown from completed batch):
+
+```bash
+earnbench report phase-b experiments/runs/phase_b_exploit
+```
+
+Reads `summary.csv`, `statistics.json`, `confusion_matrix.csv`,
+`registry_coverage.csv`, `failures.csv`, and `run_manifest.json` from the batch
+directory and writes `phase_b_report.md` with batch counts, family-level tables,
+expected-vs-observed outcomes, confusion matrix, targeted-π failure rates, EF and
+invalid distributions, sensitivity-gap analysis, registry coverage, kill-condition
+checklist, and publication-ready prose.
+
 **Blinded injection specifications** (construct-validity lockfile; no patch generation yet):
 
 Ground-truth rows for the B-blind mechanism injection study (`paper/experiments/blind_mechanism_injection_protocol.md`). Specs are JSON or YAML files in a single directory; patch paths are validated relative to that directory (or `patches/`).

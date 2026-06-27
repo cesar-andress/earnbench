@@ -53,6 +53,7 @@ from earnbench.phase_a_batch import (
     run_phase_a_batch,
 )
 from earnbench.phase_a_report import generate_phase_a_report
+from earnbench.phase_b_report import generate_phase_b_report
 from earnbench.phase_b_batch import (
     PhaseBBatchConfig,
     resolve_metadata_path,
@@ -750,6 +751,31 @@ def cmd_report_phase_a(args: argparse.Namespace) -> None:
     output_dir = Path(args.output_dir).resolve()
     try:
         result = generate_phase_a_report(output_dir)
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(
+        {
+            "report_path": str(result.report_path),
+            "output_dir": str(result.output_dir),
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
+def cmd_report_phase_b(args: argparse.Namespace) -> None:
+    """Generate deterministic Phase B markdown report."""
+    output_dir = Path(args.output_dir).resolve()
+    try:
+        result = generate_phase_b_report(output_dir)
     except FileNotFoundError as exc:
         raise CLIError(str(exc)) from exc
     except ValueError as exc:
@@ -1674,6 +1700,19 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write report only; do not print JSON summary to stdout",
     )
+    report_phase_b_parser = report_subparsers.add_parser(
+        "phase-b",
+        help="Generate phase_b_report.md from a completed Phase B batch directory",
+    )
+    report_phase_b_parser.add_argument(
+        "output_dir",
+        help="Path to completed Phase B batch output (contains summary.csv)",
+    )
+    report_phase_b_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write report only; do not print JSON summary to stdout",
+    )
     report_rank_stability_parser = report_subparsers.add_parser(
         "rank-stability",
         help="Compute Earned Rank Stability (ERS) from agent × instance CSV",
@@ -1827,6 +1866,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "report":
             if args.report_command == "phase-a":
                 cmd_report_phase_a(args)
+            elif args.report_command == "phase-b":
+                cmd_report_phase_b(args)
             elif args.report_command == "rank-stability":
                 cmd_report_rank_stability(args)
             elif args.report_command == "injection-validity":
