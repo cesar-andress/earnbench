@@ -1,5 +1,14 @@
 # Examples
 
-Examples will demonstrate computing Earned Fraction on nominally successful agent submissions.
+Runnable demonstrations of EarnBench without external benchmark dependencies.
 
-**Not yet available** — this directory is a placeholder for the artifact skeleton.
+## Synthetic visible test overfitting
+
+```bash
+pip install -e .
+python examples/synthetic_visible_test_overfitting.py
+```
+
+Simulates a nominally successful agent run and three counterfactual perturbations
+(`visible_test_removed`, `metadata_removed`, `verifier_hardened`). Writes
+`synthetic_visible_test_overfitting.report.json` alongside the script.

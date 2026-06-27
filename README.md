@@ -36,6 +36,21 @@ ruff check .
 ruff format .
 ```
 
+## Example (synthetic, no SWE-bench)
+
+A minimal end-to-end demo simulates a nominally successful run and three
+counterfactual perturbations (`visible_test_removed`, `metadata_removed`,
+`verifier_hardened`). One perturbation fails and two survive, yielding
+Earned Fraction \(= 2/3\).
+
+```bash
+pip install -e .
+python examples/synthetic_visible_test_overfitting.py
+```
+
+The script prints an `EarnedFractionReport` summary and writes
+`examples/synthetic_visible_test_overfitting.report.json`.
+
 ## License
 
 See [LICENSE](LICENSE).
