@@ -93,6 +93,7 @@ from earnbench.phase_c_agents import (
     summarize_phase_c,
 )
 from earnbench.provenance import Provenance, build_provenance
+from earnbench.phase_c_prime import validate_phase_c_prime_manifest
 from earnbench.policy_ef import generate_policy_ef_report
 from earnbench.policy_variance import generate_policy_variance_report
 from earnbench.rank_stability import generate_rank_stability_report
@@ -861,6 +862,31 @@ def cmd_report_policy_ef(args: argparse.Namespace) -> None:
                 if result.exploitation_frontier_csv is not None
                 else {}
             ),
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
+def cmd_phase_c_prime_validate_manifest(args: argparse.Namespace) -> None:
+    """Validate a Phase C′ pilot manifest CSV (schema only)."""
+    result = validate_phase_c_prime_manifest(Path(args.manifest))
+    if not result.ok:
+        for error in result.errors:
+            print(f"error: {error}", file=sys.stderr)
+        raise CLIError("Phase C prime manifest validation failed", exit_code=1)
+    if args.quiet:
+        return
+    json.dump(
+        {
+            "status": "ok",
+            "manifest": str(result.path),
+            "row_count": result.row_count,
+            "agent_count": result.agent_count,
+            "instance_count": result.instance_count,
+            "total_attempts": result.total_attempts,
         },
         sys.stdout,
         indent=2,
@@ -1989,6 +2015,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Do not print validation summary JSON on success",
     )
 
+    phase_c_prime_parser = subparsers.add_parser(
+        "phase-c-prime",
+        help="Phase C′ variance-pilot planning tools",
+    )
+    phase_c_prime_subparsers = phase_c_prime_parser.add_subparsers(
+        dest="phase_c_prime_command",
+        required=True,
+    )
+    phase_c_prime_validate_parser = phase_c_prime_subparsers.add_parser(
+        "validate-manifest",
+        help="Validate Phase C′0 pilot manifest CSV schema",
+    )
+    phase_c_prime_validate_parser.add_argument(
+        "manifest",
+        help="Path to phase_c_prime_pilot_manifest.csv",
+    )
+    phase_c_prime_validate_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print validation summary JSON on success",
+    )
+
     external_exploit_parser = subparsers.add_parser(
         "external-exploit",
         help="Phase B-ext external exploit catalog tools",
@@ -3100,6 +3148,13 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_controls_validate_manifest(args)
             else:
                 parser.error(f"unknown controls command: {args.controls_command}")
+        elif args.command == "phase-c-prime":
+            if args.phase_c_prime_command == "validate-manifest":
+                cmd_phase_c_prime_validate_manifest(args)
+            else:
+                parser.error(
+                    f"unknown phase-c-prime command: {args.phase_c_prime_command}"
+                )
         elif args.command == "external-exploit":
             if args.external_exploit_command == "validate-catalog":
                 cmd_external_exploit_validate_catalog(args)

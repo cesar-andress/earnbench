@@ -8,6 +8,7 @@ Documentation is in early draft. Design notes live in the private research repos
 - [External unearned anchor](external_unearned_anchor.md)
 - [Policy-level earned credit (stochastic agents)](policy_earned_credit.md)
 - [Policy variance decomposition (Phase C′)](policy_variance.md)
+- [Phase C′ pilot manifest validation](phase_c_prime.md)
 - [Policy-level EF reference (legacy alias)](policy_ef.md)
 - [Maintainer-certified correctness anchor](maintainer_certified_correctness.md)
 - [Certified correct control study (legacy)](certified_correct_controls.md)
