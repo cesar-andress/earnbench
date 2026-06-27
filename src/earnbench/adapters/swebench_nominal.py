@@ -10,6 +10,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from earnbench.adapters.swebench_config import (
+    SWEBenchRunConfig,
+    prepare_swebench_workdir,
+)
 from earnbench.adapters.swebench_metadata import (
     SWEBenchVerifiedRecord,
     load_verified_instance,
@@ -41,6 +45,7 @@ class NominalRunRequest:
     model_name: str
     run_id: str
     timeout_seconds: int
+    force_rebuild: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -185,7 +190,7 @@ def default_nominal_runner(request: NominalRunRequest) -> NominalRunResult:
             test_spec,
             prediction,
             rm_image=False,
-            force_rebuild=False,
+            force_rebuild=request.force_rebuild,
             client=client,
             run_id=request.run_id,
             timeout=request.timeout_seconds,
@@ -314,12 +319,27 @@ def run_nominal_grading(
     instance_id: str,
     patch_path: Path,
     output_dir: Path,
-    timeout_seconds: int = 1800,
+    timeout_seconds: int | None = None,
     run_id: str | None = None,
     runner: NominalRunner | None = None,
     model_name: str = DEFAULT_MODEL_NAME,
+    config: SWEBenchRunConfig | None = None,
 ) -> dict[str, Any]:
     """Run nominal SWE-bench grading and write ``nominal/*`` artifacts."""
+    from earnbench.adapters.swebench_config import (
+        DEFAULT_TIMEOUT_SECONDS,
+        DEFAULT_WORKERS,
+    )
+
+    run_config = config or SWEBenchRunConfig(
+        workers=DEFAULT_WORKERS,
+        reuse_images=True,
+        allow_build=True,
+        cache_dir=None,
+        timeout_seconds=timeout_seconds or DEFAULT_TIMEOUT_SECONDS,
+    )
+    effective_timeout = timeout_seconds or run_config.timeout_seconds
+
     if not patch_path.is_file():
         msg = f"patch file not found: {patch_path}"
         raise FileNotFoundError(msg)
@@ -354,8 +374,7 @@ def run_nominal_grading(
                 output_dir=output_dir,
             )
 
-    work_cwd = output_dir / ".swebench_work"
-    work_cwd.mkdir(parents=True, exist_ok=True)
+    work_cwd = prepare_swebench_workdir(output_dir, run_config)
     original_cwd = os.getcwd()
     os.chdir(work_cwd)
     try:
@@ -366,7 +385,8 @@ def run_nominal_grading(
                 patch_content=patch_content,
                 model_name=model_name,
                 run_id=effective_run_id,
-                timeout_seconds=timeout_seconds,
+                timeout_seconds=effective_timeout,
+                force_rebuild=run_config.force_rebuild,
             )
         )
     finally:
@@ -375,13 +395,13 @@ def run_nominal_grading(
     grade = build_grade_payload(
         record,
         result,
-        timeout_seconds=timeout_seconds,
+        timeout_seconds=effective_timeout,
         log_ref=log_ref,
     )
     audit = build_nominal_audit(
         record,
         result,
-        timeout_seconds=timeout_seconds,
+        timeout_seconds=effective_timeout,
         log_ref=log_ref,
     )
 

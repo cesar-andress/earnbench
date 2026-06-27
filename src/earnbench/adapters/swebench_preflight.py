@@ -11,6 +11,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from earnbench.adapters.swebench_config import (
+    SWEBenchRunConfig,
+    prepare_swebench_workdir,
+)
 from earnbench.adapters.swebench_metadata import (
     SWEBenchVerifiedRecord,
     load_verified_instance,
@@ -46,7 +50,7 @@ class RequiredImages:
 
 ImageInspector = Callable[[str], bool]
 ImageDiscoverer = Callable[[dict[str, Any]], RequiredImages]
-ImageBuilder = Callable[[dict[str, Any], Any], tuple[bool, str]]
+ImageBuilder = Callable[[dict[str, Any], Any, SWEBenchRunConfig], tuple[bool, str]]
 
 
 class MissingDockerImagesError(RuntimeError):
@@ -178,6 +182,7 @@ def build_actionable_commands(
 def default_build_instance_images(
     instance_row: dict[str, Any],
     client: Any,
+    config: SWEBenchRunConfig,
 ) -> tuple[bool, str]:
     """Build missing SWE-bench images through the official harness API."""
     from swebench.harness.constants import LATEST
@@ -192,8 +197,8 @@ def default_build_instance_images(
             _successful, failed = build_instance_images(
                 client=client,
                 dataset=[row],
-                force_rebuild=False,
-                max_workers=1,
+                force_rebuild=config.force_rebuild,
+                max_workers=config.effective_harness_build_workers,
                 tag=LATEST,
                 env_image_tag=LATEST,
             )
@@ -234,9 +239,10 @@ def build_preflight_payload(
     build_success: bool,
     actionable_commands: list[str],
     status: PreflightStatus,
+    performance: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the ``preflight.json`` document."""
-    return {
+    payload = {
         "instance_id": record.instance_id,
         "repo": record.repo,
         "base_commit": record.base_commit,
@@ -248,6 +254,9 @@ def build_preflight_payload(
         "actionable_commands": actionable_commands,
         "status": status.value,
     }
+    if performance is not None:
+        payload["performance"] = performance
+    return payload
 
 
 def check_nominal_docker_images(
@@ -289,17 +298,46 @@ def run_swebench_preflight(
     instance_id: str,
     output_dir: Path,
     build_missing_images: bool = False,
+    config: SWEBenchRunConfig | None = None,
     discover: ImageDiscoverer | None = None,
     inspector: ImageInspector | None = None,
     builder: ImageBuilder | None = None,
     docker_client: Any | None = None,
 ) -> dict[str, Any]:
     """Check (and optionally build) SWE-bench Docker images for one instance."""
+    from earnbench.adapters.swebench_config import (
+        DEFAULT_TIMEOUT_SECONDS,
+        DEFAULT_WORKERS,
+        describe_image_cache_status,
+        effective_cache_dir,
+    )
+
+    run_config = config or SWEBenchRunConfig(
+        workers=DEFAULT_WORKERS,
+        reuse_images=True,
+        allow_build=True,
+        cache_dir=None,
+        timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
+    )
+    prepare_swebench_workdir(output_dir, run_config)
+    performance = {
+        **describe_image_cache_status(run_config, output_dir),
+        "workers": run_config.workers,
+        "effective_instance_workers": 1,
+        "effective_harness_build_workers": run_config.effective_harness_build_workers,
+        "timeout_seconds": run_config.timeout_seconds,
+    }
+
     record = load_verified_instance(metadata_path, instance_id)
     instance_row = load_verified_instance_row(metadata_path, instance_id)
     instance_dir = output_dir / instance_id
     instance_dir.mkdir(parents=True, exist_ok=True)
-    log_lines: list[str] = []
+    log_lines: list[str] = [
+        f"cache_dir={effective_cache_dir(run_config, output_dir)}",
+        f"workers={run_config.workers} "
+        f"effective_harness_build_workers={run_config.effective_harness_build_workers}",
+        f"reuse_images={run_config.reuse_images} allow_build={run_config.allow_build}",
+    ]
 
     harness_available = True
     required_mapping: dict[str, str] = {}
@@ -309,6 +347,7 @@ def run_swebench_preflight(
     build_success = False
     client: Any | None = docker_client
     close_client = False
+    should_build = build_missing_images and run_config.allow_build
 
     try:
         discover_fn = discover or default_discover_required_images
@@ -334,15 +373,16 @@ def run_swebench_preflight(
         log_lines.append(f"Present: {present_images or 'none'}")
         log_lines.append(f"Missing: {missing_images or 'none'}")
 
-        if build_missing_images and missing_images:
+        if should_build and missing_images:
             build_attempted = True
             try:
                 if builder is not None:
-                    build_success, build_log = builder(instance_row, client)
+                    build_success, build_log = builder(instance_row, client, run_config)
                 elif client is not None:
                     build_success, build_log = default_build_instance_images(
                         instance_row,
                         client,
+                        run_config,
                     )
                 else:
                     build_log = "Cannot build images without a Docker client."
@@ -355,6 +395,8 @@ def run_swebench_preflight(
             present_images, missing_images = partition_images(required, inspect)
             log_lines.append(f"After build present: {present_images or 'none'}")
             log_lines.append(f"After build missing: {missing_images or 'none'}")
+        elif build_missing_images and missing_images and not run_config.allow_build:
+            log_lines.append("Skipping image build (--no-build)")
     except HarnessNotInstalledError as exc:
         harness_available = False
         log_lines.append(str(exc))
@@ -383,6 +425,7 @@ def run_swebench_preflight(
         build_success=build_success,
         actionable_commands=actionable,
         status=status,
+        performance=performance,
     )
 
     log_path = instance_dir / PREFLIGHT_LOG_NAME

@@ -9,6 +9,11 @@ from pathlib import Path
 from typing import Any
 
 from earnbench.adapters.swebench import prepare_smoke
+from earnbench.adapters.swebench_config import (
+    add_swebench_performance_arguments,
+    print_swebench_execution_summary,
+    resolve_swebench_run_config_from_args,
+)
 from earnbench.adapters.swebench_metadata import MetadataLoadError
 from earnbench.adapters.swebench_nominal import (
     HarnessNotInstalledError,
@@ -285,11 +290,24 @@ def cmd_swebench_preflight(args: argparse.Namespace) -> None:
         )
 
     try:
+        run_config = resolve_swebench_run_config_from_args(args)
+    except (FileNotFoundError, ValueError) as exc:
+        raise CLIError(str(exc)) from exc
+
+    print_swebench_execution_summary(
+        command="preflight",
+        config=run_config,
+        output_dir=output_dir,
+        instance_count=1,
+    )
+
+    try:
         payload = run_swebench_preflight(
             metadata_path=metadata_path,
             instance_id=args.instance_id,
             output_dir=output_dir,
             build_missing_images=args.build_missing_images,
+            config=run_config,
         )
     except MetadataLoadError as exc:
         raise CLIError(str(exc)) from exc
@@ -322,13 +340,26 @@ def cmd_swebench_run_nominal(args: argparse.Namespace) -> None:
         raise CLIError(f"--patch file not found: {patch_path}")
 
     try:
+        run_config = resolve_swebench_run_config_from_args(args)
+    except (FileNotFoundError, ValueError) as exc:
+        raise CLIError(str(exc)) from exc
+
+    print_swebench_execution_summary(
+        command="run-nominal",
+        config=run_config,
+        output_dir=output_dir,
+        instance_count=1,
+    )
+
+    try:
         grade = run_nominal_grading(
             metadata_path=metadata_path,
             instance_id=args.instance_id,
             patch_path=patch_path,
             output_dir=output_dir,
-            timeout_seconds=args.timeout_seconds,
+            timeout_seconds=run_config.timeout_seconds,
             run_id=args.run_id or None,
+            config=run_config,
         )
     except MetadataLoadError as exc:
         raise CLIError(str(exc)) from exc
@@ -503,6 +534,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Build missing SWE-bench harness images when possible",
     )
+    add_swebench_performance_arguments(preflight_parser)
     preflight_parser.add_argument(
         "--quiet",
         action="store_true",
@@ -532,12 +564,7 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Output directory for nominal grading artifacts",
     )
-    run_nominal_parser.add_argument(
-        "--timeout-seconds",
-        type=int,
-        default=1800,
-        help="Harness test timeout in seconds (default: 1800)",
-    )
+    add_swebench_performance_arguments(run_nominal_parser)
     run_nominal_parser.add_argument(
         "--run-id",
         default="",

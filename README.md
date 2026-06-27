@@ -147,6 +147,7 @@ earnbench swebench preflight \
   --metadata-parquet path/to/swe_verified_test.parquet \
   --instance-id psf__requests-1724 \
   --output /tmp/earnbench_smoke \
+  --workers 1 \
   --build-missing-images
 
 # 3. Nominal golden-patch grading (F2P + P2P)
@@ -155,8 +156,43 @@ earnbench swebench run-nominal \
   --instance-id psf__requests-1724 \
   --patch /tmp/earnbench_smoke/psf__requests-1724/patch/prod_only.patch \
   --output /tmp/earnbench_smoke \
-  --timeout-seconds 1800
+  --workers 1
 ```
+
+Optional JSON config (defaults for `--timeout-seconds`, `--workers`, cache):
+
+```json
+{
+  "timeout_seconds": 1800,
+  "workers": 1,
+  "reuse_images": true,
+  "cache_dir": "/tmp/earnbench_swebench_cache"
+}
+```
+
+```bash
+earnbench swebench run-nominal --config swebench.json ...
+```
+
+**Performance settings**
+
+| Scenario | Recommended `--workers` | Notes |
+|----------|-------------------------|-------|
+| Smoke / single instance | `1` | Single-instance commands keep harness build parallelism at 1 |
+| Phase A batch (high-CPU) | `8` or `12` | Reserved for future batch mode (instance-level parallelism) |
+| Docker memory rule | — | Avoid exceeding roughly **RAM / 8GB** concurrent containers |
+
+Shared flags for `preflight` and `run-nominal`:
+
+- `--workers` — batch instance parallelism (single-instance runs stay serial)
+- `--reuse-images` / `--no-reuse-images` — reuse local Docker images vs force rebuild
+- `--no-build` — never build images (check only; preflight skips build)
+- `--cache-dir` — persistent harness build logs and artifacts (default: `<output>/.swebench_cache`)
+- `--timeout-seconds` — harness test timeout (default **1800** from config)
+- `--config` — JSON file supplying the defaults above
+
+Before execution, both commands print effective parallelism and image cache
+status to stderr.
 
 Preflight writes `<output>/<instance_id>/preflight.json` and `preflight.log`
 with required Docker image names, local presence checks, and actionable build
@@ -171,7 +207,7 @@ earnbench swebench run-nominal \
   --instance-id psf__requests-1724 \
   --patch /tmp/earnbench_smoke/psf__requests-1724/patch/prod_only.patch \
   --output /tmp/earnbench_smoke \
-  --timeout-seconds 1800
+  --workers 1
 ```
 
 Writes under `<output>/<instance_id>/nominal/`:

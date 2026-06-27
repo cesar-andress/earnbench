@@ -318,12 +318,15 @@ def test_swebench_run_nominal_cli(capsys, tmp_path: Path) -> None:
         "diff --git a/requests/models.py b/requests/models.py\n", encoding="utf-8"
     )
 
-    with patch(
-        "earnbench.adapters.swebench_nominal.default_nominal_runner",
-        _mock_nominal_runner_for_cli,
-    ), patch(
-        "earnbench.adapters.swebench_preflight.check_nominal_docker_images",
-        lambda **_kwargs: (),
+    with (
+        patch(
+            "earnbench.adapters.swebench_nominal.default_nominal_runner",
+            _mock_nominal_runner_for_cli,
+        ),
+        patch(
+            "earnbench.adapters.swebench_preflight.check_nominal_docker_images",
+            lambda **_kwargs: (),
+        ),
     ):
         exit_code = main(
             [

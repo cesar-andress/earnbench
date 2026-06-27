@@ -93,7 +93,7 @@ def test_run_preflight_missing_images_without_build(tmp_path: Path) -> None:
 
 
 def test_run_preflight_build_failed(tmp_path: Path) -> None:
-    def builder(_row: dict, _client) -> tuple[bool, str]:
+    def builder(_row: dict, _client, _config) -> tuple[bool, str]:
         return False, "env image build failed\n"
 
     payload = run_swebench_preflight(
@@ -117,7 +117,7 @@ def test_run_preflight_build_missing_images_success(tmp_path: Path) -> None:
     def inspector(image_name: str) -> bool:
         return image_name in present
 
-    def builder(_row: dict, _client) -> tuple[bool, str]:
+    def builder(_row: dict, _client, _config) -> tuple[bool, str]:
         present.update(
             {
                 MOCK_REQUIRED.base,
@@ -144,6 +144,7 @@ def test_run_preflight_build_missing_images_success(tmp_path: Path) -> None:
 
 
 def test_default_build_instance_images_passes_latest_tags(monkeypatch) -> None:
+    from earnbench.adapters.swebench_config import SWEBenchRunConfig
     from earnbench.adapters.swebench_preflight import default_build_instance_images
 
     captured: dict[str, object] = {}
@@ -157,11 +158,20 @@ def test_default_build_instance_images_passes_latest_tags(monkeypatch) -> None:
         fake_build_instance_images,
     )
 
-    ok, log = default_build_instance_images({"instance_id": "x"}, object())
+    config = SWEBenchRunConfig(
+        workers=8,
+        reuse_images=True,
+        allow_build=True,
+        cache_dir=None,
+        timeout_seconds=1800,
+    )
+    ok, log = default_build_instance_images({"instance_id": "x"}, object(), config)
 
     assert ok is True
     assert captured["tag"] == "latest"
     assert captured["env_image_tag"] == "latest"
+    assert captured["max_workers"] == 1
+    assert captured["force_rebuild"] is False
     assert log == ""
 
 
