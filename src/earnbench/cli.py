@@ -35,6 +35,7 @@ from earnbench.audit import AuditRecord
 from earnbench.classification import PerturbationOutcome
 from earnbench.metrics import compute_earned_fraction
 from earnbench.outcomes import NominalOutcome, OutcomeStatus, PerturbationResult
+from earnbench.phase_a_batch import PhaseABatchConfig, run_phase_a_batch
 from earnbench.provenance import Provenance, build_provenance
 from earnbench.registry import RegistryError
 from earnbench.registry import get as get_perturbation
@@ -603,7 +604,7 @@ def cmd_swebench_diagnose_pi_env(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
-def cmd_phase_a(args: argparse.Namespace) -> None:
+def cmd_phase_a_schedule(args: argparse.Namespace) -> None:
     """Run Phase A golden validation with parallel instance and π scheduling."""
     metadata_path = Path(args.metadata_parquet)
     output_dir = Path(args.output)
@@ -628,7 +629,7 @@ def cmd_phase_a(args: argparse.Namespace) -> None:
 
     configure_structured_logging(verbose=not args.quiet)
     print_swebench_execution_summary(
-        command="phase-a",
+        command="phase-a schedule",
         config=run_config,
         output_dir=output_dir,
         instance_count=len(instance_ids) if instance_ids else 0,
@@ -650,6 +651,60 @@ def cmd_phase_a(args: argparse.Namespace) -> None:
 
     try:
         summary = run_phase_a_scheduler(config)
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(summary, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
+def cmd_phase_a_run(args: argparse.Namespace) -> None:
+    """Run Phase A golden validation batch experiment (sequential π per instance)."""
+    manifest_path = Path(args.manifest)
+    metadata_path = Path(args.metadata_parquet)
+    output_dir = Path(args.output)
+
+    if not manifest_path.is_file():
+        raise CLIError(f"--manifest file not found: {manifest_path}")
+
+    suffix = metadata_path.suffix.lower()
+    if suffix not in {".parquet", ".json"}:
+        raise CLIError(
+            f"--metadata-parquet must be a .parquet or .json file, got: {metadata_path}"
+        )
+
+    try:
+        run_config = resolve_swebench_run_config_from_args(args)
+    except (FileNotFoundError, ValueError) as exc:
+        raise CLIError(str(exc)) from exc
+
+    configure_structured_logging(verbose=not args.quiet)
+    print_swebench_execution_summary(
+        command="phase-a run",
+        config=run_config,
+        output_dir=output_dir,
+        instance_count=0,
+    )
+
+    config = PhaseABatchConfig(
+        manifest_path=manifest_path,
+        metadata_path=metadata_path,
+        output_dir=output_dir,
+        workers=args.workers if args.workers is not None else run_config.workers,
+        resume=args.resume,
+        run_config=run_config,
+        run_id=args.run_id or f"phase_a_{output_dir.name}",
+        dataset_revision=args.dataset_revision,
+        build_missing_images=args.build_missing_images,
+    )
+
+    try:
+        summary = run_phase_a_batch(config)
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
     except ValueError as exc:
         raise CLIError(str(exc)) from exc
 
@@ -1020,19 +1075,74 @@ def build_parser() -> argparse.ArgumentParser:
 
     phase_a_parser = subparsers.add_parser(
         "phase-a",
-        help="Run Phase A golden validation batch (parallel scheduler)",
+        help="Phase A golden validation (batch runner or parallel scheduler)",
     )
-    phase_a_parser.add_argument(
+    phase_a_subparsers = phase_a_parser.add_subparsers(
+        dest="phase_a_command",
+        required=True,
+    )
+
+    phase_a_run_parser = phase_a_subparsers.add_parser(
+        "run",
+        help="Run Phase A batch experiment (nominal → π sequential → EF)",
+    )
+    phase_a_run_parser.add_argument(
+        "--manifest",
+        required=True,
+        help="Pilot instance manifest JSON (e.g. pilot_instance_selection.json)",
+    )
+    phase_a_run_parser.add_argument(
         "--metadata-parquet",
         required=True,
         help="Path to SWE-bench Verified metadata (.parquet or test .json fixture)",
     )
-    phase_a_parser.add_argument(
+    phase_a_run_parser.add_argument(
+        "--output",
+        required=True,
+        help="Batch output directory (instance trees, reports/, summary.csv, …)",
+    )
+    add_swebench_performance_arguments(phase_a_run_parser)
+    phase_a_run_parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Skip completed instances and stages recorded on disk",
+    )
+    phase_a_run_parser.add_argument(
+        "--run-id",
+        default="",
+        help="Batch run identifier stored in run_manifest.json and summary.csv",
+    )
+    phase_a_run_parser.add_argument(
+        "--dataset-revision",
+        default="unpinned",
+        help="Dataset revision label stored in adapter config digest inputs",
+    )
+    phase_a_run_parser.add_argument(
+        "--build-missing-images",
+        action="store_true",
+        help="Build missing SWE-bench harness images during preflight",
+    )
+    phase_a_run_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Progress on stderr only; do not print batch summary JSON to stdout",
+    )
+
+    phase_a_schedule_parser = phase_a_subparsers.add_parser(
+        "schedule",
+        help="Run Phase A parallel scheduler (legacy π-parallel worker)",
+    )
+    phase_a_schedule_parser.add_argument(
+        "--metadata-parquet",
+        required=True,
+        help="Path to SWE-bench Verified metadata (.parquet or test .json fixture)",
+    )
+    phase_a_schedule_parser.add_argument(
         "--output",
         required=True,
         help="Batch output directory for Phase A artifacts and golden_validation.csv",
     )
-    phase_a_parser.add_argument(
+    phase_a_schedule_parser.add_argument(
         "--instances",
         default="",
         help=(
@@ -1040,39 +1150,39 @@ def build_parser() -> argparse.ArgumentParser:
             "(required for parquet; optional for json fixtures)"
         ),
     )
-    phase_a_parser.add_argument(
+    phase_a_schedule_parser.add_argument(
         "--parallel-perturbations",
         type=int,
         default=3,
         help="Max concurrent π perturbation workers per instance (default: 3)",
     )
-    phase_a_parser.add_argument(
+    phase_a_schedule_parser.add_argument(
         "--resume",
         action="store_true",
         help="Skip completed jobs recorded in phase_a_scheduler_state.json",
     )
-    phase_a_parser.add_argument(
+    phase_a_schedule_parser.add_argument(
         "--retry-failed",
         action="store_true",
         help="With --resume, re-run jobs previously marked failed",
     )
-    phase_a_parser.add_argument(
+    phase_a_schedule_parser.add_argument(
         "--run-id",
         default="",
         help="Batch run identifier stored in meta.json and golden_validation.csv",
     )
-    phase_a_parser.add_argument(
+    phase_a_schedule_parser.add_argument(
         "--dataset-revision",
         default="unpinned",
         help="Dataset revision label stored in adapter config digest inputs",
     )
-    phase_a_parser.add_argument(
+    phase_a_schedule_parser.add_argument(
         "--build-missing-images",
         action="store_true",
         help="Build missing SWE-bench harness images during preflight",
     )
-    add_swebench_performance_arguments(phase_a_parser)
-    phase_a_parser.add_argument(
+    add_swebench_performance_arguments(phase_a_schedule_parser)
+    phase_a_schedule_parser.add_argument(
         "--quiet",
         action="store_true",
         help="Structured logs only; do not print scheduler summary JSON to stdout",
@@ -1119,7 +1229,12 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 parser.error(f"unknown swebench command: {args.swebench_command}")
         elif args.command == "phase-a":
-            cmd_phase_a(args)
+            if args.phase_a_command == "run":
+                cmd_phase_a_run(args)
+            elif args.phase_a_command == "schedule":
+                cmd_phase_a_schedule(args)
+            else:
+                parser.error(f"unknown phase-a command: {args.phase_a_command}")
         else:
             parser.error(f"unknown command: {args.command}")
     except CLIError as exc:

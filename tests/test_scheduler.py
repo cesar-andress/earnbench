@@ -289,7 +289,7 @@ def test_scheduler_persists_state_after_run(
     }
 
 
-def test_cli_phase_a_smoke(capsys, tmp_path: Path) -> None:
+def test_cli_phase_a_schedule_smoke(capsys, tmp_path: Path) -> None:
     from earnbench.cli import main
 
     with (
@@ -308,6 +308,7 @@ def test_cli_phase_a_smoke(capsys, tmp_path: Path) -> None:
         exit_code = main(
             [
                 "phase-a",
+                "schedule",
                 "--metadata-parquet",
                 str(METADATA_FIXTURE),
                 "--instances",
