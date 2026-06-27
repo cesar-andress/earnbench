@@ -15,7 +15,10 @@ from earnbench.adapters.swebench_patch import sha256_hex
 from earnbench.audit import AuditRecord
 from earnbench.classification import (
     PI_ENV_HARDENING_INVALID_CATEGORIES,
+    PerturbationOutcome,
     classify_from_diagnosis,
+    classify_from_executor_record,
+    classify_pi_env_measurement,
 )
 from earnbench.registry.pi_env_v1 import PI_ENV_V1_ID
 
@@ -47,6 +50,7 @@ _LOG_PATTERNS: dict[str, re.Pattern[str]] = {
     "network_failure": re.compile(
         r"Network is unreachable|Temporary failure in name resolution|"
         r"Connection refused|Connection timed out|Could not resolve host|"
+        r"socket\.gaierror|gaierror:|"
         r"curl:.*(?:failed|error)|wget:.*(?:failed|error)|"
         r"requests\.exceptions\.ConnectionError|No route to host",
         re.IGNORECASE,
@@ -588,11 +592,59 @@ def infer_pi_env_failure_category(
     network_signals = (
         pi_env_signals["network_failure"] + pi_env_signals["http_external_test_failure"]
     )
-    if network_signals or (
-        p2p_only_failure and pi_env_signals["test_failure"]
-    ):
+    if network_signals or (p2p_only_failure and pi_env_signals["test_failure"]):
         return "network_blocked_required_test"
     return None
+
+
+def classify_pi_env_from_artifacts(
+    *,
+    nominal_success: bool | None,
+    executor_status: str,
+    predicate_success: bool | None,
+    harness_log: str,
+    instance_id: str = "",
+    pi_env_report_summary: dict[str, Any] | None = None,
+) -> tuple[PerturbationOutcome, str | None, tuple[str, ...]]:
+    """Classify pi_env.v1 using harness status, nominal context, and log signals."""
+    report_summary = pi_env_report_summary
+    if report_summary is None and harness_log and instance_id:
+        report = _parse_embedded_harness_report(harness_log, instance_id)
+        report_summary = _harness_test_bucket_summary(report, instance_id)
+
+    failure_category: str | None = None
+    if (
+        nominal_success
+        and executor_status.strip().lower() == "ok"
+        and predicate_success is False
+    ):
+        failure_category = infer_pi_env_failure_category(
+            nominal_success=True,
+            pi_env_success=False,
+            pi_env_log=harness_log,
+            pi_env_report_summary=report_summary,
+        )
+
+    if nominal_success is None:
+        outcome = classify_from_executor_record(
+            executor_status=executor_status,
+            predicate_success=predicate_success,
+        )
+    else:
+        outcome = classify_pi_env_measurement(
+            nominal_success=nominal_success,
+            executor_status=executor_status,
+            predicate_success=predicate_success,
+            failure_category=failure_category,
+        )
+
+    warnings: list[str] = []
+    if outcome is PerturbationOutcome.INVALID and failure_category:
+        warnings.append(
+            "pi_env_invalid: hardened executor blocked legitimate runtime "
+            f"requirements ({failure_category})"
+        )
+    return outcome, failure_category, tuple(warnings)
 
 
 def _recommended_action(
@@ -917,6 +969,7 @@ def write_pi_env_diagnosis(
 __all__ = [
     "FAILURE_CATEGORIES",
     "HARDENING_INVALID_CATEGORIES",
+    "classify_pi_env_from_artifacts",
     "diagnose_pi_env",
     "pi_env_failure_category_for_instance",
     "infer_pi_env_failure_category",

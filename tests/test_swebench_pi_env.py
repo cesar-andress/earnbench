@@ -231,3 +231,70 @@ def test_build_pi_env_grade_payload_includes_repo_fields() -> None:
     )
     assert grade["repo"] == record.repo
     assert grade["base_commit"] == record.base_commit
+
+
+def _mock_runner_pip_blocked(request: NominalRunRequest) -> PiEnvHarnessResult:
+    outcome = NominalRunResult(
+        success=False,
+        status=AuditStatus.OK.value,
+        harness_command="/bin/bash /eval.sh",
+        log_text=(
+            "APPLY_PATCH_PASS\n"
+            "PIP_NO_INDEX=1\n"
+            "ERROR: No matching distribution found for urllib3\n"
+            "ERROR: Could not find a version that satisfies the requirement urllib3\n"
+            "FAILED tests/test_models.py::TestCase::test_redirect\n"
+        ),
+        tests_run=(),
+        warnings=(),
+        started_at_utc="2025-06-01T12:20:00+00:00",
+        completed_at_utc="2025-06-01T12:25:00+00:00",
+        patch_sha256=sha256_hex(request.patch_content),
+    )
+    return PiEnvHarnessResult(
+        outcome=outcome,
+        hardening_flags_requested=HARDENING_FLAG_NAMES,
+        hardening_flags_enforced=(
+            "network_disabled",
+            "python_nousersite",
+            "pip_no_index",
+        ),
+        hardening_flags_not_enforced=("tests_mount_readonly",),
+        image_digest="sha256:mock-instance-image",
+    )
+
+
+def test_run_pi_env_reclassifies_pip_no_index_as_invalid(tmp_path: Path) -> None:
+    record = load_verified_instance(METADATA_FIXTURE, INSTANCE_ID)
+    prod = extract_prod_patch(record.golden_patch)
+    patch_path = tmp_path / "prod_only.patch"
+    patch_path.write_text(prod.prod_patch, encoding="utf-8")
+    instance_dir = tmp_path / INSTANCE_ID
+    (instance_dir / "nominal").mkdir(parents=True)
+    (instance_dir / "nominal" / "grade.json").write_text(
+        json.dumps({"success": True, "status": "ok"}) + "\n",
+        encoding="utf-8",
+    )
+
+    grade = run_pi_env_grading(
+        metadata_path=METADATA_FIXTURE,
+        instance_id=INSTANCE_ID,
+        patch_path=patch_path,
+        output_dir=tmp_path,
+        runner=_mock_runner_pip_blocked,
+    )
+
+    artifact_dir = tmp_path / INSTANCE_ID / PI_ENV_ARTIFACT_DIR
+    assert grade["status"] == AuditStatus.INVALID.value
+    assert grade["success"] is None
+    assert grade["outcome"] == "invalid"
+    assert grade["failure_category"] == "dependency_blocked_by_pip_no_index"
+
+    audit = AuditRecord.from_dict(
+        json.loads((artifact_dir / "audit.json").read_text(encoding="utf-8"))
+    )
+    assert audit.status is AuditStatus.INVALID
+    assert audit.success is None
+    assert audit.outcome is not None
+    assert audit.outcome.value == "invalid"
+    assert any("pi_env_invalid" in warning for warning in audit.warnings)

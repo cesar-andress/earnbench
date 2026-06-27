@@ -513,17 +513,15 @@ def aggregate_instance(
     report_payload = report.to_dict()
     _write_json(instance_dir / "report.json", report_payload)
 
+    pi_by_id = {item.perturbation_id: item for item in perturbations}
     pi_statuses = {
-        pid: load_grade_status(instance_dir / pid / "grade.json")
-        or OutcomeStatus.MISSING.value
+        pid: pi_by_id[pid].status.value
+        if pid in pi_by_id
+        else OutcomeStatus.MISSING.value
         for pid in PI_IDS
     }
     pi_successes = {
-        pid: load_grade_success(
-            instance_dir / pid / "grade.json",
-            pi_statuses[pid],
-        )
-        for pid in PI_IDS
+        pid: pi_by_id[pid].success if pid in pi_by_id else None for pid in PI_IDS
     }
     csv_row = build_csv_row(
         instance_id=instance_id,

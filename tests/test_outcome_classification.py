@@ -15,7 +15,10 @@ from earnbench.classification import (
     outcome_counts_toward_ef_denominator,
 )
 from earnbench.registry.pi_env_v1 import PI_ENV_V1_ID
-from earnbench.scheduler import load_pi_outcome
+from earnbench.registry.pi_verif_v1 import PI_VERIF_V1_ID
+from earnbench.registry.pi_vtest_v1 import PI_VTEST_V1_ID
+from earnbench.reports import EarnedFractionStatus
+from earnbench.scheduler import aggregate_instance, load_pi_outcome
 
 FIXTURES = Path(__file__).parent / "fixtures"
 INSTANCE_ID = "psf__requests-1724"
@@ -112,30 +115,19 @@ def test_requests_1724_pi_env_invalid_excluded_from_ef_denominator(
                 "instance_id": INSTANCE_ID,
                 "success": False,
                 "status": "ok",
-                "outcome": "invalid",
+                "outcome": "fail",
             }
         )
         + "\n",
         encoding="utf-8",
     )
     pip_log = (
+        "APPLY_PATCH_PASS\n"
         "PIP_NO_INDEX=1\n"
+        "ERROR: No matching distribution found for urllib3\n"
         "ERROR: Could not find a version that satisfies the requirement urllib3\n"
     )
     (pi_env_dir / "harness.log").write_text(pip_log, encoding="utf-8")
-    diagnosis = {
-        "instance_id": INSTANCE_ID,
-        "nominal_success": True,
-        "pi_env_status": "ok",
-        "pi_env_success": False,
-        "likely_failure_category": "dependency_blocked_by_pip_no_index",
-        "should_pi_env_be_marked_invalid": True,
-        "perturbation_outcome": "invalid",
-    }
-    (instance_dir / "pi_env_diagnosis.json").write_text(
-        json.dumps(diagnosis) + "\n",
-        encoding="utf-8",
-    )
 
     pi_env = load_pi_outcome(
         instance_dir,
@@ -159,6 +151,103 @@ def test_requests_1724_pi_env_invalid_excluded_from_ef_denominator(
     assert report.is_defined
     assert report.valid_count == 1
     assert report.earned_fraction == 1.0
+
+
+def test_grade_record_pi_env_reclassifies_stored_fail_outcome() -> None:
+    grade = {
+        "status": "ok",
+        "success": False,
+        "outcome": "fail",
+        "failure_category": "dependency_blocked_by_pip_no_index",
+    }
+    outcome = classify_grade_record(
+        grade,
+        perturbation_id=PI_ENV_V1_ID,
+        nominal_success=True,
+    )
+    assert outcome is PerturbationOutcome.INVALID
+
+
+def test_aggregate_instance_summary_csv_uses_invalid_pi_env_status(
+    tmp_path: Path,
+) -> None:
+    instance_dir = tmp_path / INSTANCE_ID
+    instance_dir.mkdir(parents=True)
+    (instance_dir / "nominal").mkdir(parents=True)
+    (instance_dir / "meta.json").write_text(
+        json.dumps(
+            {
+                "instance_id": INSTANCE_ID,
+                "repo": "psf/requests",
+                "run_id": "run-1",
+                "config_digest": "sha256:cfg",
+                "scheduled_perturbations": [
+                    PI_VTEST_V1_ID,
+                    PI_VERIF_V1_ID,
+                    PI_ENV_V1_ID,
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (instance_dir / "nominal" / "grade.json").write_text(
+        json.dumps({"success": True, "status": "ok"}) + "\n",
+        encoding="utf-8",
+    )
+    for pid, success in (
+        (PI_VTEST_V1_ID, True),
+        (PI_VERIF_V1_ID, True),
+    ):
+        artifact = instance_dir / pid
+        artifact.mkdir(parents=True)
+        (artifact / "grade.json").write_text(
+            json.dumps(
+                {
+                    "instance_id": INSTANCE_ID,
+                    "success": success,
+                    "status": "ok",
+                    "outcome": "success",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    pi_env_dir = instance_dir / PI_ENV_V1_ID
+    pi_env_dir.mkdir(parents=True)
+    (pi_env_dir / "grade.json").write_text(
+        json.dumps(
+            {
+                "instance_id": INSTANCE_ID,
+                "success": False,
+                "status": "ok",
+                "outcome": "fail",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (pi_env_dir / "harness.log").write_text(
+        "PIP_NO_INDEX=1\n"
+        "ERROR: Could not find a version that satisfies the requirement urllib3\n",
+        encoding="utf-8",
+    )
+
+    row = aggregate_instance(
+        metadata_path=FIXTURES / "swebench_smoke_metadata.json",
+        output_dir=tmp_path,
+        instance_id=INSTANCE_ID,
+        scheduled_perturbations=(PI_VTEST_V1_ID, PI_VERIF_V1_ID, PI_ENV_V1_ID),
+        run_id="run-1",
+    )
+
+    assert row["pi_env_status"] == "invalid"
+    assert row["y_env"] is None
+    assert row["valid_pi_count"] == 2
+    assert row["ef_pi"] == 1.0
+    assert row["ef_status"] == EarnedFractionStatus.DEFINED.value
+    assert row["retained"] is True
 
 
 def test_grade_record_explicit_outcome_wins() -> None:

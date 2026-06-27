@@ -30,8 +30,9 @@ from earnbench.adapters.swebench_nominal import (
     require_swebench_harness,
 )
 from earnbench.adapters.swebench_patch import sha256_hex
+from earnbench.adapters.swebench_pi_env_diagnosis import classify_pi_env_from_artifacts
 from earnbench.audit import AuditRecord, AuditStatus
-from earnbench.classification import classify_from_executor_record
+from earnbench.classification import outcome_to_status_and_success
 from earnbench.provenance import build_provenance, utc_timestamp
 from earnbench.registry.pi_env_v1 import PI_ENV_V1_ID
 
@@ -221,22 +222,30 @@ def build_pi_env_grade_payload(
     *,
     timeout_seconds: int,
     log_ref: str,
+    nominal_success: bool | None = None,
 ) -> dict[str, Any]:
     """Build the ``grade.json`` document for ``pi_env.v1``."""
     run_outcome = result.outcome
-    terminal_outcome = classify_from_executor_record(
-        executor_status=run_outcome.status,
-        predicate_success=(
-            run_outcome.success if run_outcome.status == AuditStatus.OK.value else None
-        ),
+    predicate_success = (
+        run_outcome.success if run_outcome.status == AuditStatus.OK.value else None
     )
-    return {
+    terminal_outcome, failure_category, _reclass_warnings = (
+        classify_pi_env_from_artifacts(
+            nominal_success=nominal_success,
+            executor_status=run_outcome.status,
+            predicate_success=predicate_success,
+            harness_log=run_outcome.log_text,
+            instance_id=record.instance_id,
+        )
+    )
+    status_raw, success = outcome_to_status_and_success(terminal_outcome)
+    payload: dict[str, Any] = {
         "instance_id": record.instance_id,
         "repo": record.repo,
         "base_commit": record.base_commit,
         "perturbation_id": PI_ENV_V1_ID,
-        "success": run_outcome.success,
-        "status": run_outcome.status,
+        "success": success,
+        "status": status_raw,
         "outcome": terminal_outcome.value,
         "hardening_flags_requested": list(result.hardening_flags_requested),
         "hardening_flags_enforced": list(result.hardening_flags_enforced),
@@ -247,6 +256,9 @@ def build_pi_env_grade_payload(
         "harness_command": run_outcome.harness_command,
         "log_ref": log_ref,
     }
+    if failure_category is not None:
+        payload["failure_category"] = failure_category
+    return payload
 
 
 def build_pi_env_audit(
@@ -256,15 +268,24 @@ def build_pi_env_audit(
     hardening: PiEnvHardeningConfig,
     timeout_seconds: int,
     log_ref: str,
+    nominal_success: bool | None = None,
 ) -> AuditRecord:
     """Build an ``AuditRecord`` for ``pi_env.v1``."""
     run_outcome = result.outcome
-    audit_status = AuditStatus(run_outcome.status)
-    audit_success = run_outcome.success if audit_status is AuditStatus.OK else None
-    terminal_outcome = classify_from_executor_record(
-        executor_status=run_outcome.status,
-        predicate_success=audit_success,
+    predicate_success = (
+        run_outcome.success if run_outcome.status == AuditStatus.OK.value else None
     )
+    terminal_outcome, failure_category, reclass_warnings = (
+        classify_pi_env_from_artifacts(
+            nominal_success=nominal_success,
+            executor_status=run_outcome.status,
+            predicate_success=predicate_success,
+            harness_log=run_outcome.log_text,
+            instance_id=record.instance_id,
+        )
+    )
+    status_raw, audit_success = outcome_to_status_and_success(terminal_outcome)
+    audit_status = AuditStatus(status_raw)
     hardening_warnings = tuple(
         not_enforced_warning(flag, "requested but not enforced by harness wrapper")
         for flag in result.hardening_flags_not_enforced
@@ -286,7 +307,7 @@ def build_pi_env_audit(
         success=audit_success,
         outcome=terminal_outcome,
         tests_run=run_outcome.tests_run,
-        warnings=run_outcome.warnings + hardening_warnings,
+        warnings=run_outcome.warnings + hardening_warnings + reclass_warnings,
         timestamp_utc=run_outcome.completed_at_utc,
         log_ref=log_ref,
         provenance=build_provenance(
@@ -535,11 +556,19 @@ def run_pi_env_grading(
     finally:
         os.chdir(original_cwd)
 
+    nominal_success: bool | None = None
+    nominal_grade_path = output_dir / instance_id / "nominal" / "grade.json"
+    if nominal_grade_path.is_file():
+        nominal_grade = json.loads(nominal_grade_path.read_text(encoding="utf-8"))
+        if isinstance(nominal_grade, dict) and "success" in nominal_grade:
+            nominal_success = bool(nominal_grade["success"])
+
     grade = build_pi_env_grade_payload(
         record,
         harness_result,
         timeout_seconds=effective_timeout,
         log_ref=log_ref,
+        nominal_success=nominal_success,
     )
     audit = build_pi_env_audit(
         record,
@@ -547,6 +576,7 @@ def run_pi_env_grading(
         hardening=effective_hardening,
         timeout_seconds=effective_timeout,
         log_ref=log_ref,
+        nominal_success=nominal_success,
     )
 
     (artifact_dir / "harness.log").write_text(

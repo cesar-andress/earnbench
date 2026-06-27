@@ -64,10 +64,7 @@ def classify_pi_env_measurement(
     )
     if base is not PerturbationOutcome.FAIL:
         return base
-    if (
-        nominal_success
-        and failure_category in PI_ENV_HARDENING_INVALID_CATEGORIES
-    ):
+    if nominal_success and failure_category in PI_ENV_HARDENING_INVALID_CATEGORIES:
         return PerturbationOutcome.INVALID
     return PerturbationOutcome.FAIL
 
@@ -111,23 +108,27 @@ def classify_grade_record(
     failure_category: str | None = None,
 ) -> PerturbationOutcome:
     """Classify a ``grade.json`` payload for any perturbation."""
-    if "outcome" in grade:
-        return PerturbationOutcome(str(grade["outcome"]))
     executor_status = str(grade.get("status", ""))
     success_raw = grade.get("success")
     predicate_success = None if success_raw is None else bool(success_raw)
-    if perturbation_id.endswith("pi_env.v1") or perturbation_id == "pi_env.v1":
-        if nominal_success is None:
-            return classify_from_executor_record(
+    is_pi_env = perturbation_id.endswith("pi_env.v1") or perturbation_id == "pi_env.v1"
+    if is_pi_env:
+        category = failure_category
+        if category is None and grade.get("failure_category") is not None:
+            category = str(grade["failure_category"])
+        if nominal_success is not None:
+            return classify_pi_env_measurement(
+                nominal_success=nominal_success,
                 executor_status=executor_status,
                 predicate_success=predicate_success,
+                failure_category=category,
             )
-        return classify_pi_env_measurement(
-            nominal_success=nominal_success,
+        return classify_from_executor_record(
             executor_status=executor_status,
             predicate_success=predicate_success,
-            failure_category=failure_category,
         )
+    if "outcome" in grade:
+        return PerturbationOutcome(str(grade["outcome"]))
     return classify_from_executor_record(
         executor_status=executor_status,
         predicate_success=predicate_success,
