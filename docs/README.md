@@ -4,6 +4,7 @@ Documentation is in early draft. Design notes live in the private research repos
 
 ## Checklists and policy
 
+- [Perturbation outcome classification](outcome_classification.md)
 - [Zenodo readiness checklist](zenodo_checklist.md)
 - [Release and versioning policy](release_policy.md)
 

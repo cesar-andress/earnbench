@@ -30,6 +30,7 @@ DIAGNOSIS_KEYS = (
     "log_excerpt_nominal",
     "log_excerpt_pi_env",
     "recommended_action",
+    "perturbation_outcome",
     "should_pi_env_be_marked_invalid",
     "should_pi_env_be_excluded_from_EF",
     "protocol_implication",
@@ -171,6 +172,7 @@ def test_diagnose_pip_no_index_failure(tmp_path: Path) -> None:
     assert diagnosis["pi_env_success"] is False
     assert diagnosis["likely_failure_category"] == "dependency_blocked_by_pip_no_index"
     assert diagnosis["should_pi_env_be_marked_invalid"] is True
+    assert diagnosis["perturbation_outcome"] == "invalid"
     assert diagnosis["should_pi_env_be_excluded_from_EF"] is True
     assert "invalid" in diagnosis["recommended_action"]
     assert "PIP_NO_INDEX" in diagnosis["log_excerpt_pi_env"]
@@ -237,9 +239,7 @@ def test_diagnose_requests_1724_p2p_http_failure(tmp_path: Path) -> None:
         "report: {'psf__requests-1724': {'resolved': False, 'tests_status': "
         "{'FAIL_TO_PASS': {'success': ['tests.test_models.TestCase.test_redirect'], "
         "'failure': []}, 'PASS_TO_PASS': {'success': [], "
-        "'failure': ['"
-        + p2p_failure
-        + "']}}}}"
+        "'failure': ['" + p2p_failure + "']}}}}"
     )
     _write_pi_env_artifacts(
         pi_env_dir,

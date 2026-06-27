@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from earnbench.outcomes import NominalOutcome, OutcomeStatus, PerturbationResult
+from earnbench.outcomes import NominalOutcome, PerturbationResult
 from earnbench.provenance import Provenance, build_provenance
 from earnbench.reports import EarnedFractionReport, EarnedFractionStatus
 
@@ -36,10 +36,11 @@ def _exclusion_warnings(
     counterfactuals: list[PerturbationResult],
 ) -> list[str]:
     warnings: list[str] = []
-    excluded = [r for r in counterfactuals if r.status is not OutcomeStatus.OK]
+    excluded = [r for r in counterfactuals if not r.counts_toward_ef_denominator]
     if excluded:
         warnings.append(
-            f"excluded {len(excluded)} invalid counterfactual run(s) from denominator"
+            "excluded "
+            f"{len(excluded)} non-measurement counterfactual run(s) from denominator"
         )
     return warnings
 
@@ -78,7 +79,7 @@ def compute_earned_fraction(
         )
 
     warnings = _exclusion_warnings(counterfactuals)
-    valid_results = [r for r in counterfactuals if r.status is OutcomeStatus.OK]
+    valid_results = [r for r in counterfactuals if r.counts_toward_ef_denominator]
     valid_count = len(valid_results)
 
     if valid_count == 0:

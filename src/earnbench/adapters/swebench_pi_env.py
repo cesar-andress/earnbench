@@ -31,6 +31,7 @@ from earnbench.adapters.swebench_nominal import (
 )
 from earnbench.adapters.swebench_patch import sha256_hex
 from earnbench.audit import AuditRecord, AuditStatus
+from earnbench.classification import classify_from_executor_record
 from earnbench.provenance import build_provenance, utc_timestamp
 from earnbench.registry.pi_env_v1 import PI_ENV_V1_ID
 
@@ -222,21 +223,28 @@ def build_pi_env_grade_payload(
     log_ref: str,
 ) -> dict[str, Any]:
     """Build the ``grade.json`` document for ``pi_env.v1``."""
-    outcome = result.outcome
+    run_outcome = result.outcome
+    terminal_outcome = classify_from_executor_record(
+        executor_status=run_outcome.status,
+        predicate_success=(
+            run_outcome.success if run_outcome.status == AuditStatus.OK.value else None
+        ),
+    )
     return {
         "instance_id": record.instance_id,
         "repo": record.repo,
         "base_commit": record.base_commit,
         "perturbation_id": PI_ENV_V1_ID,
-        "success": outcome.success,
-        "status": outcome.status,
+        "success": run_outcome.success,
+        "status": run_outcome.status,
+        "outcome": terminal_outcome.value,
         "hardening_flags_requested": list(result.hardening_flags_requested),
         "hardening_flags_enforced": list(result.hardening_flags_enforced),
         "hardening_flags_not_enforced": list(result.hardening_flags_not_enforced),
         "timeout_seconds": timeout_seconds,
-        "started_at_utc": outcome.started_at_utc,
-        "completed_at_utc": outcome.completed_at_utc,
-        "harness_command": outcome.harness_command,
+        "started_at_utc": run_outcome.started_at_utc,
+        "completed_at_utc": run_outcome.completed_at_utc,
+        "harness_command": run_outcome.harness_command,
         "log_ref": log_ref,
     }
 
@@ -250,16 +258,20 @@ def build_pi_env_audit(
     log_ref: str,
 ) -> AuditRecord:
     """Build an ``AuditRecord`` for ``pi_env.v1``."""
-    outcome = result.outcome
-    audit_status = AuditStatus(outcome.status)
-    audit_success = outcome.success if audit_status is AuditStatus.OK else None
+    run_outcome = result.outcome
+    audit_status = AuditStatus(run_outcome.status)
+    audit_success = run_outcome.success if audit_status is AuditStatus.OK else None
+    terminal_outcome = classify_from_executor_record(
+        executor_status=run_outcome.status,
+        predicate_success=audit_success,
+    )
     hardening_warnings = tuple(
         not_enforced_warning(flag, "requested but not enforced by harness wrapper")
         for flag in result.hardening_flags_not_enforced
     )
     config_digest = pi_env_config_digest(
         instance_id=record.instance_id,
-        patch_sha256=outcome.patch_sha256,
+        patch_sha256=run_outcome.patch_sha256,
         image_digest=result.image_digest,
         hardening=hardening,
         timeout_seconds=timeout_seconds,
@@ -268,13 +280,14 @@ def build_pi_env_audit(
         instance_id=record.instance_id,
         perturbation_id=PI_ENV_V1_ID,
         config_digest=config_digest,
-        patch_sha256=outcome.patch_sha256,
+        patch_sha256=run_outcome.patch_sha256,
         image_digest=result.image_digest,
         status=audit_status,
         success=audit_success,
-        tests_run=outcome.tests_run,
-        warnings=outcome.warnings + hardening_warnings,
-        timestamp_utc=outcome.completed_at_utc,
+        outcome=terminal_outcome,
+        tests_run=run_outcome.tests_run,
+        warnings=run_outcome.warnings + hardening_warnings,
+        timestamp_utc=run_outcome.completed_at_utc,
         log_ref=log_ref,
         provenance=build_provenance(
             config_digest=config_digest,
@@ -389,7 +402,7 @@ def default_pi_env_runner(
     completed = bool(outcome.get("completed"))
     resolved = bool(outcome.get("resolved"))
     if not completed:
-        status = AuditStatus.INVALID.value
+        status = AuditStatus.ERROR.value
         success = False
         if not any("did not complete" in item for item in warnings):
             warnings.append("harness run did not complete")

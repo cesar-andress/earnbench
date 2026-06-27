@@ -27,6 +27,7 @@ from earnbench.adapters.swebench_preflight import (
     run_swebench_preflight,
 )
 from earnbench.audit import AuditRecord
+from earnbench.classification import PerturbationOutcome
 from earnbench.metrics import compute_earned_fraction
 from earnbench.outcomes import NominalOutcome, OutcomeStatus, PerturbationResult
 from earnbench.provenance import Provenance, build_provenance
@@ -103,12 +104,19 @@ def parse_compute_input(
 
         success_raw = item.get("success")
         success = None if success_raw is None else bool(success_raw)
+        outcome_raw = item.get("outcome")
+        outcome = (
+            PerturbationOutcome(str(outcome_raw))
+            if outcome_raw is not None
+            else None
+        )
         try:
             perturbations.append(
                 PerturbationResult(
                     perturbation_id=perturbation_id,
                     status=status,
                     success=success,
+                    outcome=outcome,
                     channel=str(item.get("channel", "")),
                     message=str(item.get("message", "")),
                 )

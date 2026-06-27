@@ -92,6 +92,13 @@ def test_audit_record_from_dict_round_trip() -> None:
     assert restored.to_dict() == record.to_dict()
 
 
+def test_audit_record_derives_outcome_from_status() -> None:
+    record = _sample_record(status=AuditStatus.OK, success=True)
+    assert record.outcome.value == "success"
+    payload = record.to_dict()
+    assert payload["outcome"] == "success"
+
+
 def test_audit_record_invalid_status_without_success() -> None:
     record = AuditRecord(
         instance_id="django__django-13279",
@@ -103,4 +110,5 @@ def test_audit_record_invalid_status_without_success() -> None:
     )
     payload = record.to_dict()
     assert "success" not in payload
+    assert payload["outcome"] == "invalid"
     assert payload["warnings"] == ["patch apply failed"]

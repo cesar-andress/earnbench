@@ -73,6 +73,11 @@ class EarnedFractionReport:
                     "channel": r.channel,
                     "mechanism": r.mechanism,
                     "status": r.status.value,
+                    "outcome": (
+                        r.resolved_outcome.value
+                        if r.resolved_outcome is not None
+                        else None
+                    ),
                     "success": r.success,
                     "message": r.message,
                 }

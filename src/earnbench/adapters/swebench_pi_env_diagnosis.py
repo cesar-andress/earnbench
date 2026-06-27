@@ -13,6 +13,10 @@ from earnbench.adapters.swebench_metadata import (
 )
 from earnbench.adapters.swebench_patch import sha256_hex
 from earnbench.audit import AuditRecord
+from earnbench.classification import (
+    PI_ENV_HARDENING_INVALID_CATEGORIES,
+    classify_from_diagnosis,
+)
 from earnbench.registry.pi_env_v1 import PI_ENV_V1_ID
 
 FAILURE_CATEGORIES = (
@@ -27,15 +31,7 @@ FAILURE_CATEGORIES = (
     "unknown",
 )
 
-HARDENING_INVALID_CATEGORIES = frozenset(
-    {
-        "dependency_blocked_by_pip_no_index",
-        "python_nousersite_changed_runtime",
-        "network_blocked_required_test",
-        "harness_difference",
-        "readonly_not_enforced",
-    }
-)
+HARDENING_INVALID_CATEGORIES = PI_ENV_HARDENING_INVALID_CATEGORIES
 
 _LOG_PATTERNS: dict[str, re.Pattern[str]] = {
     "pip_no_index": re.compile(
@@ -543,6 +539,62 @@ def _classify_failure(
     ]
 
 
+def pi_env_failure_category_for_instance(
+    *,
+    instance_dir: Path,
+    instance_id: str,
+    nominal_success: bool,
+) -> str | None:
+    """Infer pi_env failure category from on-disk artifacts for EF classification."""
+    pi_env_dir = instance_dir / PI_ENV_V1_ID
+    grade_path = pi_env_dir / "grade.json"
+    if not grade_path.is_file():
+        return None
+    grade = json.loads(grade_path.read_text(encoding="utf-8"))
+    if not isinstance(grade, dict):
+        return None
+    harness_log_path = pi_env_dir / "harness.log"
+    harness_log = (
+        harness_log_path.read_text(encoding="utf-8", errors="replace")
+        if harness_log_path.is_file()
+        else ""
+    )
+    report = _parse_embedded_harness_report(harness_log, instance_id)
+    report_summary = _harness_test_bucket_summary(report, instance_id)
+    return infer_pi_env_failure_category(
+        nominal_success=nominal_success,
+        pi_env_success=bool(grade.get("success")),
+        pi_env_log=harness_log,
+        pi_env_report_summary=report_summary,
+    )
+
+
+def infer_pi_env_failure_category(
+    *,
+    nominal_success: bool,
+    pi_env_success: bool,
+    pi_env_log: str,
+    pi_env_report_summary: dict[str, Any] | None = None,
+) -> str | None:
+    """Infer a failure category from pi_env artifacts without a full diagnosis run."""
+    if not nominal_success or pi_env_success:
+        return None
+    pi_env_signals = _analyze_log_signals(pi_env_log)
+    p2p_only_failure, _ = _pi_env_pass_to_pass_only_failure(pi_env_report_summary)
+    if pi_env_signals["pip_no_index"]:
+        return "dependency_blocked_by_pip_no_index"
+    if pi_env_signals["python_nousersite"]:
+        return "python_nousersite_changed_runtime"
+    network_signals = (
+        pi_env_signals["network_failure"] + pi_env_signals["http_external_test_failure"]
+    )
+    if network_signals or (
+        p2p_only_failure and pi_env_signals["test_failure"]
+    ):
+        return "network_blocked_required_test"
+    return None
+
+
 def _recommended_action(
     category: str,
     *,
@@ -686,6 +738,15 @@ def diagnose_pi_env(
         and category in HARDENING_INVALID_CATEGORIES
     )
     should_exclude = should_mark_invalid or _grade_status(pi_env_grade) == "invalid"
+    perturbation_outcome = classify_from_diagnosis(
+        {
+            "nominal_success": nominal_success,
+            "pi_env_success": pi_env_success,
+            "pi_env_status": _grade_status(pi_env_grade),
+            "likely_failure_category": category,
+            "should_pi_env_be_marked_invalid": should_mark_invalid,
+        }
+    )
 
     error_patterns = (
         _LOG_PATTERNS["pip_no_index"],
@@ -725,6 +786,7 @@ def diagnose_pi_env(
         "nominal_success": nominal_success,
         "pi_env_success": pi_env_success,
         "likely_failure_category": category,
+        "perturbation_outcome": perturbation_outcome.value,
         "evidence": evidence,
         "differing_fields": grade_diffs + audit_diffs,
         "log_excerpt_nominal": _focused_excerpt(nominal_log, error_patterns),
@@ -856,6 +918,8 @@ __all__ = [
     "FAILURE_CATEGORIES",
     "HARDENING_INVALID_CATEGORIES",
     "diagnose_pi_env",
+    "pi_env_failure_category_for_instance",
+    "infer_pi_env_failure_category",
     "render_pi_env_diagnosis_markdown",
     "resolve_artifact_dir",
     "resolve_pi_env_artifact_dirs",

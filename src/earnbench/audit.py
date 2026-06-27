@@ -8,6 +8,7 @@ from enum import Enum
 from typing import Any
 from uuid import UUID, uuid5
 
+from earnbench.classification import PerturbationOutcome, audit_outcome_from_record
 from earnbench.provenance import Provenance, build_provenance, utc_timestamp
 
 AUDIT_SCHEMA_VERSION = "earnbench_audit.v1"
@@ -52,6 +53,7 @@ class AuditRecord:
     pristine_test_sha256: str | None = None
     image_digest: str | None = None
     success: bool | None = None
+    outcome: PerturbationOutcome | None = None
     log_ref: str | None = None
     schema_version: str = AUDIT_SCHEMA_VERSION
     provenance: Provenance | None = None
@@ -78,6 +80,15 @@ class AuditRecord:
         if self.status is not AuditStatus.OK and self.success is not None:
             msg = "success must be None when status is not OK"
             raise ValueError(msg)
+        resolved_outcome = audit_outcome_from_record(
+            status=self.status.value,
+            success=self.success,
+            outcome=self.outcome,
+        )
+        if self.outcome is not None and self.outcome is not resolved_outcome:
+            msg = "outcome is inconsistent with audit status/success"
+            raise ValueError(msg)
+        object.__setattr__(self, "outcome", resolved_outcome)
 
     def effective_provenance(self) -> Provenance:
         """Return explicit provenance or derive it from audit fields."""
@@ -116,6 +127,7 @@ class AuditRecord:
             "config_digest": self.config_digest,
             "patch_sha256": self.patch_sha256,
             "status": self.status.value,
+            "outcome": self.outcome.value if self.outcome is not None else None,
             "tests_run": list(self.tests_run),
             "warnings": list(self.warnings),
             "provenance": provenance.to_dict(),
@@ -147,6 +159,12 @@ class AuditRecord:
             else AuditStatus(status_raw)
         )
         success = data.get("success")
+        outcome_raw = data.get("outcome")
+        outcome = (
+            PerturbationOutcome(str(outcome_raw))
+            if outcome_raw is not None
+            else None
+        )
         default_version = _default_earnbench_version()
         provenance_raw = data.get("provenance")
         provenance = (
@@ -165,6 +183,7 @@ class AuditRecord:
             image_digest=data.get("image_digest"),
             status=status,
             success=success,
+            outcome=outcome,
             tests_run=tuple(data.get("tests_run", ())),
             log_ref=data.get("log_ref"),
             warnings=tuple(data.get("warnings", ())),

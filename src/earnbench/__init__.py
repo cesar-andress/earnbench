@@ -1,5 +1,6 @@
 """EarnBench: executable counterfactual measurement of earned agent success."""
 
+from earnbench.classification import PerturbationOutcome
 from earnbench.metrics import compute_earned_fraction
 from earnbench.outcomes import NominalOutcome, OutcomeStatus, PerturbationResult
 from earnbench.perturbations import Perturbation
@@ -26,6 +27,7 @@ __all__ = [
     "OutcomeStatus",
     "PERTURBATION_REGISTRY_VERSION",
     "Perturbation",
+    "PerturbationOutcome",
     "PerturbationResult",
     "Provenance",
     "RegistryError",

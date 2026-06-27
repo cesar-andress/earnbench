@@ -21,6 +21,7 @@ from earnbench.adapters.swebench_nominal import run_nominal_grading
 from earnbench.adapters.swebench_pi_env import run_pi_env_grading
 from earnbench.adapters.swebench_pi_verif import run_pi_verif_grading
 from earnbench.adapters.swebench_preflight import run_swebench_preflight
+from earnbench.classification import classify_from_diagnosis, classify_grade_record
 from earnbench.metrics import compute_earned_fraction
 from earnbench.outcomes import NominalOutcome, OutcomeStatus, PerturbationResult
 from earnbench.registry.pi_env_v1 import PI_ENV_V1_ID
@@ -374,6 +375,7 @@ def load_pi_outcome(
     perturbation_id: str,
     *,
     scheduled: tuple[str, ...],
+    nominal_success: bool | None = None,
 ) -> PerturbationResult:
     if perturbation_id not in scheduled:
         return PerturbationResult.missing(
@@ -381,23 +383,54 @@ def load_pi_outcome(
             message="not scheduled for this instance",
         )
     grade_path = instance_dir / perturbation_id / "grade.json"
-    status_raw = load_grade_status(grade_path)
-    if status_raw is None:
+    if not grade_path.is_file():
         return PerturbationResult.missing(
             perturbation_id,
             message="grade.json missing",
         )
-    if status_raw == OutcomeStatus.OK.value:
-        success = load_grade_success(grade_path, status_raw)
-        if success is None:
-            return PerturbationResult.invalid(
+
+    grade = json.loads(grade_path.read_text(encoding="utf-8"))
+    if not isinstance(grade, dict):
+        return PerturbationResult.error(
+            perturbation_id,
+            message="grade.json is not an object",
+        )
+
+    diagnosis_path = instance_dir / "pi_env_diagnosis.json"
+    if perturbation_id == PI_ENV_V1_ID and diagnosis_path.is_file():
+        diagnosis = json.loads(diagnosis_path.read_text(encoding="utf-8"))
+        if isinstance(diagnosis, dict):
+            terminal_outcome = classify_from_diagnosis(diagnosis)
+            return PerturbationResult.from_outcome(
                 perturbation_id,
-                message="grade.json missing success for status=ok",
+                terminal_outcome,
+                message=str(diagnosis.get("likely_failure_category") or ""),
             )
-        return PerturbationResult.ok(perturbation_id, success=success)
-    if status_raw == OutcomeStatus.INVALID.value:
-        return PerturbationResult.invalid(perturbation_id)
-    return PerturbationResult.missing(perturbation_id, message=status_raw)
+
+    failure_category: str | None = None
+    if perturbation_id == PI_ENV_V1_ID and nominal_success is not None:
+        from earnbench.adapters.swebench_pi_env_diagnosis import (
+            pi_env_failure_category_for_instance,
+        )
+
+        failure_category = pi_env_failure_category_for_instance(
+            instance_dir=instance_dir,
+            instance_id=str(grade.get("instance_id") or instance_dir.name),
+            nominal_success=nominal_success,
+        )
+
+    terminal_outcome = classify_grade_record(
+        grade,
+        perturbation_id=perturbation_id,
+        nominal_success=nominal_success,
+        failure_category=failure_category,
+    )
+    if grade.get("status") == OutcomeStatus.OK.value and grade.get("success") is None:
+        return PerturbationResult.error(
+            perturbation_id,
+            message="grade.json missing success for status=ok",
+        )
+    return PerturbationResult.from_outcome(perturbation_id, terminal_outcome)
 
 
 def build_csv_row(
@@ -471,6 +504,7 @@ def aggregate_instance(
             instance_dir,
             perturbation_id,
             scheduled=scheduled_perturbations,
+            nominal_success=bool(nominal_grade.get("success")),
         )
         for perturbation_id in PI_IDS
     ]

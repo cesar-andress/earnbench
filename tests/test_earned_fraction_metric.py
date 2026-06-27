@@ -91,7 +91,7 @@ def test_invalid_perturbation_excluded() -> None:
     assert report.earned_fraction == 1.0
     assert report.valid_count == 1
     assert report.successful_count == 1
-    assert any("excluded 1 invalid" in w for w in report.warnings)
+    assert any("excluded 1 non-measurement" in w for w in report.warnings)
 
 
 def test_no_valid_perturbations_undefined_with_warning() -> None:
