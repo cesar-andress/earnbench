@@ -35,6 +35,7 @@ CHANNEL_ATTRIBUTION_MATRIX_CSV = "channel_attribution_matrix.csv"
 FALSE_EARNED_FALSE_UNEARNED_CSV = "false_earned_false_unearned.csv"
 INVALID_ASYMMETRY_CSV = "invalid_asymmetry.csv"
 INJECTION_VALIDITY_REPORT_MD = "injection_validity_report.md"
+BLIND_INJECTION_SUMMARY_SCHEMA = "earnbench.blind_injection_summary.v1"
 
 CLEAN_ROW_SUFFIX = "__clean"
 PI_ORDER = ("pi_vtest.v1", "pi_verif.v1", "pi_env.v1")
@@ -77,6 +78,8 @@ class InjectionValidityResult:
     false_earned_false_unearned_csv: Path
     invalid_asymmetry_csv: Path
     report_md: Path
+    summary_json: Path
+    diagnostic_md: Path
 
 
 def _as_bool(value: object) -> bool:
@@ -208,6 +211,34 @@ def _mechanism_hit(spec: InjectionSpec, row: InjectionResultRow) -> bool | None:
     return observed_failed_pi(row) == spec.expected_failed_pi
 
 
+def _exact_channel_attribution(
+    spec: InjectionSpec,
+    row: InjectionResultRow,
+) -> bool | None:
+    """Alias for mechanism hit: observed_failed_pi equals expected channel π."""
+    return _mechanism_hit(spec, row)
+
+
+def _target_pi_attributed(spec: InjectionSpec, row: InjectionResultRow) -> bool | None:
+    """True when expected π appears in failed_mechanisms (ignores invalid/none)."""
+    if not row.y0 or not spec.in_registry:
+        return None
+    return spec.expected_failed_pi in _failed_pis_from_mechanisms(row)
+
+
+def _ef_detected(row: InjectionResultRow) -> bool | None:
+    """True when Y₀ holds and EF drops below the earned threshold."""
+    if not row.y0:
+        return None
+    return row.ef_exclude_invalid < FALSE_EARNED_THRESHOLD
+
+
+def _in_registry_ef_detected(spec: InjectionSpec, row: InjectionResultRow) -> bool | None:
+    if not row.y0 or not spec.in_registry:
+        return None
+    return row.ef_exclude_invalid < FALSE_EARNED_THRESHOLD
+
+
 def _off_target(row: InjectionResultRow, spec: InjectionSpec) -> bool | None:
     if not row.y0 or not spec.in_registry:
         return None
@@ -250,6 +281,11 @@ def analyze_injection_validity(
 
     in_registry_hits = 0
     in_registry_eligible = 0
+    target_pi_hits = 0
+    target_pi_eligible = 0
+    in_registry_ef_hits = 0
+    in_registry_ef_eligible = 0
+    injected_invalid_count = 0
     off_target_count = 0
     off_target_eligible = 0
     oor_none_count = 0
@@ -268,6 +304,8 @@ def analyze_injection_validity(
     false_earned_eligible = 0
     false_unearned_count = 0
     false_unearned_eligible = 0
+    false_unearned_y0_count = 0
+    false_unearned_y0_eligible = 0
 
     for injection_id, spec in sorted(specs.items()):
         row = results.get(injection_id)
@@ -288,7 +326,13 @@ def analyze_injection_validity(
         sensitivity_by_channel[spec.injected_channel].append(gap)
 
         hit = _mechanism_hit(spec, row)
+        exact = _exact_channel_attribution(spec, row)
+        target_pi = _target_pi_attributed(spec, row)
+        in_registry_ef = _in_registry_ef_detected(spec, row)
+        ef_det = _ef_detected(row)
         off_target = _off_target(row, spec)
+        if row.invalid_pi_count > 0 or observed == "invalid":
+            injected_invalid_count += 1
         pair_rows.append(
             {
                 "injection_id": injection_id,
@@ -299,6 +343,10 @@ def analyze_injection_validity(
                 "expected_failed_pi": spec.expected_failed_pi,
                 "observed_failed_pi": observed,
                 "mechanism_hit": hit,
+                "exact_channel_attribution": exact,
+                "target_pi_attributed": target_pi,
+                "ef_detected": ef_det,
+                "in_registry_ef_detected": in_registry_ef,
                 "off_target_failure": off_target,
                 "ef_exclude_invalid": row.ef_exclude_invalid,
                 "ef_invalid_as_fail": row.ef_invalid_as_fail,
@@ -306,6 +354,15 @@ def analyze_injection_validity(
                 "invalid_pi_count": row.invalid_pi_count,
             }
         )
+
+        if target_pi is not None:
+            target_pi_eligible += 1
+            if target_pi:
+                target_pi_hits += 1
+        if in_registry_ef is not None:
+            in_registry_ef_eligible += 1
+            if in_registry_ef:
+                in_registry_ef_hits += 1
 
         if spec.in_registry and row.y0:
             in_registry_eligible += 1
@@ -338,7 +395,12 @@ def analyze_injection_validity(
             false_unearned_eligible += 1
             if clean_row.ef_exclude_invalid < FALSE_EARNED_THRESHOLD:
                 false_unearned_count += 1
+            if clean_row.y0:
+                false_unearned_y0_eligible += 1
+                if clean_row.ef_exclude_invalid < FALSE_EARNED_THRESHOLD:
+                    false_unearned_y0_count += 1
 
+    exact_channel_attribution_rate = _rate(in_registry_hits, in_registry_eligible)
     pair_by_id = {row["injection_id"]: row for row in pair_rows}
     channel_summary_rows: list[dict[str, Any]] = []
     all_channels = sorted({spec.injected_channel for spec in specs.values()})
@@ -528,10 +590,7 @@ def analyze_injection_validity(
         "invalid_asymmetry_rows": invalid_asymmetry_rows,
         "ef_separation": ef_separation,
         "metrics": {
-            "targeted_channel_detection_rate": _rate(
-                in_registry_hits,
-                in_registry_eligible,
-            ),
+            "targeted_channel_detection_rate": exact_channel_attribution_rate,
             "off_target_failure_rate": _rate(
                 off_target_count,
                 off_target_eligible,
@@ -543,6 +602,22 @@ def analyze_injection_validity(
                 false_unearned_eligible,
             ),
             **ef_separation,
+        },
+        "diagnostic_metrics": {
+            "exact_channel_attribution_rate": exact_channel_attribution_rate,
+            "target_pi_attribution_rate": _rate(target_pi_hits, target_pi_eligible),
+            "in_registry_ef_detection_rate": _rate(
+                in_registry_ef_hits,
+                in_registry_ef_eligible,
+            ),
+            "invalid_rate": _rate(injected_invalid_count, len(specs)),
+            "false_unearned_rate_y0_only": _rate(
+                false_unearned_y0_count,
+                false_unearned_y0_eligible,
+            ),
+            "target_pi_eligible_count": target_pi_eligible,
+            "in_registry_ef_eligible_count": in_registry_ef_eligible,
+            "injected_invalid_count": injected_invalid_count,
         },
         "spec_count": len(specs),
         "result_count": len(results),
@@ -586,8 +661,24 @@ def render_injection_validity_report(payload: dict[str, Any]) -> str:
         "| Metric | Value |",
         "| --- | --- |",
         (
-            f"| Targeted channel detection rate (in-registry) | "
+            f"| Targeted channel detection rate (in-registry, legacy) | "
             f"{_format_float(metrics['targeted_channel_detection_rate'])} |"
+        ),
+        (
+            f"| Exact channel attribution rate (in-registry, Y₀=1) | "
+            f"{_format_float(payload['diagnostic_metrics']['exact_channel_attribution_rate'])} |"
+        ),
+        (
+            f"| Target-π attribution rate (in-registry, Y₀=1) | "
+            f"{_format_float(payload['diagnostic_metrics']['target_pi_attribution_rate'])} |"
+        ),
+        (
+            f"| In-registry EF detection rate (EF < τ, Y₀=1) | "
+            f"{_format_float(payload['diagnostic_metrics']['in_registry_ef_detection_rate'])} |"
+        ),
+        (
+            f"| Invalid rate (all injected rows) | "
+            f"{_format_float(payload['diagnostic_metrics']['invalid_rate'])} |"
         ),
         (
             f"| Off-target failure rate (in-registry) | "
@@ -605,6 +696,32 @@ def render_injection_validity_report(payload: dict[str, Any]) -> str:
             f"| False unearned rate (clean paired) | "
             f"{_format_float(metrics['false_unearned_rate'])} |"
         ),
+        (
+            f"| False unearned rate (clean paired, Y₀=1 only) | "
+            f"{_format_float(payload['diagnostic_metrics']['false_unearned_rate_y0_only'])} |"
+        ),
+        "",
+        "## Metric definitions",
+        "",
+        (
+            "`targeted_channel_detection_rate` is an exact channel-attribution rate: "
+            "`observed_failed_pi == expected_failed_pi` among in-registry injected rows "
+            "with Y₀=1. It is **not** based on an EF threshold."
+        ),
+        "",
+        (
+            "`in_registry_ef_detection_rate` counts rows where EF_exclude_invalid drops "
+            f"below τ={FALSE_EARNED_THRESHOLD}; it can diverge from attribution when "
+            "invalid outcomes or off-target mechanism failures occur."
+        ),
+        "",
+        (
+            "`target_pi_attribution_rate` checks whether the expected π appears in "
+            "`failed_mechanisms`, independent of `observed_failed_pi` tie-breaking."
+        ),
+        "",
+        "See `blind_injection_diagnostic.md` and `blind_injection_summary.json` "
+        "for row-level reconciliation against the attribution matrix.",
         "",
         "## EF separation (clean vs injected)",
         "",
@@ -715,6 +832,8 @@ def generate_injection_validity_report(
     specs: dict[str, InjectionSpec] | None = None,
 ) -> InjectionValidityResult:
     """Load results and specs, then write injection validity artifacts."""
+    from earnbench.injection_diagnostic import write_blind_injection_diagnostic_artifacts
+
     results = load_injection_results(results_path)
     if specs is None:
         if specs_dir is None:
@@ -730,6 +849,12 @@ def generate_injection_validity_report(
     false_rates_path = output_dir / FALSE_EARNED_FALSE_UNEARNED_CSV
     invalid_path = output_dir / INVALID_ASYMMETRY_CSV
     report_path = output_dir / INJECTION_VALIDITY_REPORT_MD
+    summary_json_path, diagnostic_md_path = write_blind_injection_diagnostic_artifacts(
+        payload,
+        results,
+        specs,
+        output_dir,
+    )
 
     _write_csv(summary_path, SUMMARY_COLUMNS, payload["summary_rows"])
     _write_csv(matrix_path, MATRIX_COLUMNS, payload["matrix_rows"])
@@ -746,10 +871,13 @@ def generate_injection_validity_report(
         false_earned_false_unearned_csv=false_rates_path,
         invalid_asymmetry_csv=invalid_path,
         report_md=report_path,
+        summary_json=summary_json_path,
+        diagnostic_md=diagnostic_md_path,
     )
 
 
 __all__ = [
+    "BLIND_INJECTION_SUMMARY_SCHEMA",
     "CHANNEL_ATTRIBUTION_MATRIX_CSV",
     "FALSE_EARNED_FALSE_UNEARNED_CSV",
     "INJECTION_VALIDITY_REPORT_MD",
@@ -757,6 +885,10 @@ __all__ = [
     "INVALID_ASYMMETRY_CSV",
     "InjectionResultRow",
     "InjectionValidityResult",
+    "_ef_detected",
+    "_exact_channel_attribution",
+    "_in_registry_ef_detected",
+    "_target_pi_attributed",
     "analyze_injection_validity",
     "generate_injection_validity_report",
     "load_injection_results",

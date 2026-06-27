@@ -895,6 +895,8 @@ def cmd_report_injection_validity(args: argparse.Namespace) -> None:
             ),
             "invalid_asymmetry_csv": str(result.invalid_asymmetry_csv),
             "report_md": str(result.report_md),
+            "summary_json": str(result.summary_json),
+            "diagnostic_md": str(result.diagnostic_md),
         },
         sys.stdout,
         indent=2,
