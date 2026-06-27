@@ -13,12 +13,22 @@ EarnBench assigns an **Earned Fraction (EF)** in \([0, 1]\) to nominally success
 ## Repository layout
 
 ```
-src/earnbench/   Python package (core types and API stubs)
-tests/           Unit tests
-docs/            Documentation (in progress)
-examples/        Usage examples (in progress)
-scripts/         Helper scripts (in progress)
+src/earnbench/          Python package (core types and API)
+  adapters/             Benchmark adapter interfaces (SWE-bench stub)
+tests/                  Unit tests
+docs/                   Documentation (in progress)
+examples/               Usage examples (in progress)
+scripts/                Helper scripts (in progress)
 ```
+
+### Benchmark adapters
+
+`earnbench.adapters` defines typed request/response schemas (`PatchArtifact`,
+`BenchmarkInstance`, `AdapterConfig`, `AuditRecord`, …) and a
+`SWEBenchAdapter` stub for SWE-bench Verified post-hoc re-grade. **Input
+validation is implemented; Docker/harness execution is not.** Calling
+`evaluate_nominal` or `evaluate_perturbation` raises `NotImplementedError`
+until a later release.
 
 ## Installation
 
