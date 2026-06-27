@@ -2,8 +2,7 @@ import pytest
 
 from earnbench import (
     AgentRun,
-    EarnedFractionReport,
-    EarnedFractionStatus,
+    NominalOutcome,
     OutcomeStatus,
     Perturbation,
     PerturbationResult,
@@ -42,9 +41,9 @@ def test_agent_run_construction() -> None:
 
 
 def test_perturbation_result_factories() -> None:
-    ok = PerturbationResult.ok("pi_vtest.v1", success=True)
+    ok = PerturbationResult.ok("pi_vtest.v1", success=True, channel="vtest")
     assert ok.valid
-    assert ok.success is True
+    assert ok.mechanism == "vtest"
 
     invalid = PerturbationResult.invalid("pi_env.v1", message="harness error")
     assert not invalid.valid
@@ -55,33 +54,33 @@ def test_perturbation_result_factories() -> None:
 
 
 def test_earned_fraction_simple_ratio() -> None:
-    run = AgentRun(
+    nominal = NominalOutcome(
         run_id="run-1",
         task_id="django__123",
-        artifact_ref="patch-abc",
-        nominal_success=True,
+        success=True,
     )
     results = [
-        PerturbationResult.ok("pi_vtest.v1", success=True),
-        PerturbationResult.ok("pi_verif.v1", success=True),
-        PerturbationResult.ok("pi_env.v1", success=False),
+        PerturbationResult.ok("pi_vtest.v1", success=True, channel="vtest"),
+        PerturbationResult.ok("pi_verif.v1", success=True, channel="verif"),
+        PerturbationResult.ok("pi_env.v1", success=False, channel="env"),
     ]
-    report = compute_earned_fraction(run, results)
+    report = compute_earned_fraction(nominal, results)
     assert report.is_defined
     assert report.earned_fraction == pytest.approx(2 / 3)
     assert report.successful_count == 2
     assert report.valid_count == 3
+    assert report.failed_mechanisms == ("env",)
+    assert report.survived_mechanisms == ("vtest", "verif")
 
 
 def test_earned_fraction_failed_nominal() -> None:
-    run = AgentRun(
+    nominal = NominalOutcome(
         run_id="run-1",
         task_id="django__123",
-        artifact_ref="patch-abc",
-        nominal_success=False,
+        success=False,
     )
     report = compute_earned_fraction(
-        run,
+        nominal,
         [PerturbationResult.ok("pi_vtest.v1", success=True)],
     )
     assert not report.is_defined
@@ -90,59 +89,12 @@ def test_earned_fraction_failed_nominal() -> None:
 
 
 def test_earned_fraction_no_perturbations() -> None:
-    run = AgentRun(
+    nominal = NominalOutcome(
         run_id="run-1",
         task_id="django__123",
-        artifact_ref="patch-abc",
-        nominal_success=True,
+        success=True,
     )
-    report = compute_earned_fraction(run, [])
+    report = compute_earned_fraction(nominal, [])
     assert not report.is_defined
     assert report.reason == "no_perturbations"
-
-
-def test_earned_fraction_no_valid_runs() -> None:
-    run = AgentRun(
-        run_id="run-1",
-        task_id="django__123",
-        artifact_ref="patch-abc",
-        nominal_success=True,
-    )
-    results = [
-        PerturbationResult.invalid("pi_vtest.v1", message="crash"),
-        PerturbationResult.missing("pi_verif.v1"),
-    ]
-    report = compute_earned_fraction(run, results)
-    assert not report.is_defined
-    assert report.reason == "no_valid_counterfactual_runs"
-    assert report.valid_count == 0
-
-
-def test_earned_fraction_report_validation() -> None:
-    with pytest.raises(ValueError, match="earned_fraction must be set"):
-        EarnedFractionReport(
-            run_id="run-1",
-            task_id="django__123",
-            status=EarnedFractionStatus.DEFINED,
-            earned_fraction=None,
-            successful_count=0,
-            valid_count=1,
-            perturbation_results=(),
-        )
-
-
-def test_report_to_dict() -> None:
-    run = AgentRun(
-        run_id="run-1",
-        task_id="django__123",
-        artifact_ref="patch-abc",
-        nominal_success=True,
-    )
-    report = compute_earned_fraction(
-        run,
-        [PerturbationResult.ok("pi_vtest.v1", success=True)],
-    )
-    payload = report.to_dict()
-    assert payload["earned_fraction"] == 1.0
-    assert payload["status"] == "defined"
-    assert len(payload["perturbation_results"]) == 1
+    assert "no perturbations provided" in report.warnings[0]

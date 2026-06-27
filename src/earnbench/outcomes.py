@@ -15,12 +15,30 @@ class OutcomeStatus(str, Enum):
 
 
 @dataclass(frozen=True, slots=True)
+class NominalOutcome:
+    """Result of nominal (unperturbed) grading for one agent run."""
+
+    run_id: str
+    task_id: str
+    success: bool
+
+    def __post_init__(self) -> None:
+        if not self.run_id:
+            msg = "run_id must be non-empty"
+            raise ValueError(msg)
+        if not self.task_id:
+            msg = "task_id must be non-empty"
+            raise ValueError(msg)
+
+
+@dataclass(frozen=True, slots=True)
 class PerturbationResult:
     """Result of applying one perturbation to a nominally successful run."""
 
     perturbation_id: str
     status: OutcomeStatus
     success: bool | None = None
+    channel: str = ""
     message: str = ""
 
     def __post_init__(self) -> None:
@@ -39,26 +57,52 @@ class PerturbationResult:
         """Whether this result counts toward the EF denominator."""
         return self.status is OutcomeStatus.OK
 
+    @property
+    def mechanism(self) -> str:
+        """Mechanism label for attribution (channel or perturbation id)."""
+        return self.channel or self.perturbation_id
+
     @classmethod
-    def ok(cls, perturbation_id: str, *, success: bool) -> PerturbationResult:
+    def ok(
+        cls,
+        perturbation_id: str,
+        *,
+        success: bool,
+        channel: str = "",
+    ) -> PerturbationResult:
         return cls(
             perturbation_id=perturbation_id,
             status=OutcomeStatus.OK,
             success=success,
+            channel=channel,
         )
 
     @classmethod
-    def invalid(cls, perturbation_id: str, *, message: str = "") -> PerturbationResult:
+    def invalid(
+        cls,
+        perturbation_id: str,
+        *,
+        channel: str = "",
+        message: str = "",
+    ) -> PerturbationResult:
         return cls(
             perturbation_id=perturbation_id,
             status=OutcomeStatus.INVALID,
+            channel=channel,
             message=message,
         )
 
     @classmethod
-    def missing(cls, perturbation_id: str, *, message: str = "") -> PerturbationResult:
+    def missing(
+        cls,
+        perturbation_id: str,
+        *,
+        channel: str = "",
+        message: str = "",
+    ) -> PerturbationResult:
         return cls(
             perturbation_id=perturbation_id,
             status=OutcomeStatus.MISSING,
+            channel=channel,
             message=message,
         )

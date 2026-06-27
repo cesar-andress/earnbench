@@ -21,10 +21,14 @@ class EarnedFractionReport:
 
     run_id: str
     task_id: str
+    nominal_success: bool
     status: EarnedFractionStatus
     earned_fraction: float | None
-    successful_count: int
     valid_count: int
+    successful_count: int
+    failed_mechanisms: tuple[str, ...]
+    survived_mechanisms: tuple[str, ...]
+    warnings: tuple[str, ...]
     perturbation_results: tuple[PerturbationResult, ...]
     reason: str = ""
 
@@ -52,14 +56,20 @@ class EarnedFractionReport:
         return {
             "run_id": self.run_id,
             "task_id": self.task_id,
+            "nominal_success": self.nominal_success,
             "status": self.status.value,
             "earned_fraction": self.earned_fraction,
-            "successful_count": self.successful_count,
             "valid_count": self.valid_count,
+            "successful_count": self.successful_count,
+            "failed_mechanisms": list(self.failed_mechanisms),
+            "survived_mechanisms": list(self.survived_mechanisms),
+            "warnings": list(self.warnings),
             "reason": self.reason,
             "perturbation_results": [
                 {
                     "perturbation_id": r.perturbation_id,
+                    "channel": r.channel,
+                    "mechanism": r.mechanism,
                     "status": r.status.value,
                     "success": r.success,
                     "message": r.message,
