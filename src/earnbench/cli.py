@@ -94,6 +94,7 @@ from earnbench.phase_c_agents import (
 )
 from earnbench.provenance import Provenance, build_provenance
 from earnbench.policy_ef import generate_policy_ef_report
+from earnbench.policy_variance import generate_policy_variance_report
 from earnbench.rank_stability import generate_rank_stability_report
 from earnbench.registry import RegistryError
 from earnbench.registry import get as get_perturbation
@@ -837,6 +838,7 @@ def cmd_report_policy_ef(args: argparse.Namespace) -> None:
             Path(args.agent_results),
             Path(args.output),
             bootstrap_draws=args.bootstrap,
+            bootstrap_seed=args.seed,
         )
     except FileNotFoundError as exc:
         raise CLIError(str(exc)) from exc
@@ -853,6 +855,45 @@ def cmd_report_policy_ef(args: argparse.Namespace) -> None:
             "variance_csv": str(result.variance_csv),
             "pairwise_flips_csv": str(result.pairwise_flips_csv),
             "bootstrap_json": str(result.bootstrap_json),
+            "report_md": str(result.report_md),
+            **(
+                {"exploitation_frontier_csv": str(result.exploitation_frontier_csv)}
+                if result.exploitation_frontier_csv is not None
+                else {}
+            ),
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
+def cmd_report_policy_variance(args: argparse.Namespace) -> None:
+    """Generate Phase C′ policy variance decomposition artifacts."""
+    try:
+        result = generate_policy_variance_report(
+            Path(args.agent_results),
+            Path(args.output),
+            bootstrap_draws=args.bootstrap,
+            bootstrap_seed=args.seed,
+        )
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(
+        {
+            "output_dir": str(result.output_dir),
+            "by_agent_csv": str(result.by_agent_csv),
+            "by_agent_instance_csv": str(result.by_agent_instance_csv),
+            "components_csv": str(result.components_csv),
+            "bootstrap_json": str(result.bootstrap_json),
+            "pairwise_flips_csv": str(result.pairwise_flips_csv),
             "report_md": str(result.report_md),
             **(
                 {"exploitation_frontier_csv": str(result.exploitation_frontier_csv)}
@@ -2813,6 +2854,43 @@ def build_parser() -> argparse.ArgumentParser:
         help="Bootstrap resamples over instances (replicates kept within instance)",
     )
     report_policy_ef_parser.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+        help="Random seed for bootstrap resampling (default: 0)",
+    )
+    report_policy_ef_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write artifacts only; do not print JSON summary to stdout",
+    )
+    report_policy_variance_parser = report_subparsers.add_parser(
+        "policy-variance",
+        help="Phase C′ policy-level earned-credit variance decomposition",
+    )
+    report_policy_variance_parser.add_argument(
+        "--agent-results",
+        required=True,
+        help="Long-format CSV with agent, instance_id, replicate, y0, ef_pi, ...",
+    )
+    report_policy_variance_parser.add_argument(
+        "--output",
+        required=True,
+        help="Directory for policy_variance_* artifacts",
+    )
+    report_policy_variance_parser.add_argument(
+        "--bootstrap",
+        type=int,
+        default=10_000,
+        help="Bootstrap resamples over instances (replicates kept within instance)",
+    )
+    report_policy_variance_parser.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+        help="Random seed for bootstrap resampling (default: 0)",
+    )
+    report_policy_variance_parser.add_argument(
         "--quiet",
         action="store_true",
         help="Write artifacts only; do not print JSON summary to stdout",
@@ -3119,6 +3197,8 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_report_rank_stability(args)
             elif args.report_command == "policy-ef":
                 cmd_report_policy_ef(args)
+            elif args.report_command == "policy-variance":
+                cmd_report_policy_variance(args)
             elif args.report_command == "injection-validity":
                 cmd_report_injection_validity(args)
             elif args.report_command == "controls":
