@@ -46,6 +46,10 @@ from earnbench.cross_oracle_agreement import (
     validate_cross_oracle_table,
 )
 from earnbench.external_exploits import validate_external_exploit_catalog
+from earnbench.external_unearned import (
+    generate_external_unearned_report,
+    validate_external_unearned_catalog,
+)
 from earnbench.monte_carlo_ef import MonteCarloSimulationConfig, generate_monte_carlo_ef_report
 from earnbench.pi_ablation import generate_pi_ablation_report
 from earnbench.registry_agreement import validate_registry_agreement_table
@@ -1497,6 +1501,59 @@ def cmd_validation_registry_agreement(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_external_unearned_validate_catalog(args: argparse.Namespace) -> None:
+    """Validate an external unearned anchor catalog CSV."""
+    result = validate_external_unearned_catalog(Path(args.catalog))
+    if not result.ok:
+        for error in result.errors:
+            print(f"error: {error}", file=sys.stderr)
+        raise CLIError("external unearned catalog validation failed", exit_code=1)
+    if args.quiet:
+        return
+    json.dump(
+        {
+            "status": "ok",
+            "catalog": str(result.path),
+            "row_count": result.row_count,
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
+def cmd_report_external_unearned(args: argparse.Namespace) -> None:
+    """Generate external unearned anchor validation report."""
+    try:
+        result = generate_external_unearned_report(
+            Path(args.catalog),
+            Path(args.results),
+            Path(args.output),
+        )
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(
+        {
+            "output_dir": str(result.output_dir),
+            "report_md": str(result.report_md),
+            "summary_json": str(result.summary_json),
+            "join_csv": str(result.join_csv),
+            "channel_attribution_csv": str(result.channel_attribution_csv),
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
 def cmd_external_exploit_validate_catalog(args: argparse.Namespace) -> None:
     """Validate a Phase B-ext external exploit catalog CSV."""
     result = validate_external_exploit_catalog(Path(args.catalog))
@@ -1835,6 +1892,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to external_exploit_catalog.csv",
     )
     external_validate_catalog_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print validation summary JSON on success",
+    )
+
+    external_unearned_parser = subparsers.add_parser(
+        "external-unearned",
+        help="External unearned anchor catalog tools",
+    )
+    external_unearned_subparsers = external_unearned_parser.add_subparsers(
+        dest="external_unearned_command",
+        required=True,
+    )
+    external_unearned_validate_parser = external_unearned_subparsers.add_parser(
+        "validate-catalog",
+        help="Validate external unearned anchor catalog CSV schema",
+    )
+    external_unearned_validate_parser.add_argument(
+        "catalog",
+        help="Path to external_unearned_anchor.csv",
+    )
+    external_unearned_validate_parser.add_argument(
         "--quiet",
         action="store_true",
         help="Do not print validation summary JSON on success",
@@ -2712,6 +2791,30 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write artifacts only; do not print JSON summary to stdout",
     )
+    report_external_unearned_parser = report_subparsers.add_parser(
+        "external-unearned",
+        help="External unearned anchor validation report",
+    )
+    report_external_unearned_parser.add_argument(
+        "--catalog",
+        required=True,
+        help="Path to external_unearned_anchor.csv",
+    )
+    report_external_unearned_parser.add_argument(
+        "--results",
+        required=True,
+        help="Path to external_unearned_results.csv (harness outcomes)",
+    )
+    report_external_unearned_parser.add_argument(
+        "--output",
+        required=True,
+        help="Directory for external_unearned_* artifacts",
+    )
+    report_external_unearned_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write artifacts only; do not print JSON summary to stdout",
+    )
 
     investigate_parser = subparsers.add_parser(
         "investigate",
@@ -2804,6 +2907,13 @@ def main(argv: list[str] | None = None) -> int:
                 parser.error(
                     f"unknown external-exploit command: {args.external_exploit_command}"
                 )
+        elif args.command == "external-unearned":
+            if args.external_unearned_command == "validate-catalog":
+                cmd_external_unearned_validate_catalog(args)
+            else:
+                parser.error(
+                    f"unknown external-unearned command: {args.external_unearned_command}"
+                )
         elif args.command == "validation":
             if args.validation_command == "bootstrap":
                 cmd_validation_bootstrap(args)
@@ -2891,6 +3001,8 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_report_controls(args)
             elif args.report_command == "certified-controls":
                 cmd_report_certified_controls(args)
+            elif args.report_command == "external-unearned":
+                cmd_report_external_unearned(args)
             else:
                 parser.error(f"unknown report command: {args.report_command}")
         elif args.command == "investigate":

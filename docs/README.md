@@ -5,6 +5,7 @@ Documentation is in early draft. Design notes live in the private research repos
 ## Checklists and policy
 
 - [Validation ladder CLI](validation_ladder.md)
+- [External unearned anchor](external_unearned_anchor.md)
 - [Maintainer-certified correctness anchor](maintainer_certified_correctness.md)
 - [Certified correct control study (legacy)](certified_correct_controls.md)
 - [Docker container cleanup (Phase A/B idempotency)](docker_container_cleanup.md)

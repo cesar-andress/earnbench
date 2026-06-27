@@ -1,0 +1,2 @@
+external_id,source,paper_or_url,original_benchmark,original_task_id,external_label,external_label_quote,external_label_type,artifact_available,patch_available,trace_available,reproducible,mapped_channel,registry_label,expected_failed_pi,expected_ef_behavior,expected_detection,inclusion_decision,exclusion_reason,notes
+EU001,SpecBench,https://example.org/specbench,SpecBench,task-001,visible test overfit,"passes held-out visible only",not_a_valid_type,yes,yes,no,yes,visible_test_overfitting,IN_REGISTRY,pi_vtest.v1,low_on_y0_eq_1,detect,include,,invalid type
