@@ -81,21 +81,13 @@ def _validate_field_types(
         value = config[key]
         expected_type = spec.get("type")
         if expected_type == "string" and not isinstance(value, str):
-            errors.append(
-                f"{perturbation_id}: config field '{key}' must be a string"
-            )
+            errors.append(f"{perturbation_id}: config field '{key}' must be a string")
         elif expected_type == "integer" and not isinstance(value, int):
-            errors.append(
-                f"{perturbation_id}: config field '{key}' must be an integer"
-            )
+            errors.append(f"{perturbation_id}: config field '{key}' must be an integer")
         elif expected_type == "boolean" and not isinstance(value, bool):
-            errors.append(
-                f"{perturbation_id}: config field '{key}' must be a boolean"
-            )
+            errors.append(f"{perturbation_id}: config field '{key}' must be a boolean")
         elif expected_type == "array" and not isinstance(value, list):
-            errors.append(
-                f"{perturbation_id}: config field '{key}' must be an array"
-            )
+            errors.append(f"{perturbation_id}: config field '{key}' must be an array")
         minimum = spec.get("minimum")
         if (
             expected_type == "integer"

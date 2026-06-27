@@ -55,8 +55,10 @@ def list() -> list[PerturbationSpec]:
 @lru_cache(maxsize=1)
 def load_manifest() -> dict[str, Any]:
     """Load the shipped perturbation registry manifest."""
-    raw = files("earnbench.registry").joinpath("manifest.json").read_text(
-        encoding="utf-8"
+    raw = (
+        files("earnbench.registry")
+        .joinpath("manifest.json")
+        .read_text(encoding="utf-8")
     )
     manifest = json.loads(raw)
     if not isinstance(manifest, dict):
@@ -133,9 +135,7 @@ def validate(*, sample_configs: dict[str, dict[str, Any]] | None = None) -> list
                 errors.append(str(exc))
                 continue
             if not isinstance(config, dict):
-                errors.append(
-                    f"{perturbation_id}: sample config must be a JSON object"
-                )
+                errors.append(f"{perturbation_id}: sample config must be a JSON object")
                 continue
             errors.extend(spec.validate_config(config))
 
