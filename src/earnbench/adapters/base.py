@@ -6,11 +6,10 @@ import hashlib
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
 
+from earnbench.audit import AuditRecord
 from earnbench.outcomes import NominalOutcome, PerturbationResult
 
-AUDIT_SCHEMA_VERSION = "earnbench_audit.v1"
 ADAPTER_CONFIG_SCHEMA_VERSION = "swe_adapter_run.v1"
 MVP_PERTURBATION_IDS = frozenset({"pi_vtest.v1", "pi_verif.v1", "pi_env.v1"})
 
@@ -139,82 +138,6 @@ class PerturbationEvaluationRequest:
         if not self.perturbation_id:
             msg = "perturbation_id must be non-empty"
             raise ValueError(msg)
-
-
-@dataclass(frozen=True, slots=True)
-class AuditRecord:
-    """Structured audit log for one nominal or perturbation grading run."""
-
-    instance_id: str
-    run_id: str
-    config_digest: str
-    inputs: dict[str, Any]
-    outputs: dict[str, Any]
-    schema_version: str = AUDIT_SCHEMA_VERSION
-    perturbation_id: str = ""
-    harness: dict[str, Any] = field(default_factory=dict)
-    procedure: dict[str, Any] = field(default_factory=dict)
-    timestamp_utc: str = ""
-    duration_s: float | None = None
-
-    def __post_init__(self) -> None:
-        if self.schema_version != AUDIT_SCHEMA_VERSION:
-            msg = f"unsupported audit schema_version: {self.schema_version}"
-            raise ValueError(msg)
-        if not self.instance_id:
-            msg = "instance_id must be non-empty"
-            raise ValueError(msg)
-        if not self.run_id:
-            msg = "run_id must be non-empty"
-            raise ValueError(msg)
-        if not self.config_digest:
-            msg = "config_digest must be non-empty"
-            raise ValueError(msg)
-        if not isinstance(self.inputs, dict):
-            msg = "inputs must be a dict"
-            raise TypeError(msg)
-        if not isinstance(self.outputs, dict):
-            msg = "outputs must be a dict"
-            raise TypeError(msg)
-
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize to JSON-friendly dict (``audit.json`` on disk)."""
-        payload: dict[str, Any] = {
-            "schema_version": self.schema_version,
-            "instance_id": self.instance_id,
-            "run_id": self.run_id,
-            "config_digest": self.config_digest,
-            "inputs": self.inputs,
-            "outputs": self.outputs,
-        }
-        if self.perturbation_id:
-            payload["perturbation_id"] = self.perturbation_id
-        if self.harness:
-            payload["harness"] = self.harness
-        if self.procedure:
-            payload["procedure"] = self.procedure
-        if self.timestamp_utc:
-            payload["timestamp_utc"] = self.timestamp_utc
-        if self.duration_s is not None:
-            payload["duration_s"] = self.duration_s
-        return payload
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> AuditRecord:
-        """Parse an ``audit.json`` payload."""
-        return cls(
-            schema_version=data.get("schema_version", AUDIT_SCHEMA_VERSION),
-            instance_id=data["instance_id"],
-            run_id=data["run_id"],
-            perturbation_id=data.get("perturbation_id", ""),
-            config_digest=data["config_digest"],
-            harness=dict(data.get("harness", {})),
-            inputs=dict(data["inputs"]),
-            procedure=dict(data.get("procedure", {})),
-            outputs=dict(data["outputs"]),
-            timestamp_utc=data.get("timestamp_utc", ""),
-            duration_s=data.get("duration_s"),
-        )
 
 
 @dataclass(frozen=True, slots=True)

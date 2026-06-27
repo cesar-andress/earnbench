@@ -12,4 +12,4 @@ Documentation is in early draft. Design notes live in the private research repos
 - Earned Fraction definitions
 - Counterfactual perturbation specifications
 - Harness integration (for example SWE-bench-class evaluators)
-- Audit log schema
+- Audit log schema — see ``earnbench.audit.AuditRecord`` (``audit.json`` fields)

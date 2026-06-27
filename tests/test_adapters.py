@@ -2,7 +2,6 @@ import pytest
 
 from earnbench.adapters import (
     AdapterConfig,
-    AuditRecord,
     BenchmarkInstance,
     EvaluationArtifact,
     NominalEvaluationRequest,
@@ -62,23 +61,6 @@ def test_benchmark_instance_rejects_empty_fail_to_pass() -> None:
 def test_adapter_config_computes_digest() -> None:
     config = _sample_config()
     assert config.config_digest.startswith("sha256:")
-
-
-def test_audit_record_round_trip() -> None:
-    record = AuditRecord(
-        instance_id="django__django-13279",
-        run_id="run-1",
-        perturbation_id="pi_vtest.v1",
-        config_digest="sha256:abc",
-        inputs={"patch_sha256": "deadbeef"},
-        outputs={"Y": 1, "resolved": True},
-        harness={"swebench_version": "1.2.0"},
-        procedure={"tamper_flag": False},
-        timestamp_utc="2026-06-27T00:00:00Z",
-        duration_s=12.5,
-    )
-    restored = AuditRecord.from_dict(record.to_dict())
-    assert restored == record
 
 
 def test_evaluation_artifact_requires_exactly_one_outcome() -> None:

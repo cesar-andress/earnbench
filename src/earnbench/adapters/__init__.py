@@ -2,7 +2,6 @@
 
 from earnbench.adapters.base import (
     AdapterConfig,
-    AuditRecord,
     BenchmarkAdapter,
     BenchmarkInstance,
     EvaluationArtifact,
@@ -11,6 +10,7 @@ from earnbench.adapters.base import (
     PerturbationEvaluationRequest,
 )
 from earnbench.adapters.swebench import SWEBenchAdapter
+from earnbench.audit import AuditRecord
 
 __all__ = [
     "AdapterConfig",
