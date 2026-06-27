@@ -14,6 +14,10 @@ from earnbench.adapters.swebench_nominal import (
     HarnessNotInstalledError,
     run_nominal_grading,
 )
+from earnbench.adapters.swebench_preflight import (
+    MissingDockerImagesError,
+    run_swebench_preflight,
+)
 from earnbench.audit import AuditRecord
 from earnbench.metrics import compute_earned_fraction
 from earnbench.outcomes import NominalOutcome, OutcomeStatus, PerturbationResult
@@ -270,6 +274,40 @@ def cmd_swebench_prepare_smoke(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_swebench_preflight(args: argparse.Namespace) -> None:
+    """Check and optionally build SWE-bench Docker images for one instance."""
+    metadata_path = Path(args.metadata_parquet)
+    output_dir = Path(args.output)
+    suffix = metadata_path.suffix.lower()
+    if suffix not in {".parquet", ".json"}:
+        raise CLIError(
+            f"--metadata-parquet must be a .parquet or .json file, got: {metadata_path}"
+        )
+
+    try:
+        payload = run_swebench_preflight(
+            metadata_path=metadata_path,
+            instance_id=args.instance_id,
+            output_dir=output_dir,
+            build_missing_images=args.build_missing_images,
+        )
+    except MetadataLoadError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if payload["status"] != "ok":
+        raise CLIError(
+            f"preflight status: {payload['status']} "
+            f"(see {output_dir / args.instance_id / 'preflight.json'})",
+            exit_code=1,
+        )
+
+    if args.quiet:
+        return
+
+    json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
 def cmd_swebench_run_nominal(args: argparse.Namespace) -> None:
     """Run nominal SWE-bench grading for one instance."""
     metadata_path = Path(args.metadata_parquet)
@@ -295,6 +333,8 @@ def cmd_swebench_run_nominal(args: argparse.Namespace) -> None:
     except MetadataLoadError as exc:
         raise CLIError(str(exc)) from exc
     except HarnessNotInstalledError as exc:
+        raise CLIError(str(exc)) from exc
+    except MissingDockerImagesError as exc:
         raise CLIError(str(exc)) from exc
     except FileNotFoundError as exc:
         raise CLIError(str(exc)) from exc
@@ -439,6 +479,35 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write artifacts only; do not print plan.json to stdout",
     )
+    preflight_parser = swebench_subparsers.add_parser(
+        "preflight",
+        help="Check or build SWE-bench Docker images for one instance",
+    )
+    preflight_parser.add_argument(
+        "--metadata-parquet",
+        required=True,
+        help="Path to SWE-bench Verified metadata (.parquet or test .json fixture)",
+    )
+    preflight_parser.add_argument(
+        "--instance-id",
+        required=True,
+        help="SWE-bench instance id (e.g. psf__requests-1724)",
+    )
+    preflight_parser.add_argument(
+        "--output",
+        required=True,
+        help="Output directory for preflight artifacts",
+    )
+    preflight_parser.add_argument(
+        "--build-missing-images",
+        action="store_true",
+        help="Build missing SWE-bench harness images when possible",
+    )
+    preflight_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write artifacts only; do not print preflight.json to stdout",
+    )
     run_nominal_parser = swebench_subparsers.add_parser(
         "run-nominal",
         help="Run nominal SWE-bench grading (Docker harness)",
@@ -506,6 +575,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "swebench":
             if args.swebench_command == "prepare-smoke":
                 cmd_swebench_prepare_smoke(args)
+            elif args.swebench_command == "preflight":
+                cmd_swebench_preflight(args)
             elif args.swebench_command == "run-nominal":
                 cmd_swebench_run_nominal(args)
             else:

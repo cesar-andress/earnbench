@@ -133,7 +133,37 @@ earnbench swebench prepare-smoke \
   --output /tmp/earnbench_smoke
 ```
 
-Run **nominal** grading (golden patch, F2P + P2P verification):
+**Phase A smoke sequence** (recommended order):
+
+```bash
+# 1. Dry-run artifact layout (no Docker)
+earnbench swebench prepare-smoke \
+  --metadata-parquet path/to/swe_verified_test.parquet \
+  --instance-id psf__requests-1724 \
+  --output /tmp/earnbench_smoke
+
+# 2. Verify or build harness Docker images
+earnbench swebench preflight \
+  --metadata-parquet path/to/swe_verified_test.parquet \
+  --instance-id psf__requests-1724 \
+  --output /tmp/earnbench_smoke \
+  --build-missing-images
+
+# 3. Nominal golden-patch grading (F2P + P2P)
+earnbench swebench run-nominal \
+  --metadata-parquet path/to/swe_verified_test.parquet \
+  --instance-id psf__requests-1724 \
+  --patch /tmp/earnbench_smoke/psf__requests-1724/patch/prod_only.patch \
+  --output /tmp/earnbench_smoke \
+  --timeout-seconds 1800
+```
+
+Preflight writes `<output>/<instance_id>/preflight.json` and `preflight.log`
+with required Docker image names, local presence checks, and actionable build
+commands when images are missing. If `run-nominal` fails because the environment
+image is absent, it points you at the preflight command above.
+
+Run **nominal** grading alone (after images exist):
 
 ```bash
 earnbench swebench run-nominal \

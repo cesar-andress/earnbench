@@ -281,6 +281,36 @@ def test_swebench_prepare_smoke_missing_instance(capsys, tmp_path: Path) -> None
     assert "not found" in captured.err.lower()
 
 
+def test_swebench_preflight_cli(capsys, tmp_path: Path) -> None:
+    output_dir = tmp_path / "out"
+
+    with patch(
+        "earnbench.cli.run_swebench_preflight",
+        lambda **_kwargs: {
+            "instance_id": "psf__requests-1724",
+            "status": "ok",
+            "missing_images": [],
+        },
+    ):
+        exit_code = main(
+            [
+                "swebench",
+                "preflight",
+                "--metadata-parquet",
+                str(FIXTURES / "swebench_smoke_metadata.json"),
+                "--instance-id",
+                "psf__requests-1724",
+                "--output",
+                str(output_dir),
+            ]
+        )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    payload = json.loads(captured.out)
+    assert payload["status"] == "ok"
+
+
 def test_swebench_run_nominal_cli(capsys, tmp_path: Path) -> None:
     output_dir = tmp_path / "out"
     patch_path = tmp_path / "golden.patch"
@@ -291,6 +321,9 @@ def test_swebench_run_nominal_cli(capsys, tmp_path: Path) -> None:
     with patch(
         "earnbench.adapters.swebench_nominal.default_nominal_runner",
         _mock_nominal_runner_for_cli,
+    ), patch(
+        "earnbench.adapters.swebench_preflight.check_nominal_docker_images",
+        lambda **_kwargs: (),
     ):
         exit_code = main(
             [

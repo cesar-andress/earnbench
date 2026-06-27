@@ -336,6 +336,24 @@ def run_nominal_grading(
     nominal_dir.mkdir(parents=True, exist_ok=True)
     log_ref = f"{instance_id}/nominal/harness.log"
 
+    if runner is None:
+        from earnbench.adapters.swebench_preflight import (
+            MissingDockerImagesError,
+            check_nominal_docker_images,
+        )
+
+        missing_images = check_nominal_docker_images(
+            metadata_path=metadata_path,
+            instance_id=instance_id,
+        )
+        if missing_images:
+            raise MissingDockerImagesError(
+                instance_id=instance_id,
+                missing_images=missing_images,
+                metadata_path=metadata_path,
+                output_dir=output_dir,
+            )
+
     work_cwd = output_dir / ".swebench_work"
     work_cwd.mkdir(parents=True, exist_ok=True)
     original_cwd = os.getcwd()
