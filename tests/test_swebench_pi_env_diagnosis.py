@@ -255,6 +255,30 @@ def test_all_failure_categories_are_documented() -> None:
     assert len(FAILURE_CATEGORIES) == 9
 
 
+def test_resolve_artifact_dir_accepts_batch_root(tmp_path: Path) -> None:
+    from earnbench.adapters.swebench_pi_env_diagnosis import (
+        resolve_pi_env_artifact_dirs,
+    )
+
+    batch = tmp_path / "SMOKE_NOMINAL_2"
+    nominal = batch / INSTANCE_ID / "nominal"
+    nominal.mkdir(parents=True)
+    (nominal / "grade.json").write_text("{}", encoding="utf-8")
+
+    pi_batch = tmp_path / "SMOKE_ENV"
+    pi_env = pi_batch / INSTANCE_ID / "pi_env.v1"
+    pi_env.mkdir(parents=True)
+    (pi_env / "grade.json").write_text("{}", encoding="utf-8")
+
+    resolved_nominal, resolved_pi_env = resolve_pi_env_artifact_dirs(
+        instance_id=INSTANCE_ID,
+        nominal_dir=batch,
+        pi_env_dir=pi_batch,
+    )
+    assert resolved_nominal == nominal
+    assert resolved_pi_env == pi_env
+
+
 def test_diagnose_missing_nominal_grade_raises(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="nominal grade"):
         diagnose_pi_env(

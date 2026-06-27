@@ -880,12 +880,18 @@ def build_parser() -> argparse.ArgumentParser:
     diagnose_pi_env_parser.add_argument(
         "--nominal-dir",
         required=True,
-        help="Path to nominal artifact directory (contains grade.json, harness.log)",
+        help=(
+            "Nominal artifact dir (grade.json) or batch output root "
+            "(<dir>/<instance_id>/nominal resolved automatically)"
+        ),
     )
     diagnose_pi_env_parser.add_argument(
         "--pi-env-dir",
         required=True,
-        help="Path to pi_env.v1 artifact directory (contains grade.json, harness.log)",
+        help=(
+            "pi_env.v1 artifact dir (grade.json) or batch output root "
+            "(<dir>/<instance_id>/pi_env.v1 resolved automatically)"
+        ),
     )
     diagnose_pi_env_parser.add_argument(
         "--output",

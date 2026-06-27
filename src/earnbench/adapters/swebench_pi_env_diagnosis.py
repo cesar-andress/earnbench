@@ -80,6 +80,48 @@ _LOG_PATTERNS: dict[str, re.Pattern[str]] = {
 }
 
 
+def resolve_artifact_dir(
+    path: Path,
+    instance_id: str,
+    artifact_subdir: str,
+    *,
+    label: str,
+) -> Path:
+    """Accept either an artifact dir or a batch output root."""
+    direct_grade = path / "grade.json"
+    if direct_grade.is_file():
+        return path
+    nested = path / instance_id / artifact_subdir
+    nested_grade = nested / "grade.json"
+    if nested_grade.is_file():
+        return nested
+    msg = f"{label} grade.json not found. Tried:\n  {direct_grade}\n  {nested_grade}"
+    raise FileNotFoundError(msg)
+
+
+def resolve_pi_env_artifact_dirs(
+    *,
+    instance_id: str,
+    nominal_dir: Path,
+    pi_env_dir: Path,
+) -> tuple[Path, Path]:
+    """Resolve nominal and pi_env artifact directories from common layouts."""
+    return (
+        resolve_artifact_dir(
+            nominal_dir,
+            instance_id,
+            "nominal",
+            label="nominal",
+        ),
+        resolve_artifact_dir(
+            pi_env_dir,
+            instance_id,
+            "pi_env.v1",
+            label="pi_env",
+        ),
+    )
+
+
 def _load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
@@ -637,12 +679,17 @@ def write_pi_env_diagnosis(
     output_dir: Path,
 ) -> dict[str, Any]:
     """Run diagnosis and write ``pi_env_diagnosis.json`` and ``.md``."""
+    resolved_nominal, resolved_pi_env = resolve_pi_env_artifact_dirs(
+        instance_id=instance_id,
+        nominal_dir=nominal_dir,
+        pi_env_dir=pi_env_dir,
+    )
     diagnosis = diagnose_pi_env(
         metadata_path=metadata_path,
         instance_id=instance_id,
         patch_path=patch_path,
-        nominal_dir=nominal_dir,
-        pi_env_dir=pi_env_dir,
+        nominal_dir=resolved_nominal,
+        pi_env_dir=resolved_pi_env,
     )
     instance_dir = output_dir / instance_id
     instance_dir.mkdir(parents=True, exist_ok=True)
@@ -658,6 +705,8 @@ def write_pi_env_diagnosis(
     )
     diagnosis["diagnosis_json_path"] = str(json_path)
     diagnosis["diagnosis_md_path"] = str(md_path)
+    diagnosis["resolved_nominal_dir"] = str(resolved_nominal)
+    diagnosis["resolved_pi_env_dir"] = str(resolved_pi_env)
     return diagnosis
 
 
@@ -666,5 +715,7 @@ __all__ = [
     "HARDENING_INVALID_CATEGORIES",
     "diagnose_pi_env",
     "render_pi_env_diagnosis_markdown",
+    "resolve_artifact_dir",
+    "resolve_pi_env_artifact_dirs",
     "write_pi_env_diagnosis",
 ]
