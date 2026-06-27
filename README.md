@@ -74,7 +74,20 @@ Example input:
 }
 ```
 
-Prints an `EarnedFractionReport` as JSON on stdout.
+Prints an `EarnedFractionReport` as JSON on stdout, including a nested
+`provenance` object (see [Provenance](#provenance)).
+
+Optional input fields for provenance overrides:
+
+```json
+{
+  "config_digest": "sha256:run-config",
+  "random_seed": 42,
+  "docker_image_digest": "sha256:docker-image"
+}
+```
+
+Or supply a full `"provenance"` object to pin every field for reproducibility tests.
 
 ### Validate an audit record
 
@@ -104,6 +117,39 @@ Equivalent module invocation:
 
 ```bash
 python -m earnbench compute tests/fixtures/compute_input.json
+```
+
+## Provenance
+
+Every `EarnedFractionReport` and serialized `AuditRecord` includes a **`provenance`**
+block describing the measurement environment:
+
+| Field | Description |
+|-------|-------------|
+| `earnbench_version` | Installed package version |
+| `git_commit` | Git commit hash (`EARNBENCH_GIT_COMMIT` or repo HEAD) |
+| `python_version` | Interpreter version |
+| `platform` | OS/platform string |
+| `docker_image_digest` | Container image digest when grading runs in Docker |
+| `perturbation_registry_version` | Version label for the shipped Π registry |
+| `config_digest` | Hash of the run configuration |
+| `timestamp_utc` | UTC timestamp (ISO-8601) |
+| `random_seed` | Random seed when applicable (`null` otherwise) |
+| `hostname` | Optional host identifier |
+| `execution_uuid` | Unique id for this measurement execution |
+
+Build provenance in Python:
+
+```python
+from earnbench import build_provenance, compute_earned_fraction
+
+provenance = build_provenance(
+    config_digest="sha256:abc",
+    docker_image_digest="sha256:img",
+    random_seed=42,
+)
+report = compute_earned_fraction(nominal, counterfactuals, provenance=provenance)
+print(report.to_dict()["provenance"])
 ```
 
 ## Development

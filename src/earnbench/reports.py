@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 from earnbench.outcomes import PerturbationResult
+from earnbench.provenance import Provenance, build_provenance
 
 
 class EarnedFractionStatus(str, Enum):
@@ -31,6 +32,7 @@ class EarnedFractionReport:
     warnings: tuple[str, ...]
     perturbation_results: tuple[PerturbationResult, ...]
     reason: str = ""
+    provenance: Provenance = field(default_factory=build_provenance)
 
     def __post_init__(self) -> None:
         if self.status is EarnedFractionStatus.DEFINED:
@@ -76,4 +78,5 @@ class EarnedFractionReport:
                 }
                 for r in self.perturbation_results
             ],
+            "provenance": self.provenance.to_dict(),
         }

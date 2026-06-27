@@ -19,6 +19,8 @@ def test_compute_prints_earned_fraction_report(capsys) -> None:
     assert payload["valid_count"] == 3
     assert payload["successful_count"] == 2
     assert payload["run_id"] == "cli-run-001"
+    assert "provenance" in payload
+    assert payload["provenance"]["perturbation_registry_version"]
 
 
 def test_compute_missing_nominal_exits_nonzero(capsys, tmp_path: Path) -> None:
@@ -40,6 +42,40 @@ def test_compute_missing_file_exits_nonzero(capsys) -> None:
     assert "file not found" in captured.err
 
 
+def test_compute_honors_input_provenance_overrides(capsys, tmp_path) -> None:
+    input_path = tmp_path / "compute_with_provenance.json"
+    input_path.write_text(
+        json.dumps(
+            {
+                "nominal": {
+                    "run_id": "run-prov",
+                    "task_id": "task-prov",
+                    "success": True,
+                },
+                "perturbations": [
+                    {
+                        "perturbation_id": "pi_vtest.v1",
+                        "status": "ok",
+                        "success": True,
+                        "channel": "vtest",
+                    }
+                ],
+                "config_digest": "sha256:from-input",
+                "random_seed": 99,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = main(["compute", str(input_path)])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    payload = json.loads(captured.out)
+    assert payload["provenance"]["config_digest"] == "sha256:from-input"
+    assert payload["provenance"]["random_seed"] == 99
+
+
 def test_validate_audit_success(capsys) -> None:
     exit_code = main(["validate-audit", str(FIXTURES / "valid_audit.json")])
     captured = capsys.readouterr()
@@ -48,6 +84,7 @@ def test_validate_audit_success(capsys) -> None:
     payload = json.loads(captured.out)
     assert payload["instance_id"] == "django__django-13279"
     assert payload["status"] == "ok"
+    assert "provenance" in payload
 
 
 def test_validate_audit_quiet(capsys) -> None:

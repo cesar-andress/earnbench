@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from earnbench.outcomes import NominalOutcome, OutcomeStatus, PerturbationResult
+from earnbench.provenance import Provenance, build_provenance
 from earnbench.reports import EarnedFractionReport, EarnedFractionStatus
 
 
@@ -12,6 +13,7 @@ def _undefined_report(
     *,
     reason: str,
     warnings: tuple[str, ...],
+    provenance: Provenance,
 ) -> EarnedFractionReport:
     return EarnedFractionReport(
         run_id=nominal.run_id,
@@ -26,6 +28,7 @@ def _undefined_report(
         warnings=warnings,
         perturbation_results=counterfactuals,
         reason=reason,
+        provenance=provenance,
     )
 
 
@@ -44,6 +47,8 @@ def _exclusion_warnings(
 def compute_earned_fraction(
     nominal: NominalOutcome,
     counterfactuals: list[PerturbationResult],
+    *,
+    provenance: Provenance | None = None,
 ) -> EarnedFractionReport:
     """Compute MVP Earned Fraction from nominal and counterfactual outcomes.
 
@@ -52,12 +57,15 @@ def compute_earned_fraction(
     Defined only when the nominal outcome succeeded and at least one
     counterfactual run is valid.
     """
+    prov = provenance or build_provenance()
+
     if not nominal.success:
         return _undefined_report(
             nominal,
             tuple(counterfactuals),
             reason="nominal_run_failed",
             warnings=("nominal run failed; earned fraction undefined",),
+            provenance=prov,
         )
 
     if not counterfactuals:
@@ -66,6 +74,7 @@ def compute_earned_fraction(
             (),
             reason="no_perturbations",
             warnings=("no perturbations provided; earned fraction undefined",),
+            provenance=prov,
         )
 
     warnings = _exclusion_warnings(counterfactuals)
@@ -82,6 +91,7 @@ def compute_earned_fraction(
             tuple(counterfactuals),
             reason="no_valid_counterfactual_runs",
             warnings=warnings,
+            provenance=prov,
         )
 
     survived = tuple(r.mechanism for r in valid_results if r.success)
@@ -102,4 +112,5 @@ def compute_earned_fraction(
         warnings=tuple(warnings),
         perturbation_results=tuple(counterfactuals),
         reason="",
+        provenance=prov,
     )

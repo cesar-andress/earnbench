@@ -6,8 +6,12 @@ import json
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
+from uuid import UUID, uuid5
+
+from earnbench.provenance import Provenance, build_provenance, utc_timestamp
 
 AUDIT_SCHEMA_VERSION = "earnbench_audit.v1"
+_DERIVED_PROVENANCE_NAMESPACE = UUID("00000000-0000-4000-8000-000000000001")
 
 
 class AuditStatus(str, Enum):
@@ -50,6 +54,7 @@ class AuditRecord:
     success: bool | None = None
     log_ref: str | None = None
     schema_version: str = AUDIT_SCHEMA_VERSION
+    provenance: Provenance | None = None
 
     def __post_init__(self) -> None:
         if self.schema_version != AUDIT_SCHEMA_VERSION:
@@ -74,11 +79,38 @@ class AuditRecord:
             msg = "success must be None when status is not OK"
             raise ValueError(msg)
 
+    def effective_provenance(self) -> Provenance:
+        """Return explicit provenance or derive it from audit fields."""
+        if self.provenance is not None:
+            return self.provenance
+        execution_uuid = str(
+            uuid5(
+                _DERIVED_PROVENANCE_NAMESPACE,
+                "|".join(
+                    (
+                        self.instance_id,
+                        self.perturbation_id,
+                        self.patch_sha256,
+                        self.config_digest,
+                    )
+                ),
+            )
+        )
+        return build_provenance(
+            config_digest=self.config_digest,
+            docker_image_digest=self.image_digest,
+            timestamp_utc=self.timestamp_utc or utc_timestamp(),
+            earnbench_version=self.earnbench_version,
+            execution_uuid=execution_uuid,
+            include_hostname=False,
+        )
+
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable dict with stable field order."""
+        provenance = self.effective_provenance()
         payload: dict[str, Any] = {
             "schema_version": self.schema_version,
-            "earnbench_version": self.earnbench_version,
+            "earnbench_version": provenance.earnbench_version,
             "instance_id": self.instance_id,
             "perturbation_id": self.perturbation_id,
             "config_digest": self.config_digest,
@@ -86,6 +118,7 @@ class AuditRecord:
             "status": self.status.value,
             "tests_run": list(self.tests_run),
             "warnings": list(self.warnings),
+            "provenance": provenance.to_dict(),
         }
         if self.pristine_test_sha256 is not None:
             payload["pristine_test_sha256"] = self.pristine_test_sha256
@@ -95,8 +128,9 @@ class AuditRecord:
             payload["success"] = self.success
         if self.log_ref is not None:
             payload["log_ref"] = self.log_ref
-        if self.timestamp_utc:
-            payload["timestamp_utc"] = self.timestamp_utc
+        timestamp = self.timestamp_utc or provenance.timestamp_utc
+        if timestamp:
+            payload["timestamp_utc"] = timestamp
         return payload
 
     def to_json(self, *, indent: int | None = None) -> str:
@@ -114,6 +148,12 @@ class AuditRecord:
         )
         success = data.get("success")
         default_version = _default_earnbench_version()
+        provenance_raw = data.get("provenance")
+        provenance = (
+            Provenance.from_dict(provenance_raw)
+            if isinstance(provenance_raw, dict)
+            else None
+        )
         return cls(
             schema_version=data.get("schema_version", AUDIT_SCHEMA_VERSION),
             earnbench_version=data.get("earnbench_version", default_version),
@@ -129,4 +169,5 @@ class AuditRecord:
             log_ref=data.get("log_ref"),
             warnings=tuple(data.get("warnings", ())),
             timestamp_utc=data.get("timestamp_utc", ""),
+            provenance=provenance,
         )

@@ -43,3 +43,5 @@ def test_synthetic_visible_test_overfitting_example_runs() -> None:
         "metadata_removed",
         "verifier_hardened",
     }
+    assert "provenance" in payload
+    assert payload["provenance"]["execution_uuid"]

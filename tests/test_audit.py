@@ -60,6 +60,8 @@ def test_audit_record_to_dict_is_json_serializable() -> None:
     assert payload["status"] == "ok"
     assert payload["tests_run"] == ["tests.test_foo.TestCase.test_bar"]
     assert payload["warnings"] == []
+    assert "provenance" in payload
+    assert payload["provenance"]["execution_uuid"]
 
 
 def test_audit_record_to_json_is_deterministic_except_timestamp() -> None:
@@ -87,7 +89,7 @@ def test_audit_record_from_dict_round_trip() -> None:
         warnings=("holdout thin",),
     )
     restored = AuditRecord.from_dict(record.to_dict())
-    assert restored == record
+    assert restored.to_dict() == record.to_dict()
 
 
 def test_audit_record_invalid_status_without_success() -> None:

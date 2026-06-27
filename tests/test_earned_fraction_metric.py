@@ -119,6 +119,8 @@ def test_report_to_dict_includes_new_fields() -> None:
     assert payload["failed_mechanisms"] == []
     assert payload["survived_mechanisms"] == ["vtest"]
     assert payload["warnings"] == []
+    assert "provenance" in payload
+    assert payload["provenance"]["earnbench_version"]
 
 
 def test_report_validation_rejects_invalid_defined_state() -> None:

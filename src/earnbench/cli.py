@@ -11,6 +11,7 @@ from typing import Any
 from earnbench.audit import AuditRecord
 from earnbench.metrics import compute_earned_fraction
 from earnbench.outcomes import NominalOutcome, OutcomeStatus, PerturbationResult
+from earnbench.provenance import Provenance, build_provenance
 
 
 class CLIError(Exception):
@@ -91,6 +92,35 @@ def parse_compute_input(
     return nominal, perturbations
 
 
+def parse_provenance_from_input(data: dict[str, Any]) -> Provenance | None:
+    """Parse optional provenance overrides from a compute input document."""
+    provenance_raw = data.get("provenance")
+    if isinstance(provenance_raw, dict):
+        return Provenance.from_dict(provenance_raw)
+
+    config_digest = data.get("config_digest")
+    random_seed = data.get("random_seed")
+    docker_image_digest = data.get("docker_image_digest")
+    if (
+        config_digest is not None
+        or random_seed is not None
+        or docker_image_digest is not None
+    ):
+        seed_value: int | None
+        if random_seed is None:
+            seed_value = None
+        else:
+            seed_value = int(random_seed)
+        return build_provenance(
+            config_digest=str(config_digest or ""),
+            docker_image_digest=(
+                str(docker_image_digest) if docker_image_digest is not None else None
+            ),
+            random_seed=seed_value,
+        )
+    return None
+
+
 def cmd_compute(args: argparse.Namespace) -> None:
     """Compute Earned Fraction from a JSON outcomes file."""
     data = _load_json_file(Path(args.input))
@@ -98,7 +128,12 @@ def cmd_compute(args: argparse.Namespace) -> None:
         raise CLIError("compute input must be a JSON object")
 
     nominal, perturbations = parse_compute_input(data)
-    report = compute_earned_fraction(nominal, perturbations)
+    provenance = parse_provenance_from_input(data)
+    report = compute_earned_fraction(
+        nominal,
+        perturbations,
+        provenance=provenance,
+    )
     json.dump(report.to_dict(), sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")
 
