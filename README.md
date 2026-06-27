@@ -249,6 +249,43 @@ from the batch directory and writes `phase_a_report.md` with summary tables,
 EF and invalid histograms, sensitivity-gap analysis, retained/excluded instance
 lists, top failures, and publication-ready prose.
 
+**Earned Rank Stability (ERS)** — leaderboard sensitivity to EF@Π:
+
+```bash
+earnbench report rank-stability \
+  --agent-results path/to/agent_results.csv \
+  --output experiments/reports/ers \
+  --bootstrap 10000
+```
+
+Input CSV is **long format** (one row per agent × instance). Required columns:
+
+| Column | Meaning |
+| --- | --- |
+| `agent` | Agent arm label |
+| `instance_id` | Instance id (same set for every agent) |
+| `y0` | Nominal success (`1`/`0` or `true`/`false`) |
+| `ef_exclude_invalid` | EF@Π under exclude-invalid rule (empty when `y0=0`) |
+| `ef_invalid_as_fail` | EF@Π under invalid-as-fail sensitivity rule |
+| `failed_mechanisms` | Semicolon- or comma-separated shortcut channels that failed |
+| `invalid_pi_count` | Count of INVALID perturbations on the instance |
+
+Per agent the command computes nominal pass rate, earned pass rates (both EF
+variants), sensitivity band, nominal vs earned ranks, rank shift, Spearman ρ,
+Kendall τ, pairwise flips, bootstrap CIs over instances, and channel-attributed
+lost credit. Writes:
+
+- `rank_stability_summary.csv`
+- `pairwise_flips.csv`
+- `channel_rank_contributions.csv`
+- `rank_stability_report.md`
+- `rank_stability.json`
+
+ERS compares **ordering** under nominal vs earned pass rate on a fixed instance
+set; it is a diagnostic of leaderboard fragility, not a replacement capability
+score. EF@Π is a post-hoc measurement estimand over fixed final artifacts, not
+a policy-gradient credit signal.
+
 **Phase A instance investigation** (confound / failure diagnosis):
 
 ```bash

@@ -44,6 +44,7 @@ from earnbench.phase_a_batch import (
 )
 from earnbench.investigate import write_phase_a_investigation
 from earnbench.phase_a_report import generate_phase_a_report
+from earnbench.rank_stability import generate_rank_stability_report
 from earnbench.phase_b_batch import (
     PhaseBBatchConfig,
     resolve_metadata_path,
@@ -752,6 +753,42 @@ def cmd_report_phase_a(args: argparse.Namespace) -> None:
         {
             "report_path": str(result.report_path),
             "output_dir": str(result.output_dir),
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
+def cmd_report_rank_stability(args: argparse.Namespace) -> None:
+    """Generate Earned Rank Stability artifacts from agent × instance CSV."""
+    agent_results = Path(args.agent_results).resolve()
+    output_dir = Path(args.output).resolve()
+    try:
+        result = generate_rank_stability_report(
+            agent_results,
+            output_dir,
+            bootstrap_draws=args.bootstrap,
+        )
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(
+        {
+            "output_dir": str(result.output_dir),
+            "summary_csv": str(result.summary_csv),
+            "pairwise_flips_csv": str(result.pairwise_flips_csv),
+            "channel_rank_contributions_csv": str(
+                result.channel_rank_contributions_csv,
+            ),
+            "report_md": str(result.report_md),
+            "report_json": str(result.report_json),
         },
         sys.stdout,
         indent=2,
@@ -1492,6 +1529,31 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write report only; do not print JSON summary to stdout",
     )
+    report_rank_stability_parser = report_subparsers.add_parser(
+        "rank-stability",
+        help="Compute Earned Rank Stability (ERS) from agent × instance CSV",
+    )
+    report_rank_stability_parser.add_argument(
+        "--agent-results",
+        required=True,
+        help="CSV with agent, instance_id, y0, ef variants, and failure metadata",
+    )
+    report_rank_stability_parser.add_argument(
+        "--output",
+        required=True,
+        help="Directory for rank_stability_* artifacts",
+    )
+    report_rank_stability_parser.add_argument(
+        "--bootstrap",
+        type=int,
+        default=10_000,
+        help="Bootstrap resamples over instances for rank-shift and ERS CIs",
+    )
+    report_rank_stability_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write artifacts only; do not print JSON summary to stdout",
+    )
 
     investigate_parser = subparsers.add_parser(
         "investigate",
@@ -1587,6 +1649,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "report":
             if args.report_command == "phase-a":
                 cmd_report_phase_a(args)
+            elif args.report_command == "rank-stability":
+                cmd_report_rank_stability(args)
             else:
                 parser.error(f"unknown report command: {args.report_command}")
         elif args.command == "investigate":
