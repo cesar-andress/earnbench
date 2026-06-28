@@ -39,6 +39,13 @@ earnbench phase-c summarize \
 
 \*For `run`, `--output` overrides the directory stored in the manifest when set.
 
+## API keys (cloud agent arms)
+
+Cloud provider arms (`external_cli` in `arms.yaml`) use the standard environment
+variables: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and `GEMINI_API_KEY`. Export
+them in your shell before `phase-c run`; EarnBench does not accept them as CLI
+flags.
+
 ## Ollama models
 
 Pull local models before `phase-c run`:

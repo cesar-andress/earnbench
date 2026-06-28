@@ -5,7 +5,28 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from earnbench.certified_controls.github_metadata import HttpGitHubMetadataClient
+from earnbench.certified_controls.github_metadata import (
+    HttpGitHubMetadataClient,
+    resolve_github_token,
+)
+
+
+def test_resolve_github_token_prefers_explicit_over_env(monkeypatch) -> None:
+    monkeypatch.setenv("GITHUB_TOKEN", "env-token")
+    assert resolve_github_token("cli-token") == "cli-token"
+    assert resolve_github_token(None) == "env-token"
+    assert resolve_github_token("") == "env-token"
+
+
+def test_resolve_github_token_returns_none_when_unset(monkeypatch) -> None:
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    assert resolve_github_token(None) is None
+
+
+def test_http_client_uses_github_token_env(monkeypatch) -> None:
+    monkeypatch.setenv("GITHUB_TOKEN", "secret-token")
+    client = HttpGitHubMetadataClient()
+    assert client._token == "secret-token"
 
 
 def test_http_client_fetches_verified_merge_evidence() -> None:

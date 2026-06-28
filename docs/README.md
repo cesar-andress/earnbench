@@ -2,6 +2,20 @@
 
 Documentation is in early draft. Design notes live in the private research repository during initial development.
 
+## Environment variables
+
+EarnBench reads credentials from the shell environment; CLI flags are overrides only.
+
+| Variable | Used by |
+|----------|---------|
+| `GITHUB_TOKEN` | `controls generate-manifest` (GitHub REST enrichment) |
+| `OPENAI_API_KEY` | External agent CLIs configured in Phase C `arms.yaml` |
+| `ANTHROPIC_API_KEY` | External agent CLIs configured in Phase C `arms.yaml` |
+| `GEMINI_API_KEY` | External agent CLIs configured in Phase C `arms.yaml` |
+
+Phase C `external_cli` subprocesses inherit the parent environment, so provider
+CLIs pick up these keys without EarnBench passing them on the command line.
+
 ## Checklists and policy
 
 - [Validation ladder CLI](validation_ladder.md)

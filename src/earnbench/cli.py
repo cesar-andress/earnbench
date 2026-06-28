@@ -1595,7 +1595,7 @@ def cmd_controls_generate_manifest(args: argparse.Namespace) -> None:
         result = generate_certified_controls_manifest(
             phase_a_run_dir=Path(args.phase_a_run),
             output_path=Path(args.output),
-            github_token=args.github_token or None,
+            github_token=(args.github_token.strip() or None) if args.github_token else None,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         raise CLIError(str(exc)) from exc
@@ -2346,8 +2346,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     controls_generate_parser.add_argument(
         "--github-token",
-        default="",
-        help="Optional GitHub token for higher REST API rate limits",
+        default=None,
+        help="Override GITHUB_TOKEN env var for REST API authentication",
     )
     controls_generate_parser.add_argument(
         "--quiet",

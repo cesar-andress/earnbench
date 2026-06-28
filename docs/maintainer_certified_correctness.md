@@ -21,11 +21,11 @@ remains `certification_status=undecidable` (no fabricated values).
 ```bash
 earnbench controls generate-manifest \
   --phase-a-run experiments/runs/phase_a_pilot300 \
-  --output experiments/maintainer_certified_controls.csv \
-  --github-token "$GITHUB_TOKEN"
+  --output experiments/maintainer_certified_controls.csv
 ```
 
-Optional `--github-token` improves REST API rate limits. A sidecar
+Uses `GITHUB_TOKEN` from the environment automatically (higher REST API rate limits).
+Optional `--github-token` overrides that value. A sidecar
 `*.enrichment.json` cache records per-row verification details.
 
 For `certification_status=certified_correct`, the schema requires:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import urllib.error
 import urllib.parse
@@ -70,6 +71,14 @@ def pull_url(owner: str, repo_name: str, pull_number: int) -> str:
     return f"https://github.com/{owner}/{repo_name}/pull/{pull_number}"
 
 
+def resolve_github_token(explicit: str | None = None) -> str | None:
+    """Return an explicit token or fall back to the GITHUB_TOKEN environment variable."""
+    if explicit and explicit.strip():
+        return explicit.strip()
+    env_token = os.environ.get("GITHUB_TOKEN", "").strip()
+    return env_token or None
+
+
 class HttpGitHubMetadataClient:
     """Fetch maintainer merge evidence from the public GitHub REST API."""
 
@@ -80,7 +89,7 @@ class HttpGitHubMetadataClient:
         api_base: str = "https://api.github.com",
         timeout_seconds: float = 30.0,
     ) -> None:
-        self._token = token.strip() if token else ""
+        self._token = resolve_github_token(token) or ""
         self._api_base = api_base.rstrip("/")
         self._timeout_seconds = timeout_seconds
 
