@@ -4,7 +4,21 @@ An executable counterfactual measurement framework for estimating how much of an
 
 ## Status
 
-This repository is an **early artifact skeleton**. APIs, perturbation specs, and benchmark integrations are under active design. **No finished benchmark results are reported here.**
+**Release candidate `0.1.0-rc1` (pre-release).** The instrument implements EF@Π,
+registry v1, SWE-bench Docker batch runners, and report generators used in the TOSEM
+manuscript validation ladder. Frozen experiment outputs cited in the paper live in
+the companion `paper/experiments/runs/` tree (monorepo layout).
+
+- **Standalone clone (this repo only):** metric computation, registry CLI, synthetic
+  example, and unit tests.
+- **Full batch reproduction:** requires sibling `paper/` paths (metadata parquet,
+  exploit patches, frozen manifests) — see
+  [docs/publication_readiness_audit.md](docs/publication_readiness_audit.md).
+- **Zenodo DOI:** not yet assigned; cite git SHA until `v0.1.0` is tagged and
+  archived.
+
+See [RELEASE_NOTES.md](RELEASE_NOTES.md), [release_readiness_report.md](release_readiness_report.md),
+[release_checklist.md](release_checklist.md), and [docs/release_policy.md](docs/release_policy.md).
 
 ## Concept
 
@@ -14,37 +28,38 @@ EarnBench assigns an **Earned Fraction (EF)** in \([0, 1]\) to nominally success
 
 ```
 src/earnbench/          Python package (core types and API)
-  adapters/             Benchmark adapter interfaces (SWE-bench stub)
+  adapters/             SWE-bench Docker batch executors and adapter schemas
   registry/             Versioned perturbation registry (MVP Π)
 tests/                  Unit tests
-docs/                   Documentation (in progress)
-examples/               Usage examples (in progress)
-scripts/                Helper scripts (in progress)
+docs/                   User and release documentation
+examples/               Synthetic example (no Docker)
+scripts/                Helper scripts (minimal)
 ```
 
 ### Benchmark adapters
 
-`earnbench.adapters` defines typed request/response schemas (`PatchArtifact`,
-`BenchmarkInstance`, `AdapterConfig`, `AuditRecord`, …) and a
-`SWEBenchAdapter` stub for SWE-bench Verified post-hoc re-grade. **Input
-validation is implemented; Docker/harness execution is not.** Calling
-`evaluate_nominal` or `evaluate_perturbation` raises `NotImplementedError`
-until a later release.
+`earnbench.adapters` defines typed request/response schemas and SWE-bench batch
+executors. High-level `SWEBenchAdapter.evaluate_*` remains a stub; production
+grading uses `earnbench swebench *` and `phase-a|phase-b|phase-d run` batch paths
+(requires `[swebench]` extra and Docker).
 
 ## Installation
 
 Requires Python 3.10+.
 
 ```bash
-pip install -e ".[dev]"
+pip install -e ".[dev]"      # metric, tests, reports
+pip install -e ".[swebench]" # adds Docker + swebench for batch grading
 ```
 
 After installation, the **`earnbench`** command is available on your `PATH`.
 
 ## CLI
 
-The CLI is a **skeleton**: `compute` and `validate-audit` are fully functional;
-`run` validates arguments but does not execute SWE-bench grading yet.
+Top-level commands include `compute`, `validate-audit`, `registry`, `swebench`,
+`phase-a`, `phase-b`, `phase-c`, `phase-d`, `injection`, and `report`.
+The legacy `run` subcommand validates arguments but does not execute grading —
+use `swebench` or phase batch runners instead.
 
 ### Compute Earned Fraction from outcomes
 
