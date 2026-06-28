@@ -14,3 +14,4 @@ htmlcov/
 venv/
 .env
 examples/*.report.json
+logs/build_images/
