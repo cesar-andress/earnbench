@@ -30,12 +30,15 @@ from earnbench.phase_d_diagnostics import (
     FAILURE_NOMINAL_FAILED,
     GRADE_STATUS_FAILED,
     GRADE_STATUS_OK,
+    attach_phase_d_failure_fields,
     classify_post_stage,
     classify_stage_exception,
     classify_validate_patch,
     failure_record,
     finalize_cell_diagnostics,
+    summarize_failure_categories,
     summarize_failure_reasons,
+    summarize_phase_d_outcome_counts,
     write_cell_diagnosis,
 )
 from earnbench.provenance import build_provenance, resolve_git_commit, utc_timestamp
@@ -83,6 +86,8 @@ AGENT_RESULTS_COLUMNS = (
     "failure_reason",
     "failure_stage",
     "failure_detail",
+    "phase_d_failure_category",
+    "phase_d_failure_reason",
 )
 
 FAILURE_COLUMNS = (
@@ -158,6 +163,11 @@ class PhaseDSummary:
     skipped_ineligible_count: int
     by_agent: dict[str, dict[str, int]]
     by_failure_reason: dict[str, int]
+    counts_by_failure_category: dict[str, int]
+    y0_pass_count: int
+    ef_defined_count: int
+    patch_apply_failed_count: int
+    nominal_failed_count: int
     summarized_at_utc: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -169,6 +179,11 @@ class PhaseDSummary:
             "skipped_ineligible_count": self.skipped_ineligible_count,
             "by_agent": self.by_agent,
             "by_failure_reason": self.by_failure_reason,
+            "counts_by_failure_category": self.counts_by_failure_category,
+            "y0_pass_count": self.y0_pass_count,
+            "ef_defined_count": self.ef_defined_count,
+            "patch_apply_failed_count": self.patch_apply_failed_count,
+            "nominal_failed_count": self.nominal_failed_count,
             "summarized_at_utc": self.summarized_at_utc,
         }
 
@@ -242,9 +257,10 @@ def build_agent_result_row(
     csv_row: dict[str, Any],
     report_payload: dict[str, Any],
     diagnostics: CellDiagnostics | None = None,
+    instance_dir: Path | None = None,
 ) -> dict[str, Any]:
     diag = diagnostics or CellDiagnostics(grade_status=GRADE_STATUS_OK)
-    return {
+    row = {
         "agent": attempt.agent,
         "provider": attempt.provider,
         "model": attempt.model,
@@ -275,6 +291,13 @@ def build_agent_result_row(
         "failure_stage": diag.failure_stage,
         "failure_detail": diag.failure_detail,
     }
+    return attach_phase_d_failure_fields(
+        row,
+        attempt_status=attempt.status,
+        patch_path=attempt.patch_path,
+        diagnostics=diag,
+        instance_dir=instance_dir,
+    )
 
 
 def build_synthetic_agent_result_row(
@@ -282,8 +305,9 @@ def build_synthetic_agent_result_row(
     attempt: AttemptRecord,
     run_id: str,
     diagnostics: CellDiagnostics,
+    instance_dir: Path | None = None,
 ) -> dict[str, Any]:
-    return {
+    row = {
         "agent": attempt.agent,
         "provider": attempt.provider,
         "model": attempt.model,
@@ -314,6 +338,52 @@ def build_synthetic_agent_result_row(
         "failure_stage": diagnostics.failure_stage,
         "failure_detail": diagnostics.failure_detail,
     }
+    return attach_phase_d_failure_fields(
+        row,
+        attempt_status=attempt.status,
+        patch_path=attempt.patch_path,
+        diagnostics=diagnostics,
+        instance_dir=instance_dir,
+    )
+
+
+def _cell_instance_dir(output_dir: Path, row: dict[str, Any]) -> Path:
+    agent = str(row.get("agent", "") or "").strip()
+    instance_id = str(row.get("instance_id", "") or "").strip()
+    replicate = int(row.get("replicate") or 0)
+    work_root = agent_work_root(output_dir, agent, replicate)
+    return work_root / instance_id
+
+
+def refresh_agent_result_failure_fields(
+    output_dir: Path,
+    rows: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Backfill analyst-facing failure columns for existing result rows."""
+    refreshed: dict[str, dict[str, Any]] = {}
+    for key, row in rows.items():
+        merged = {col: row.get(col, "") for col in AGENT_RESULTS_COLUMNS}
+        attach_phase_d_failure_fields(
+            merged,
+            attempt_status=str(merged.get("attempt_status", "") or ""),
+            patch_path=str(merged.get("patch_path", "") or ""),
+            diagnostics=None,
+            instance_dir=_cell_instance_dir(output_dir, merged),
+        )
+        refreshed[key] = merged
+    return refreshed
+
+
+def build_phase_d_summary(rows: dict[str, dict[str, Any]], **kwargs: Any) -> PhaseDSummary:
+    outcome_counts = summarize_phase_d_outcome_counts(rows)
+    return PhaseDSummary(
+        counts_by_failure_category=summarize_failure_categories(rows),
+        y0_pass_count=outcome_counts["y0_pass_count"],
+        ef_defined_count=outcome_counts["ef_defined_count"],
+        patch_apply_failed_count=outcome_counts["patch_apply_failed_count"],
+        nominal_failed_count=outcome_counts["nominal_failed_count"],
+        **kwargs,
+    )
 
 
 def write_agent_results_csv(
@@ -435,6 +505,7 @@ def run_phase_d_cell(
             attempt=attempt,
             run_id=run_id,
             diagnostics=diagnostics,
+            instance_dir=instance_dir if instance_dir.exists() else None,
         )
         return PhaseDCellResult(task_key=key, row=row, failures=tuple(failures))
 
@@ -636,6 +707,7 @@ def run_phase_d_cell(
                 csv_row=csv_row,
                 report_payload=report_payload,
                 diagnostics=diagnostics,
+                instance_dir=instance_dir,
             )
             return PhaseDCellResult(task_key=key, row=row, failures=tuple(failures))
         except Exception as exc:
@@ -657,6 +729,7 @@ def run_phase_d_cell(
         attempt=attempt,
         run_id=run_id,
         diagnostics=diagnostics,
+        instance_dir=instance_dir if instance_dir.exists() else None,
     )
     return PhaseDCellResult(task_key=key, row=row, failures=tuple(failures))
 
@@ -781,10 +854,12 @@ def run_phase_d(config: PhaseDRegradeConfig) -> PhaseDRunResult:
                 result_rows[result.task_key] = result.row
                 failures.extend(result.failures)
 
+    result_rows = refresh_agent_result_failure_fields(output_dir, result_rows)
     agent_results_csv = write_agent_results_csv(output_dir, result_rows)
     failures_path = write_failures_csv(output_dir, failures)
 
-    summary = PhaseDSummary(
+    summary = build_phase_d_summary(
+        result_rows,
         run_id=effective_run_id,
         graded_count=len(result_rows),
         failure_count=len(failures),
@@ -823,6 +898,11 @@ def run_phase_d(config: PhaseDRegradeConfig) -> PhaseDRunResult:
             "skipped_resume_count": skipped_resume,
             "eligible_attempt_count": len(eligible),
             "by_failure_reason": summary.by_failure_reason,
+            "counts_by_failure_category": summary.counts_by_failure_category,
+            "y0_pass_count": summary.y0_pass_count,
+            "ef_defined_count": summary.ef_defined_count,
+            "patch_apply_failed_count": summary.patch_apply_failed_count,
+            "nominal_failed_count": summary.nominal_failed_count,
         },
     )
 
@@ -861,7 +941,10 @@ def summarize_phase_d(*, output_dir: Path) -> PhaseDSummary:
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     rows = load_agent_results_rows(output_dir / AGENT_RESULTS_CSV)
-    summary = PhaseDSummary(
+    rows = refresh_agent_result_failure_fields(output_dir, rows)
+    write_agent_results_csv(output_dir, rows)
+    summary = build_phase_d_summary(
+        rows,
         run_id=str(manifest.get("run_id", "")),
         graded_count=len(rows),
         failure_count=_count_failures(output_dir / FAILURES_CSV),
@@ -914,7 +997,9 @@ __all__ = [
     "STATISTICS_JSON",
     "agent_work_root",
     "build_agent_result_row",
+    "build_phase_d_summary",
     "build_synthetic_agent_result_row",
+    "refresh_agent_result_failure_fields",
     "filter_eligible_attempts",
     "load_attempts_csv",
     "resolve_patch_path",
