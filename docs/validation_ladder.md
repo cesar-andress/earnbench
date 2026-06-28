@@ -55,7 +55,9 @@ earnbench validation external-label-agreement \
 Template: `paper/experiments/external_label_agreement.template.csv`.  
 Protocol: `paper/experiments/external_label_agreement_protocol.md`.
 
-Writes `external_label_agreement.{json,csv,md}`, `external_label_by_label.csv`, `external_label_agreement_table.csv`, and `external_label_disagreements.csv`.
+Writes `external_label_agreement_summary.json`, `external_label_agreement_by_source.csv`, `external_label_agreement_by_label.csv`, `external_label_agreement_confusion.csv`, `external_label_agreement_disagreements.csv`, and `external_label_agreement_report.md`.
+
+Optional: `--ef-threshold 0.95` (default) for low-EF band on Y₀=1 defined rows.
 
 Post-hoc agreement only; does not modify EF@Π, Π, INVALID, or frozen results.
 

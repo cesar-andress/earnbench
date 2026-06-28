@@ -1736,16 +1736,17 @@ def cmd_validation_external_label_agreement(args: argparse.Namespace) -> None:
             Path(args.summary),
             labels_path,
             Path(args.output),
+            ef_threshold=args.ef_threshold,
         )
         payload = {
             "status": "ok",
             "output_dir": str(report.output_dir),
-            "agreement_json": str(report.agreement_json),
-            "agreement_csv": str(report.agreement_csv),
+            "summary_json": str(report.summary_json),
+            "by_source_csv": str(report.by_source_csv),
             "by_label_csv": str(report.by_label_csv),
-            "agreement_table_csv": str(report.agreement_table_csv),
+            "confusion_csv": str(report.confusion_csv),
             "disagreements_csv": str(report.disagreements_csv),
-            "agreement_md": str(report.agreement_md),
+            "report_md": str(report.report_md),
         }
     if args.quiet:
         return
@@ -2715,6 +2716,12 @@ def build_parser() -> argparse.ArgumentParser:
     external_label_parser.add_argument(
         "--output",
         help="Output directory for agreement artifacts (required unless --validate-only)",
+    )
+    external_label_parser.add_argument(
+        "--ef-threshold",
+        type=float,
+        default=0.95,
+        help="Low-EF threshold τ for Y₀=1 defined EF rows (default: 0.95)",
     )
     external_label_parser.add_argument(
         "--validate-only",

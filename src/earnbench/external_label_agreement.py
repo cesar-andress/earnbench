@@ -13,12 +13,14 @@ from earnbench.bootstrap_uncertainty import load_phase_summary_rows
 from earnbench.injection_validity import FALSE_EARNED_THRESHOLD
 from earnbench.reports import EarnedFractionStatus
 
-EXTERNAL_LABEL_AGREEMENT_JSON = "external_label_agreement.json"
-EXTERNAL_LABEL_AGREEMENT_CSV = "external_label_agreement.csv"
-EXTERNAL_LABEL_BY_LABEL_CSV = "external_label_by_label.csv"
-EXTERNAL_LABEL_AGREEMENT_TABLE_CSV = "external_label_agreement_table.csv"
-EXTERNAL_LABEL_DISAGREEMENTS_CSV = "external_label_disagreements.csv"
-EXTERNAL_LABEL_AGREEMENT_MD = "external_label_agreement.md"
+SUMMARY_JSON = "external_label_agreement_summary.json"
+BY_SOURCE_CSV = "external_label_agreement_by_source.csv"
+BY_LABEL_CSV = "external_label_agreement_by_label.csv"
+CONFUSION_CSV = "external_label_agreement_confusion.csv"
+DISAGREEMENTS_CSV = "external_label_agreement_disagreements.csv"
+REPORT_MD = "external_label_agreement_report.md"
+
+DEFAULT_EF_THRESHOLD = FALSE_EARNED_THRESHOLD
 
 REQUIRED_LABEL_COLUMNS = (
     "instance_id",
@@ -27,24 +29,17 @@ REQUIRED_LABEL_COLUMNS = (
     "label_value",
 )
 
-CASE_COLUMNS = (
-    "instance_id",
+BY_SOURCE_COLUMNS = (
     "source",
-    "label_name",
-    "label_value",
-    "label_category",
-    "external_polarity",
-    "label_confidence",
-    "notes",
-    "y0",
-    "ef_pi",
-    "ef_status",
-    "false_unearned",
-    "ef_band",
-    "low_ef",
-    "summary_matched",
-    "agreement_cell",
-    "disagreement_type",
+    "label_row_count",
+    "label_instance_count",
+    "overlap_instance_count",
+    "summary_coverage_rate",
+    "source_match_rate",
+    "decidable_case_count",
+    "concordant_case_count",
+    "concordance_rate",
+    "disagreement_count",
 )
 
 BY_LABEL_COLUMNS = (
@@ -52,16 +47,19 @@ BY_LABEL_COLUMNS = (
     "label_name",
     "label_category",
     "label_row_count",
-    "overlap_count",
+    "overlap_instance_count",
     "ef_mean",
     "low_ef_rate",
     "false_unearned_rate",
+    "retained_rate",
+    "invalid_pi_rate_mean",
+    "failed_mechanism_row_count",
 )
 
-AGREEMENT_TABLE_COLUMNS = (
-    "label_category",
+CONFUSION_COLUMNS = (
     "ef_band",
     "external_polarity",
+    "agreement_cell",
     "count",
 )
 
@@ -72,10 +70,14 @@ DISAGREEMENT_COLUMNS = (
     "label_category",
     "label_value",
     "ef_pi",
+    "ef_status",
     "ef_band",
     "external_polarity",
     "disagreement_type",
+    "failed_mechanisms",
     "notes",
+    "citation_key",
+    "url",
 )
 
 WEAK_TEST_LABELS = frozenset(
@@ -93,6 +95,10 @@ OTHER_CONCERN_LABELS = frozenset(
         "solution_leakage",
         "oracle_mismatch",
         "validity_concern",
+        "benchmark_inflation",
+        "retrieval_exploit",
+        "runtime_leakage",
+        "cursor_audit_flag",
     }
 )
 CLEAN_LABEL_NAMES = frozenset(
@@ -105,6 +111,7 @@ POSITIVE_VALUES = frozenset(
         "yes",
         "y",
         "flag",
+        "flagged",
         "positive",
         "concern",
         "fail",
@@ -118,6 +125,13 @@ POSITIVE_VALUES = frozenset(
 )
 NEGATIVE_VALUES = frozenset(
     {"0", "false", "no", "n", "clean", "pass", "passed", "accepted", "consistent", "none"}
+)
+
+CONFUSION_CELLS = (
+    ("low", "flagged", "ef_low_vs_external_flagged"),
+    ("high", "clean", "ef_high_vs_external_clean"),
+    ("low", "clean", "ef_low_vs_external_clean"),
+    ("high", "flagged", "ef_high_vs_external_flagged"),
 )
 
 
@@ -135,12 +149,12 @@ class ExternalLabelValidationResult:
 @dataclass(frozen=True, slots=True)
 class ExternalLabelAgreementResult:
     output_dir: Path
-    agreement_json: Path
-    agreement_csv: Path
+    summary_json: Path
+    by_source_csv: Path
     by_label_csv: Path
-    agreement_table_csv: Path
+    confusion_csv: Path
     disagreements_csv: Path
-    agreement_md: Path
+    report_md: Path
 
 
 def _as_bool(value: object) -> bool:
@@ -166,6 +180,12 @@ def _rate(numerator: int, denominator: int) -> float | None:
     return numerator / denominator
 
 
+def _mean(values: list[float]) -> float | None:
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
 def _format_float(value: float | None, *, precision: int = 4) -> str:
     if value is None:
         return "—"
@@ -176,13 +196,14 @@ def _normalize_label_name(label_name: str) -> str:
     return label_name.strip().lower().replace("-", "_").replace(" ", "_")
 
 
-def _parse_label_polarity(label_name: str, label_value: object) -> str:
+def _parse_external_polarity(label_name: str, label_value: object) -> str:
+    """Return external_polarity: flagged, clean, or unknown."""
     normalized_name = _normalize_label_name(label_name)
     if normalized_name in CLEAN_LABEL_NAMES:
         return "clean"
     text = str(label_value).strip().lower()
     if text in POSITIVE_VALUES:
-        return "concern"
+        return "flagged"
     if text in NEGATIVE_VALUES:
         return "clean"
     return "unknown"
@@ -203,18 +224,26 @@ def _label_category(label_name: str) -> str:
     return "other_concern"
 
 
+def _parse_failed_mechanisms(summary_row: dict[str, Any]) -> tuple[str, ...]:
+    raw = summary_row.get("failed_mechanisms")
+    if raw in (None, ""):
+        return ()
+    return tuple(part.strip() for part in str(raw).split(";") if part.strip())
+
+
 def _classify_ef_band(
     *,
     y0: bool,
     ef_pi: float | None,
     ef_status: str,
     false_unearned: bool,
+    ef_threshold: float,
 ) -> str:
     if not y0:
         return "undefined"
     if ef_status != EarnedFractionStatus.DEFINED.value or ef_pi is None:
         return "undefined"
-    if false_unearned or ef_pi < FALSE_EARNED_THRESHOLD:
+    if false_unearned or ef_pi < ef_threshold:
         return "low"
     return "high"
 
@@ -225,27 +254,38 @@ def _is_low_ef(
     ef_pi: float | None,
     ef_status: str,
     false_unearned: bool,
+    ef_threshold: float,
 ) -> bool:
-    return _classify_ef_band(
-        y0=y0,
-        ef_pi=ef_pi,
-        ef_status=ef_status,
-        false_unearned=false_unearned,
-    ) == "low"
+    return (
+        _classify_ef_band(
+            y0=y0,
+            ef_pi=ef_pi,
+            ef_status=ef_status,
+            false_unearned=false_unearned,
+            ef_threshold=ef_threshold,
+        )
+        == "low"
+    )
 
 
-def _agreement_cell(ef_band: str, external_polarity: str) -> str:
+def _confusion_cell_name(ef_band: str, external_polarity: str) -> str:
     if ef_band == "undefined" or external_polarity == "unknown":
         return "non_decidable"
-    if ef_band == "low" and external_polarity == "concern":
-        return "concordant_low_concern"
-    if ef_band == "high" and external_polarity == "clean":
-        return "concordant_high_clean"
-    if ef_band == "high" and external_polarity == "concern":
-        return "external_flag_ef_high"
-    if ef_band == "low" and external_polarity == "clean":
+    mapping = {
+        ("low", "flagged"): "ef_low_vs_external_flagged",
+        ("high", "clean"): "ef_high_vs_external_clean",
+        ("low", "clean"): "ef_low_vs_external_clean",
+        ("high", "flagged"): "ef_high_vs_external_flagged",
+    }
+    return mapping.get((ef_band, external_polarity), "other")
+
+
+def _disagreement_type(agreement_cell: str) -> str:
+    if agreement_cell == "ef_high_vs_external_flagged":
+        return "external_flagged_ef_high"
+    if agreement_cell == "ef_low_vs_external_clean":
         return "ef_low_external_clean"
-    return "other"
+    return ""
 
 
 def validate_external_labels_table(path: Path) -> ExternalLabelValidationResult:
@@ -310,16 +350,58 @@ def _summary_index(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return {str(row["instance_id"]).strip(): row for row in rows}
 
 
+def _label_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    ef_values: list[float] = []
+    invalid_rates: list[float] = []
+    low_ef_count = 0
+    false_unearned_count = 0
+    retained_count = 0
+    failed_mechanism_count = 0
+
+    for row in rows:
+        if row.get("ef_pi") not in ("", None):
+            ef_values.append(float(row["ef_pi"]))
+        if row.get("invalid_pi_rate") not in ("", None):
+            invalid_rates.append(float(row["invalid_pi_rate"]))
+        if row.get("low_ef") is True:
+            low_ef_count += 1
+        if _as_bool(row.get("false_unearned")):
+            false_unearned_count += 1
+        if _as_bool(row.get("retained")):
+            retained_count += 1
+        if row.get("failed_mechanisms"):
+            failed_mechanism_count += 1
+
+    total = len(rows)
+    return {
+        "ef_mean": _mean(ef_values),
+        "low_ef_rate": _rate(low_ef_count, total),
+        "false_unearned_rate": _rate(false_unearned_count, total),
+        "retained_rate": _rate(retained_count, total),
+        "invalid_pi_rate_mean": _mean(invalid_rates),
+        "failed_mechanism_row_count": failed_mechanism_count,
+    }
+
+
 def analyze_external_label_agreement(
     summary_rows: list[dict[str, Any]],
     label_rows: list[dict[str, str]],
+    *,
+    ef_threshold: float = DEFAULT_EF_THRESHOLD,
 ) -> dict[str, Any]:
+    """Join summary EF outcomes with external audit labels for agreement analysis."""
+    if ef_threshold <= 0.0 or ef_threshold > 1.0:
+        msg = f"ef_threshold must be in (0, 1], got {ef_threshold}"
+        raise ValueError(msg)
+
     summary_by_id = _summary_index(summary_rows)
     summary_ids = set(summary_by_id)
+    summary_count = len(summary_rows)
+
     label_ids = {str(row["instance_id"]).strip() for row in label_rows}
     overlap_ids = sorted(summary_ids & label_ids)
 
-    case_rows: list[dict[str, Any]] = []
+    matched_cases: list[dict[str, Any]] = []
     disagreement_rows: list[dict[str, Any]] = []
 
     for label_row in label_rows:
@@ -328,77 +410,61 @@ def analyze_external_label_agreement(
         label_name = str(label_row.get("label_name", "")).strip()
         label_value = str(label_row.get("label_value", "")).strip()
         label_category = _label_category(label_name)
-        external_polarity = _parse_label_polarity(label_name, label_value)
+        external_polarity = _parse_external_polarity(label_name, label_value)
         summary_row = summary_by_id.get(instance_id)
 
         if summary_row is None:
-            case_rows.append(
-                {
-                    "instance_id": instance_id,
-                    "source": source,
-                    "label_name": label_name,
-                    "label_value": label_value,
-                    "label_category": label_category,
-                    "external_polarity": external_polarity,
-                    "label_confidence": label_row.get("label_confidence", ""),
-                    "notes": label_row.get("notes", ""),
-                    "y0": "",
-                    "ef_pi": "",
-                    "ef_status": "",
-                    "false_unearned": "",
-                    "ef_band": "no_summary_match",
-                    "low_ef": "",
-                    "summary_matched": False,
-                    "agreement_cell": "no_summary_match",
-                    "disagreement_type": "",
-                }
-            )
             continue
 
         y0 = _as_bool(summary_row.get("y0"))
         ef_pi = _optional_float(summary_row.get("ef_pi"))
         ef_status = str(summary_row.get("ef_status", "")).strip()
         false_unearned = _as_bool(summary_row.get("false_unearned"))
+        retained = _as_bool(summary_row.get("retained"))
+        invalid_pi_rate = _optional_float(summary_row.get("invalid_pi_rate"))
+        failed_mechanisms = _parse_failed_mechanisms(summary_row)
         ef_band = _classify_ef_band(
             y0=y0,
             ef_pi=ef_pi,
             ef_status=ef_status,
             false_unearned=false_unearned,
+            ef_threshold=ef_threshold,
         )
         low_ef = _is_low_ef(
             y0=y0,
             ef_pi=ef_pi,
             ef_status=ef_status,
             false_unearned=false_unearned,
+            ef_threshold=ef_threshold,
         )
-        agreement_cell = _agreement_cell(ef_band, external_polarity)
-        disagreement_type = ""
-        if agreement_cell == "external_flag_ef_high":
-            disagreement_type = "external_flag_ef_high"
-        elif agreement_cell == "ef_low_external_clean":
-            disagreement_type = "ef_low_external_clean"
+        agreement_cell = _confusion_cell_name(ef_band, external_polarity)
+        disagreement_type = _disagreement_type(agreement_cell)
 
-        case_rows.append(
-            {
-                "instance_id": instance_id,
-                "source": source,
-                "label_name": label_name,
-                "label_value": label_value,
-                "label_category": label_category,
-                "external_polarity": external_polarity,
-                "label_confidence": label_row.get("label_confidence", ""),
-                "notes": label_row.get("notes", ""),
-                "y0": y0,
-                "ef_pi": ef_pi,
-                "ef_status": ef_status,
-                "false_unearned": false_unearned,
-                "ef_band": ef_band,
-                "low_ef": low_ef,
-                "summary_matched": True,
-                "agreement_cell": agreement_cell,
-                "disagreement_type": disagreement_type,
-            }
-        )
+        case = {
+            "instance_id": instance_id,
+            "source": source,
+            "label_name": label_name,
+            "label_value": label_value,
+            "label_category": label_category,
+            "external_polarity": external_polarity,
+            "label_confidence": label_row.get("label_confidence", ""),
+            "notes": label_row.get("notes", ""),
+            "citation_key": label_row.get("citation_key", ""),
+            "url": label_row.get("url", ""),
+            "y0": y0,
+            "ef_pi": ef_pi,
+            "ef_status": ef_status,
+            "false_unearned": false_unearned,
+            "retained": retained,
+            "invalid_pi_rate": invalid_pi_rate,
+            "failed_mechanisms": ";".join(failed_mechanisms),
+            "ef_band": ef_band,
+            "low_ef": low_ef,
+            "agreement_cell": agreement_cell,
+            "disagreement_type": disagreement_type,
+        }
+        matched_cases.append(case)
+
         if disagreement_type:
             disagreement_rows.append(
                 {
@@ -408,148 +474,173 @@ def analyze_external_label_agreement(
                     "label_category": label_category,
                     "label_value": label_value,
                     "ef_pi": ef_pi if ef_pi is not None else "",
+                    "ef_status": ef_status,
                     "ef_band": ef_band,
                     "external_polarity": external_polarity,
                     "disagreement_type": disagreement_type,
+                    "failed_mechanisms": ";".join(failed_mechanisms),
                     "notes": label_row.get("notes", ""),
+                    "citation_key": label_row.get("citation_key", ""),
+                    "url": label_row.get("url", ""),
                 }
             )
 
-    matched_cases = [row for row in case_rows if row["summary_matched"]]
+    by_source_rows: list[dict[str, Any]] = []
+    source_label_rows: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for row in label_rows:
+        source_label_rows[str(row.get("source", "")).strip() or "unknown"].append(row)
+
+    for source, rows in sorted(source_label_rows.items()):
+        source_instance_ids = {str(row["instance_id"]).strip() for row in rows}
+        overlap_for_source = sorted(summary_ids & source_instance_ids)
+        source_matched = [case for case in matched_cases if case["source"] == source]
+        decidable = [
+            case
+            for case in source_matched
+            if case["agreement_cell"]
+            in {
+                "ef_low_vs_external_flagged",
+                "ef_high_vs_external_clean",
+                "ef_low_vs_external_clean",
+                "ef_high_vs_external_flagged",
+            }
+        ]
+        concordant = [
+            case
+            for case in decidable
+            if case["agreement_cell"]
+            in {"ef_low_vs_external_flagged", "ef_high_vs_external_clean"}
+        ]
+        by_source_rows.append(
+            {
+                "source": source,
+                "label_row_count": len(rows),
+                "label_instance_count": len(source_instance_ids),
+                "overlap_instance_count": len(overlap_for_source),
+                "summary_coverage_rate": _rate(len(overlap_for_source), summary_count),
+                "source_match_rate": _rate(len(overlap_for_source), len(source_instance_ids)),
+                "decidable_case_count": len(decidable),
+                "concordant_case_count": len(concordant),
+                "concordance_rate": _rate(len(concordant), len(decidable)),
+                "disagreement_count": sum(
+                    1
+                    for case in source_matched
+                    if case["disagreement_type"]
+                    in {"external_flagged_ef_high", "ef_low_external_clean"}
+                ),
+            }
+        )
+
     by_label_key: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
-    for row in matched_cases:
+    for case in matched_cases:
         by_label_key[
-            (str(row["source"]), str(row["label_name"]), str(row["label_category"]))
-        ].append(row)
+            (str(case["source"]), str(case["label_name"]), str(case["label_category"]))
+        ].append(case)
 
     by_label_rows: list[dict[str, Any]] = []
     for (source, label_name, label_category), rows in sorted(by_label_key.items()):
-        ef_values = [float(row["ef_pi"]) for row in rows if row["ef_pi"] not in ("", None)]
-        low_ef_count = sum(1 for row in rows if row["low_ef"] is True)
-        false_unearned_count = sum(
-            1 for row in rows if _as_bool(row.get("false_unearned"))
-        )
+        metrics = _label_metrics(rows)
         by_label_rows.append(
             {
                 "source": source,
                 "label_name": label_name,
                 "label_category": label_category,
                 "label_row_count": len(rows),
-                "overlap_count": len({row["instance_id"] for row in rows}),
-                "ef_mean": (sum(ef_values) / len(ef_values) if ef_values else None),
-                "low_ef_rate": _rate(low_ef_count, len(rows)),
-                "false_unearned_rate": _rate(false_unearned_count, len(rows)),
+                "overlap_instance_count": len({row["instance_id"] for row in rows}),
+                **metrics,
             }
         )
 
-    agreement_table_counter: Counter[tuple[str, str, str]] = Counter()
-    for row in matched_cases:
-        if row["external_polarity"] == "unknown":
+    confusion_counter: Counter[tuple[str, str, str]] = Counter()
+    for case in matched_cases:
+        if case["external_polarity"] == "unknown":
             continue
-        agreement_table_counter[
+        confusion_counter[
             (
-                str(row["label_category"]),
-                str(row["ef_band"]),
-                str(row["external_polarity"]),
+                str(case["ef_band"]),
+                str(case["external_polarity"]),
+                str(case["agreement_cell"]),
             )
         ] += 1
 
-    agreement_table_rows = [
+    confusion_rows = [
         {
-            "label_category": label_category,
             "ef_band": ef_band,
             "external_polarity": external_polarity,
+            "agreement_cell": agreement_cell,
             "count": count,
         }
-        for (label_category, ef_band, external_polarity), count in sorted(
-            agreement_table_counter.items()
+        for (ef_band, external_polarity, agreement_cell), count in sorted(
+            confusion_counter.items()
         )
     ]
 
-    agreement_class_counts = Counter(row["agreement_cell"] for row in matched_cases)
+    for ef_band, external_polarity, agreement_cell in CONFUSION_CELLS:
+        if not any(
+            row["ef_band"] == ef_band
+            and row["external_polarity"] == external_polarity
+            and row["agreement_cell"] == agreement_cell
+            for row in confusion_rows
+        ):
+            confusion_rows.append(
+                {
+                    "ef_band": ef_band,
+                    "external_polarity": external_polarity,
+                    "agreement_cell": agreement_cell,
+                    "count": 0,
+                }
+            )
+    confusion_rows.sort(key=lambda row: (row["ef_band"], row["external_polarity"]))
+
     decidable_cases = [
-        row
-        for row in matched_cases
-        if row["agreement_cell"]
+        case
+        for case in matched_cases
+        if case["agreement_cell"]
         in {
-            "concordant_low_concern",
-            "concordant_high_clean",
-            "external_flag_ef_high",
-            "ef_low_external_clean",
+            "ef_low_vs_external_flagged",
+            "ef_high_vs_external_clean",
+            "ef_low_vs_external_clean",
+            "ef_high_vs_external_flagged",
         }
     ]
     concordant_cases = [
-        row
-        for row in decidable_cases
-        if row["agreement_cell"] in {"concordant_low_concern", "concordant_high_clean"}
+        case
+        for case in decidable_cases
+        if case["agreement_cell"]
+        in {"ef_low_vs_external_flagged", "ef_high_vs_external_clean"}
     ]
 
-    by_source: dict[str, dict[str, Any]] = {}
-    source_groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in matched_cases:
-        source_groups[str(row["source"]).strip() or "unknown"].append(row)
-    for source, rows in sorted(source_groups.items()):
-        source_decidable = [
-            row
-            for row in rows
-            if row["agreement_cell"]
-            in {
-                "concordant_low_concern",
-                "concordant_high_clean",
-                "external_flag_ef_high",
-                "ef_low_external_clean",
-            }
-        ]
-        source_concordant = [
-            row
-            for row in source_decidable
-            if row["agreement_cell"] in {"concordant_low_concern", "concordant_high_clean"}
-        ]
-        by_source[source] = {
-            "label_row_count": len(rows),
-            "overlap_instance_count": len({row["instance_id"] for row in rows}),
-            "decidable_count": len(source_decidable),
-            "concordant_count": len(source_concordant),
-            "concordance_rate": _rate(len(source_concordant), len(source_decidable)),
-            "disagreement_count": sum(
-                1
-                for row in rows
-                if row["disagreement_type"] in {"external_flag_ef_high", "ef_low_external_clean"}
-            ),
-        }
-
     return {
-        "schema_version": "earnbench.external_label_agreement.v1",
-        "summary_instance_count": len(summary_rows),
+        "schema_version": "earnbench.external_label_agreement.v2",
+        "ef_threshold": ef_threshold,
+        "summary_instance_count": summary_count,
         "label_row_count": len(label_rows),
         "label_instance_count": len(label_ids),
         "overlap_instance_count": len(overlap_ids),
         "overlap_instance_ids": overlap_ids,
         "matched_label_row_count": len(matched_cases),
-        "low_ef_threshold": FALSE_EARNED_THRESHOLD,
+        "undefined_ef_case_count": sum(
+            1 for case in matched_cases if case["ef_band"] == "undefined"
+        ),
         "concordance_rate": _rate(len(concordant_cases), len(decidable_cases)),
         "decidable_case_count": len(decidable_cases),
         "concordant_case_count": len(concordant_cases),
-        "agreement_class_counts": dict(agreement_class_counts),
         "disagreement_count": len(disagreement_rows),
-        "by_source": by_source,
+        "by_source_rows": by_source_rows,
         "by_label_rows": by_label_rows,
-        "agreement_table_rows": agreement_table_rows,
+        "confusion_rows": confusion_rows,
         "disagreement_rows": disagreement_rows,
-        "case_rows": case_rows,
     }
 
 
 def render_external_label_agreement_report(payload: dict[str, Any]) -> str:
     lines = [
-        "# External Label Agreement — EF@Π vs SWE-bench Validity Audits",
-        "",
-        "## Purpose",
+        "# External Label Agreement Report",
         "",
         "Post-hoc agreement analysis crossing **frozen EarnBench summary rows** with "
         "**externally sourced instance labels** (PatchDiff, SWE-bench+, SWE-ABS, "
-        "SWE-Shield, or similar audits). This scaffold does **not** modify EF@Π, Π, "
-        "INVALID semantics, or frozen Phase A/B results.",
+        "SWE-Shield, Cursor-style audits, or compatible sources). Does **not** modify "
+        "EF@Π, Π, INVALID semantics, or frozen results.",
         "",
         "## Overlap",
         "",
@@ -560,49 +651,73 @@ def render_external_label_agreement_report(payload: dict[str, Any]) -> str:
         (f"| Distinct labeled instances | {payload['label_instance_count']} |"),
         (f"| Overlap instances | {payload['overlap_instance_count']} |"),
         (f"| Matched label rows | {payload['matched_label_row_count']} |"),
+        (f"| EF undefined (excluded from low/high) | {payload['undefined_ef_case_count']} |"),
         "",
-        "## Concordance summary",
+        "## Concordance",
         "",
         "| Metric | Value |",
         "| --- | --- |",
-        (f"| Low-EF threshold τ | {payload['low_ef_threshold']} |"),
+        (f"| Low-EF threshold τ | {payload['ef_threshold']} |"),
         (f"| Decidable cases | {payload['decidable_case_count']} |"),
         (f"| Concordant cases | {payload['concordant_case_count']} |"),
         (f"| Concordance rate | {_format_float(payload['concordance_rate'])} |"),
         (f"| Disagreement cases | {payload['disagreement_count']} |"),
         "",
-        "## EF mean and low-EF rates by external label",
+        "## Overlap and coverage by source",
         "",
-        "| Source | Label | Category | Rows | Overlap | EF mean | Low-EF rate | "
-        "False-unearned rate |",
-        "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |",
+        "| Source | Label rows | Label instances | Overlap | Summary coverage | Source match | "
+        "Concordance | Disagreements |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
-    for row in payload["by_label_rows"]:
+
+    for row in payload["by_source_rows"]:
         lines.append(
-            f"| {row['source']} | {row['label_name']} | {row['label_category']} | "
-            f"{row['label_row_count']} | {row['overlap_count']} | "
-            f"{_format_float(row['ef_mean'])} | {_format_float(row['low_ef_rate'])} | "
-            f"{_format_float(row['false_unearned_rate'])} |"
+            f"| {row['source']} | {row['label_row_count']} | {row['label_instance_count']} | "
+            f"{row['overlap_instance_count']} | "
+            f"{_format_float(row['summary_coverage_rate'])} | "
+            f"{_format_float(row['source_match_rate'])} | "
+            f"{_format_float(row['concordance_rate'])} | {row['disagreement_count']} |"
         )
-    if not payload["by_label_rows"]:
-        lines.append("| _none_ | — | — | 0 | 0 | — | — | — |")
+    if not payload["by_source_rows"]:
+        lines.append("| _none_ | 0 | 0 | 0 | — | — | — | 0 |")
 
     lines.extend(
         [
             "",
-            "## Agreement table (EF band × external polarity)",
+            "## Metrics by external label",
             "",
-            "| Label category | EF band | External polarity | Count |",
+            "| Source | Label | Category | Rows | EF mean | Low-EF | False-unearned | "
+            "Retained | Invalid-π mean | Failed-mech rows |",
+            "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
+    for row in payload["by_label_rows"]:
+        lines.append(
+            f"| {row['source']} | {row['label_name']} | {row['label_category']} | "
+            f"{row['label_row_count']} | {_format_float(row['ef_mean'])} | "
+            f"{_format_float(row['low_ef_rate'])} | "
+            f"{_format_float(row['false_unearned_rate'])} | "
+            f"{_format_float(row['retained_rate'])} | "
+            f"{_format_float(row['invalid_pi_rate_mean'])} | "
+            f"{row['failed_mechanism_row_count']} |"
+        )
+    if not payload["by_label_rows"]:
+        lines.append("| _none_ | — | — | 0 | — | — | — | — | — | 0 |")
+
+    lines.extend(
+        [
+            "",
+            "## Confusion table (EF band × external polarity)",
+            "",
+            "| EF band | External | Cell | Count |",
             "| --- | --- | --- | ---: |",
         ]
     )
-    for row in payload["agreement_table_rows"]:
+    for row in payload["confusion_rows"]:
         lines.append(
-            f"| {row['label_category']} | {row['ef_band']} | "
-            f"{row['external_polarity']} | {row['count']} |"
+            f"| {row['ef_band']} | {row['external_polarity']} | "
+            f"{row['agreement_cell']} | {row['count']} |"
         )
-    if not payload["agreement_table_rows"]:
-        lines.append("| _none_ | — | — | 0 |")
 
     lines.extend(["", "## Disagreement cases", ""])
     if payload["disagreement_rows"]:
@@ -610,7 +725,7 @@ def render_external_label_agreement_report(payload: dict[str, Any]) -> str:
             lines.append(
                 f"- **`{row['instance_id']}`** ({row['disagreement_type']}, "
                 f"{row['source']}/{row['label_name']}): EF={_format_float(row['ef_pi'])} "
-                f"vs external `{row['label_value']}`"
+                f"({row['ef_status']}) vs `{row['label_value']}`"
             )
     else:
         lines.append("_None among matched rows._")
@@ -622,16 +737,10 @@ def render_external_label_agreement_report(payload: dict[str, Any]) -> str:
             "",
             "- External labels are **convergent contextual evidence**, not validation of "
             "EarnBench operating characteristics.",
-            "- Partial label coverage is expected; overlap footer must be reported.",
-            "- `external_flag_ef_high` = external concern label but EF≥τ on Y₀=1.",
-            "- `ef_low_external_clean` = EF<τ but external label reads clean.",
-            "",
-            "## Artifacts",
-            "",
-            "- `external_label_agreement.csv` — case-level join",
-            "- `external_label_by_label.csv` — aggregates by source/label",
-            "- `external_label_agreement_table.csv` — EF band × external polarity counts",
-            "- `external_label_disagreements.csv` — flagged disagreement rows only",
+            "- Partial label coverage is expected; always report overlap denominators.",
+            "- EF **undefined** rows are excluded from low/high bands (not treated as zero).",
+            "- `external_flagged_ef_high` = external flagged label but EF ≥ τ on Y₀=1.",
+            "- `ef_low_external_clean` = EF < τ but external label reads clean.",
             "",
         ]
     )
@@ -664,52 +773,60 @@ def generate_external_label_agreement_report(
     summary_path: Path,
     labels_path: Path,
     output_dir: Path,
+    *,
+    ef_threshold: float = DEFAULT_EF_THRESHOLD,
 ) -> ExternalLabelAgreementResult:
+    """Load inputs, analyze agreement, and write summary CSV/JSON/Markdown artifacts."""
     summary_rows = load_phase_summary_rows(summary_path)
     label_rows = load_external_label_rows(labels_path)
-    payload = analyze_external_label_agreement(summary_rows, label_rows)
+    payload = analyze_external_label_agreement(
+        summary_rows,
+        label_rows,
+        ef_threshold=ef_threshold,
+    )
 
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    agreement_csv_path = output_dir / EXTERNAL_LABEL_AGREEMENT_CSV
-    by_label_csv_path = output_dir / EXTERNAL_LABEL_BY_LABEL_CSV
-    agreement_table_csv_path = output_dir / EXTERNAL_LABEL_AGREEMENT_TABLE_CSV
-    disagreements_csv_path = output_dir / EXTERNAL_LABEL_DISAGREEMENTS_CSV
-    agreement_json_path = output_dir / EXTERNAL_LABEL_AGREEMENT_JSON
-    agreement_md_path = output_dir / EXTERNAL_LABEL_AGREEMENT_MD
+    summary_json_path = output_dir / SUMMARY_JSON
+    by_source_csv_path = output_dir / BY_SOURCE_CSV
+    by_label_csv_path = output_dir / BY_LABEL_CSV
+    confusion_csv_path = output_dir / CONFUSION_CSV
+    disagreements_csv_path = output_dir / DISAGREEMENTS_CSV
+    report_md_path = output_dir / REPORT_MD
 
-    case_rows = payload.pop("case_rows")
+    by_source_rows = payload.pop("by_source_rows")
     by_label_rows = payload.pop("by_label_rows")
-    agreement_table_rows = payload.pop("agreement_table_rows")
+    confusion_rows = payload.pop("confusion_rows")
     disagreement_rows = payload.pop("disagreement_rows")
 
     report_payload = {
         **payload,
+        "by_source_rows": by_source_rows,
         "by_label_rows": by_label_rows,
-        "agreement_table_rows": agreement_table_rows,
+        "confusion_rows": confusion_rows,
         "disagreement_rows": disagreement_rows,
     }
-    agreement_md_path.write_text(
+    report_md_path.write_text(
         render_external_label_agreement_report(report_payload),
         encoding="utf-8",
     )
 
-    _write_csv(agreement_csv_path, CASE_COLUMNS, case_rows)
+    _write_csv(by_source_csv_path, BY_SOURCE_COLUMNS, by_source_rows)
     _write_csv(by_label_csv_path, BY_LABEL_COLUMNS, by_label_rows)
-    _write_csv(agreement_table_csv_path, AGREEMENT_TABLE_COLUMNS, agreement_table_rows)
+    _write_csv(confusion_csv_path, CONFUSION_COLUMNS, confusion_rows)
     _write_csv(disagreements_csv_path, DISAGREEMENT_COLUMNS, disagreement_rows)
 
-    with agreement_json_path.open("w", encoding="utf-8") as handle:
+    with summary_json_path.open("w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2, sort_keys=True)
         handle.write("\n")
 
     return ExternalLabelAgreementResult(
         output_dir=output_dir,
-        agreement_json=agreement_json_path,
-        agreement_csv=agreement_csv_path,
+        summary_json=summary_json_path,
+        by_source_csv=by_source_csv_path,
         by_label_csv=by_label_csv_path,
-        agreement_table_csv=agreement_table_csv_path,
+        confusion_csv=confusion_csv_path,
         disagreements_csv=disagreements_csv_path,
-        agreement_md=agreement_md_path,
+        report_md=report_md_path,
     )
