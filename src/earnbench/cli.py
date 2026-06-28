@@ -46,6 +46,10 @@ from earnbench.cross_oracle_agreement import (
     generate_cross_oracle_agreement_report,
     validate_cross_oracle_table,
 )
+from earnbench.external_label_agreement import (
+    generate_external_label_agreement_report,
+    validate_external_labels_table,
+)
 from earnbench.external_exploits import validate_external_exploit_catalog
 from earnbench.external_unearned import (
     ExternalUnearnedExecuteConfig,
@@ -1713,6 +1717,42 @@ def cmd_validation_monte_carlo(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_validation_external_label_agreement(args: argparse.Namespace) -> None:
+    """Cross EarnBench summary rows with external SWE-bench validity audit labels."""
+    labels_path = Path(args.labels)
+    if args.validate_only:
+        result = validate_external_labels_table(labels_path)
+        if not result.ok:
+            for error in result.errors:
+                print(f"error: {error}", file=sys.stderr)
+            raise CLIError("external labels validation failed", exit_code=1)
+        payload = {
+            "status": "ok",
+            "labels": str(result.path),
+            "row_count": result.row_count,
+        }
+    else:
+        report = generate_external_label_agreement_report(
+            Path(args.summary),
+            labels_path,
+            Path(args.output),
+        )
+        payload = {
+            "status": "ok",
+            "output_dir": str(report.output_dir),
+            "agreement_json": str(report.agreement_json),
+            "agreement_csv": str(report.agreement_csv),
+            "by_label_csv": str(report.by_label_csv),
+            "agreement_table_csv": str(report.agreement_table_csv),
+            "disagreements_csv": str(report.disagreements_csv),
+            "agreement_md": str(report.agreement_md),
+        }
+    if args.quiet:
+        return
+    json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
 def cmd_validation_cross_oracle(args: argparse.Namespace) -> None:
     """Validate and analyze cross-oracle agreement table."""
     table_path = Path(args.table)
@@ -2654,6 +2694,34 @@ def build_parser() -> argparse.ArgumentParser:
         help="Validate schema only; do not run agreement analysis",
     )
     cross_oracle_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print summary JSON on success",
+    )
+
+    external_label_parser = validation_subparsers.add_parser(
+        "external-label-agreement",
+        help="Cross EF@Π summary rows with external SWE-bench validity audit labels",
+    )
+    external_label_parser.add_argument(
+        "--summary",
+        help="Phase A/B batch directory or path to summary.csv (required unless --validate-only)",
+    )
+    external_label_parser.add_argument(
+        "--labels",
+        required=True,
+        help="Path to external audit labels CSV",
+    )
+    external_label_parser.add_argument(
+        "--output",
+        help="Output directory for agreement artifacts (required unless --validate-only)",
+    )
+    external_label_parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="Validate external labels schema only; do not run agreement analysis",
+    )
+    external_label_parser.add_argument(
         "--quiet",
         action="store_true",
         help="Do not print summary JSON on success",
@@ -3746,6 +3814,19 @@ def main(argv: list[str] | None = None) -> int:
                 if not args.validate_only and not args.output:
                     parser.error("cross-oracle requires --output unless --validate-only")
                 cmd_validation_cross_oracle(args)
+            elif args.validation_command == "external-label-agreement":
+                if not args.validate_only:
+                    if not args.summary:
+                        parser.error(
+                            "external-label-agreement requires --summary unless "
+                            "--validate-only"
+                        )
+                    if not args.output:
+                        parser.error(
+                            "external-label-agreement requires --output unless "
+                            "--validate-only"
+                        )
+                cmd_validation_external_label_agreement(args)
             elif args.validation_command == "stress-test":
                 if args.stress_test_command == "validate-catalog":
                     cmd_validation_stress_test(args)

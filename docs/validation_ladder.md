@@ -40,6 +40,25 @@ earnbench validation cross-oracle cross_oracle_comparison.csv --validate-only
 
 Template: `paper/experiments/cross_oracle_comparison.template.csv`.
 
+### External label agreement (SWE-bench validity audits)
+
+```bash
+earnbench validation external-label-agreement \
+  --summary path/to/summary.csv \
+  --labels path/to/external_labels.csv \
+  --output out/external_labels
+earnbench validation external-label-agreement \
+  --labels path/to/external_labels.csv \
+  --validate-only
+```
+
+Template: `paper/experiments/external_label_agreement.template.csv`.  
+Protocol: `paper/experiments/external_label_agreement_protocol.md`.
+
+Writes `external_label_agreement.{json,csv,md}`, `external_label_by_label.csv`, `external_label_agreement_table.csv`, and `external_label_disagreements.csv`.
+
+Post-hoc agreement only; does not modify EF@Π, Π, INVALID, or frozen results.
+
 ### Stress-test catalog (layer 4)
 
 ```bash
