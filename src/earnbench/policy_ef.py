@@ -31,6 +31,11 @@ REQUIRED_COLUMNS = (
     "status",
 )
 
+# Accept ``failed`` as a synonym for ``failed_mechanisms`` in input CSV headers.
+COLUMN_ALIASES = {
+    "failed": "failed_mechanisms",
+}
+
 POLICY_EF_BY_AGENT_CSV = "policy_ef_by_agent.csv"
 POLICY_EF_VARIANCE_CSV = "policy_ef_variance.csv"
 POLICY_EF_PAIRWISE_FLIPS_CSV = "policy_ef_pairwise_flips.csv"
@@ -173,6 +178,26 @@ def _earned_contribution(
     return y0 * ef_pi, False
 
 
+def _normalize_fieldnames(fieldnames: tuple[str, ...] | list[str]) -> list[str]:
+    normalized: list[str] = []
+    for name in fieldnames:
+        canonical = COLUMN_ALIASES.get(name, name)
+        if canonical in normalized:
+            msg = f"duplicate logical column {canonical!r} after alias normalization"
+            raise ValueError(msg)
+        normalized.append(canonical)
+    return normalized
+
+
+def _row_with_canonical_columns(raw: dict[str, str | None]) -> dict[str, str | None]:
+    canonical: dict[str, str | None] = {}
+    for key, value in raw.items():
+        if key is None:
+            continue
+        canonical[COLUMN_ALIASES.get(key, key)] = value
+    return canonical
+
+
 def load_policy_agent_results(path: Path) -> list[PolicyAttemptRow]:
     """Load long-format agent attempt rows after validation."""
     resolved = path.resolve()
@@ -185,14 +210,16 @@ def load_policy_agent_results(path: Path) -> list[PolicyAttemptRow]:
         if reader.fieldnames is None:
             msg = f"{resolved} is empty or missing a header row"
             raise ValueError(msg)
-        missing = [column for column in REQUIRED_COLUMNS if column not in reader.fieldnames]
+        fieldnames = _normalize_fieldnames(tuple(reader.fieldnames))
+        missing = [column for column in REQUIRED_COLUMNS if column not in fieldnames]
         if missing:
             msg = f"{resolved} missing required columns: {', '.join(missing)}"
             raise ValueError(msg)
 
         rows: list[PolicyAttemptRow] = []
         seen_keys: set[tuple[str, str, int]] = set()
-        for line_number, raw in enumerate(reader, start=2):
+        for line_number, raw_row in enumerate(reader, start=2):
+            raw = _row_with_canonical_columns(raw_row)
             agent = str(raw.get("agent", "")).strip()
             instance_id = str(raw.get("instance_id", "")).strip()
             replicate_raw = str(raw.get("replicate", "")).strip()
@@ -996,6 +1023,7 @@ def generate_policy_ef_report(
 
 __all__ = [
     "BY_AGENT_COLUMNS",
+    "COLUMN_ALIASES",
     "DEFAULT_BOOTSTRAP_DRAWS",
     "EXPLOITATION_FRONTIER_COLUMNS",
     "OPTIONAL_COLUMNS",

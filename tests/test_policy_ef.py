@@ -222,6 +222,31 @@ def test_exploitation_frontier_when_difficulty_present(tmp_path: Path) -> None:
     assert len(payload["exploitation_frontier"]) == 4
 
 
+def test_load_accepts_failed_column_alias(tmp_path: Path) -> None:
+    path = tmp_path / "failed_alias.csv"
+    header = (
+        "agent",
+        "model",
+        "provider",
+        "instance_id",
+        "replicate",
+        "y0",
+        "ef_pi",
+        "ef_status",
+        "failed",
+        "invalid_pi_count",
+        "status",
+    )
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(header)
+        writer.writerow(
+            ("alpha", "m1", "p1", "i1", "1", "1", "0.0", "defined", "visible_test_overfitting", "0", "ok")
+        )
+    rows = load_policy_agent_results(path)
+    assert rows[0].failed_mechanisms == ("visible_test_overfitting",)
+
+
 def test_cli_report_policy_ef(capsys, tmp_path: Path) -> None:
     input_csv = tmp_path / "agent_results.csv"
     _write_deterministic_dataset(input_csv)
@@ -236,8 +261,12 @@ def test_cli_report_policy_ef(capsys, tmp_path: Path) -> None:
             str(out),
             "--bootstrap",
             "100",
+            "--seed",
+            "0",
         ]
     )
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert Path(payload["report_md"]).is_file()
+    bootstrap = json.loads(Path(payload["bootstrap_json"]).read_text(encoding="utf-8"))
+    assert bootstrap["bootstrap_seed"] == 0

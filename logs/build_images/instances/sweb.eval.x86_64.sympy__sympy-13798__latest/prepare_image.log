@@ -1,0 +1,2 @@
+2026-06-27 23:44:26,014 - INFO - Environment image sweb.env.py.x86_64.c795f4b88616b8462021ed:latest found for sympy__sympy-13798
+Building instance image sweb.eval.x86_64.sympy__sympy-13798:latest for sympy__sympy-13798

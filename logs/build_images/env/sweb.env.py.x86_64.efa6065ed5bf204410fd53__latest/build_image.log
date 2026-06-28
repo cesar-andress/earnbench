@@ -1,0 +1,847 @@
+2026-06-27 04:53:09,562 - INFO - Building image sweb.env.py.x86_64.efa6065ed5bf204410fd53:latest
+Using dockerfile:
+FROM --platform=linux/x86_64 sweb.base.py.x86_64:latest
+
+COPY ./setup_env.sh /root/
+RUN sed -i -e 's/\r$//' /root/setup_env.sh
+RUN chmod +x /root/setup_env.sh
+RUN /bin/bash -c "source ~/.bashrc && /root/setup_env.sh"
+
+WORKDIR /testbed/
+
+# Automatically activate the testbed environment
+RUN echo "source /opt/miniconda3/etc/profile.d/conda.sh && conda activate testbed" > /root/.bashrc
+
+Adding (1) setup scripts to image build repo
+2026-06-27 04:53:09,562 - INFO - [SETUP SCRIPT] setup_env.sh:
+#!/bin/bash
+set -euxo pipefail
+source /opt/miniconda3/bin/activate
+cat <<'EOF_59812759871' > environment.yml
+# To set up a development environment using conda run:
+#
+#   conda env create -f environment.yml
+#   conda activate mpl-dev
+#   pip install -e .
+#
+name: testbed
+channels:
+  - conda-forge
+dependencies:
+  # runtime dependencies
+  - cairocffi
+  - contourpy>=1.0.1
+  - cycler>=0.10.0
+  - fonttools>=4.22.0
+  - importlib-resources>=3.2.0
+  - kiwisolver>=1.0.1
+  - numpy>=1.21
+  - pillow>=6.2
+  - pybind11>=2.6.0
+  - pygobject
+  - pyparsing>=2.3.1
+  - pyqt
+  - python-dateutil>=2.1
+  - setuptools
+  - setuptools_scm
+  - wxpython
+  # building documentation
+  - colorspacious
+  - graphviz
+  - ipython
+  - ipywidgets
+  - numpydoc>=0.8
+  - packaging
+  - pydata-sphinx-theme
+  - pyyaml
+  - sphinx>=1.8.1,!=2.0.0
+  - sphinx-copybutton
+  - sphinx-gallery>=0.12
+  - sphinx-design
+  - pip
+  - pip:
+      - mpl-sphinx-theme
+      - sphinxcontrib-svg2pdfconverter
+      - pikepdf
+  # testing
+  - coverage
+  - flake8>=3.8
+  - flake8-docstrings>=1.4.0
+  - gtk4
+  - ipykernel
+  - nbconvert[execute]!=6.0.0,!=6.0.1,!=7.3.0,!=7.3.1
+  - nbformat!=5.0.0,!=5.0.1
+  - pandas!=0.25.0
+  - psutil
+  - pre-commit
+  - pydocstyle>=5.1.0
+  - pytest!=4.6.0,!=5.4.0
+  - pytest-cov
+  - pytest-rerunfailures
+  - pytest-timeout
+  - pytest-xdist
+  - tornado
+  - pytz
+  - black
+
+EOF_59812759871
+conda env create --file environment.yml
+conda activate testbed && conda install python=3.11 -y
+rm environment.yml
+conda activate testbed
+python -m pip install contourpy==1.1.0 cycler==0.11.0 fonttools==4.42.1 ghostscript kiwisolver==1.4.5 numpy==1.25.2 packaging==23.1 pillow==10.0.0 pikepdf pyparsing==3.0.9 python-dateutil==2.8.2 six==1.16.0 setuptools==68.1.2 setuptools-scm==7.1.0 typing-extensions==4.7.1
+
+2026-06-27 04:53:09,562 - INFO - Building docker image sweb.env.py.x86_64.efa6065ed5bf204410fd53:latest in logs/build_images/env/sweb.env.py.x86_64.efa6065ed5bf204410fd53__latest with platform linux/x86_64
+2026-06-27 04:53:09,566 - INFO - Step 1/7 : FROM --platform=linux/x86_64 sweb.base.py.x86_64:latest
+2026-06-27 04:53:09,566 - INFO - 
+2026-06-27 04:53:09,602 - INFO - ---> 8664dc57dd0f
+2026-06-27 04:53:09,602 - INFO - Step 2/7 : COPY ./setup_env.sh /root/
+2026-06-27 04:53:09,602 - INFO - 
+2026-06-27 04:53:12,743 - INFO - ---> f5ec76b262a5
+2026-06-27 04:53:12,744 - INFO - Step 3/7 : RUN sed -i -e 's/\r$//' /root/setup_env.sh
+2026-06-27 04:53:12,744 - INFO - 
+2026-06-27 04:53:13,194 - INFO - ---> Running in 422b3d349f27
+2026-06-27 04:53:16,631 - INFO - ---> Removed intermediate container 422b3d349f27
+2026-06-27 04:53:16,631 - INFO - ---> 5aa4310dd5e5
+2026-06-27 04:53:16,631 - INFO - Step 4/7 : RUN chmod +x /root/setup_env.sh
+2026-06-27 04:53:16,631 - INFO - 
+2026-06-27 04:53:16,920 - INFO - ---> Running in fe7ec86a1336
+2026-06-27 04:53:19,859 - INFO - ---> Removed intermediate container fe7ec86a1336
+2026-06-27 04:53:19,859 - INFO - ---> 67bfbcf750fd
+2026-06-27 04:53:19,859 - INFO - Step 5/7 : RUN /bin/bash -c "source ~/.bashrc && /root/setup_env.sh"
+2026-06-27 04:53:19,859 - INFO - 
+2026-06-27 04:53:19,996 - INFO - ---> Running in 0d541751bf2a
+2026-06-27 04:53:20,157 - INFO - + source /opt/miniconda3/bin/activate
+2026-06-27 04:53:20,158 - INFO - ++ _CONDA_ROOT=/opt/miniconda3
+2026-06-27 04:53:20,158 - INFO - ++ . /opt/miniconda3/etc/profile.d/conda.sh
+2026-06-27 04:53:20,158 - INFO - +++ export CONDA_EXE=/opt/miniconda3/bin/conda
++++ CONDA_EXE=/opt/miniconda3/bin/conda
++++ export _CE_M=
++++ _CE_M=
++++ export _CE_CONDA=
++++ _CE_CONDA=
+2026-06-27 04:53:20,158 - INFO - +++ export CONDA_PYTHON_EXE=/opt/miniconda3/bin/python
++++ CONDA_PYTHON_EXE=/opt/miniconda3/bin/python
+2026-06-27 04:53:20,158 - INFO - +++ '[' -z '' ']'
++++ export CONDA_SHLVL=0
++++ CONDA_SHLVL=0
++++ '[' -n '' ']'
+2026-06-27 04:53:20,158 - INFO - +++++ dirname /opt/miniconda3/bin/conda
+2026-06-27 04:53:20,158 - INFO - ++++ dirname /opt/miniconda3/bin
+2026-06-27 04:53:20,159 - INFO - +++ PATH=/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
++++ export PATH
+2026-06-27 04:53:20,159 - INFO - +++ '[' -z '' ']'
++++ PS1=
+2026-06-27 04:53:20,159 - INFO - ++ conda activate
+++ local cmd=activate
+++ case "$cmd" in
+2026-06-27 04:53:20,159 - INFO - ++ __conda_activate activate
+2026-06-27 04:53:20,159 - INFO - ++ '[' -n '' ']'
+++ local ask_conda
+2026-06-27 04:53:20,159 - INFO - +++ PS1=
++++ __conda_exe shell.posix activate
+2026-06-27 04:53:20,159 - INFO - +++ /opt/miniconda3/bin/conda shell.posix activate
+2026-06-27 04:53:20,251 - INFO - ++ ask_conda='PS1='\''(base) '\''
+export PATH='\''/opt/miniconda3/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'\''
+export CONDA_PREFIX='\''/opt/miniconda3'\''
+export CONDA_SHLVL='\''1'\''
+export CONDA_DEFAULT_ENV='\''base'\''
+export CONDA_PROMPT_MODIFIER='\''(base) '\''
+export CONDA_EXE='\''/opt/miniconda3/bin/conda'\''
+export _CE_M='\'''\''
+export _CE_CONDA='\'''\''
+export CONDA_PYTHON_EXE='\''/opt/miniconda3/bin/python'\'''
+++ eval 'PS1='\''(base) '\''
+export PATH='\''/opt/miniconda3/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'\''
+export CONDA_PREFIX='\''/opt/miniconda3'\''
+export CONDA_SHLVL='\''1'\''
+export CONDA_DEFAULT_ENV='\''base'\''
+export CONDA_PROMPT_MODIFIER='\''(base) '\''
+export CONDA_EXE='\''/opt/miniconda3/bin/conda'\''
+export _CE_M='\'''\''
+export _CE_CONDA='\'''\''
+export CONDA_PYTHON_EXE='\''/opt/miniconda3/bin/python'\'''
++++ PS1='(base) '
++++ export PATH=/opt/miniconda3/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
++++ PATH=/opt/miniconda3/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
++++ export CONDA_PREFIX=/opt/miniconda3
++++ CONDA_PREFIX=/opt/miniconda3
++++ export CONDA_SHLVL=1
++++ CONDA_SHLVL=1
++++ export CONDA_DEFAULT_ENV=base
++++ CONDA_DEFAULT_ENV=base
++++ export 'CONDA_PROMPT_MODIFIER=(base) '
++++ CONDA_PROMPT_MODIFIER='(base) '
+2026-06-27 04:53:20,251 - INFO - +++ export CONDA_EXE=/opt/miniconda3/bin/conda
++++ CONDA_EXE=/opt/miniconda3/bin/conda
++++ export _CE_M=
++++ _CE_M=
++++ export _CE_CONDA=
++++ _CE_CONDA=
++++ export CONDA_PYTHON_EXE=/opt/miniconda3/bin/python
++++ CONDA_PYTHON_EXE=/opt/miniconda3/bin/python
+2026-06-27 04:53:20,251 - INFO - ++ __conda_hashr
+2026-06-27 04:53:20,251 - INFO - ++ '[' -n '' ']'
+++ '[' -n '' ']'
+++ hash -r
++ cat
+2026-06-27 04:53:20,251 - INFO - + conda env create --file environment.yml
++ local cmd=env
+2026-06-27 04:53:20,252 - INFO - + case "$cmd" in
++ __conda_exe env create --file environment.yml
+2026-06-27 04:53:20,252 - INFO - + /opt/miniconda3/bin/conda env create --file environment.yml
+2026-06-27 04:53:20,726 - INFO - Channels:
+ - conda-forge
+ - defaults
+Platform: linux-64
+Collecting package metadata (repodata.json): ...working...
+2026-06-27 04:54:11,286 - INFO - done
+Solving environment: ...working...
+2026-06-27 04:59:37,705 - INFO - done
+2026-06-27 04:59:55,293 - INFO - Downloading and Extracting Packages: ...working... done
+Preparing transaction: ...working...
+2026-06-27 04:59:56,055 - INFO - done
+2026-06-27 04:59:56,055 - INFO - Verifying transaction: ...working...
+2026-06-27 04:59:59,008 - INFO - done
+2026-06-27 04:59:59,013 - INFO - Executing transaction: ...working...
+2026-06-27 05:00:06,732 - INFO - done
+2026-06-27 05:00:06,778 - INFO - Installing pip dependencies: ...working...
+2026-06-27 05:00:09,991 - INFO - Ran pip subprocess with arguments:
+['/opt/miniconda3/envs/testbed/bin/python', '-m', 'pip', 'install', '-U', '-r', '/condaenv.t0szzdx2.requirements.txt', '--exists-action=b']
+Pip subprocess output:
+Collecting mpl-sphinx-theme (from -r /condaenv.t0szzdx2.requirements.txt (line 1))
+  Downloading mpl_sphinx_theme-3.11.0-py3-none-any.whl.metadata (2.4 kB)
+Collecting sphinxcontrib-svg2pdfconverter (from -r /condaenv.t0szzdx2.requirements.txt (line 2))
+  Downloading sphinxcontrib_svg2pdfconverter-2.1.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting pikepdf (from -r /condaenv.t0szzdx2.requirements.txt (line 3))
+  Downloading pikepdf-10.9.1-cp314-abi3-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (10 kB)
+Collecting pydata-sphinx-theme==0.18.0 (from mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1))
+  Downloading pydata_sphinx_theme-0.18.0-py3-none-any.whl.metadata (6.0 kB)
+Collecting matplotlib (from mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1))
+  Downloading matplotlib-3.11.0-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (80 kB)
+Requirement already satisfied: sphinx-design in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (0.7.0)
+Requirement already satisfied: sphinx<10,>=8.0 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (9.1.0)
+Requirement already satisfied: beautifulsoup4 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (4.15.0)
+Requirement already satisfied: docutils!=0.17.0 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (0.22.4)
+Requirement already satisfied: Babel in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (2.18.0)
+Requirement already satisfied: pygments>=2.7 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (2.20.0)
+Requirement already satisfied: accessible-pygments in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (0.0.5)
+Requirement already satisfied: typing-extensions in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (4.15.0)
+Requirement already satisfied: sphinxcontrib-applehelp>=1.0.7 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from sphinx<10,>=8.0->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (2.0.0)
+Requirement already satisfied: sphinxcontrib-devhelp>=1.0.6 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from sphinx<10,>=8.0->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (2.0.0)
+Requirement already satisfied: sphinxcontrib-htmlhelp>=2.0.6 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from sphinx<10,>=8.0->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (2.1.0)
+Requirement already satisfied: sphinxcontrib-jsmath>=1.0.1 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from sphinx<10,>=8.0->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (1.0.1)
+Requirement already satisfied: sphinxcontrib-qthelp>=1.0.6 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from sphinx<10,>=8.0->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (2.0.0)
+Requirement already satisfied: sphinxcontrib-serializinghtml>=1.1.9 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from sphinx<10,>=8.0->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (2.0.0)
+Requirement already satisfied: Jinja2>=3.1 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from sphinx<10,>=8.0->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (3.1.6)
+Requirement already satisfied: snowballstemmer>=2.2 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from sphinx<10,>=8.0->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (3.1.1)
+Requirement already satisfied: alabaster>=0.7.14 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from sphinx<10,>=8.0->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (1.0.0)
+Requirement already satisfied: imagesize>=1.3 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from sphinx<10,>=8.0->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (2.0.0)
+Requirement already satisfied: requests>=2.30.0 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from sphinx<10,>=8.0->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (2.34.2)
+Requirement already satisfied: roman-numerals>=1.0.0 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from sphinx<10,>=8.0->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (4.1.0)
+Requirement already satisfied: packaging>=23.0 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from sphinx<10,>=8.0->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (26.2)
+Requirement already satisfied: Pillow>=10.0.1 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from pikepdf->-r /condaenv.t0szzdx2.requirements.txt (line 3)) (12.2.0)
+Collecting lxml>=4.8 (from pikepdf->-r /condaenv.t0szzdx2.requirements.txt (line 3))
+  Downloading lxml-6.1.1-cp314-cp314-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl.metadata (3.5 kB)
+Requirement already satisfied: MarkupSafe>=2.0 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from Jinja2>=3.1->sphinx<10,>=8.0->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (3.0.3)
+Requirement already satisfied: charset_normalizer<4,>=2 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from requests>=2.30.0->sphinx<10,>=8.0->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (3.4.7)
+Requirement already satisfied: idna<4,>=2.5 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from requests>=2.30.0->sphinx<10,>=8.0->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (3.18)
+Requirement already satisfied: urllib3<3,>=1.26 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from requests>=2.30.0->sphinx<10,>=8.0->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (2.7.0)
+Requirement already satisfied: certifi>=2023.5.7 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from requests>=2.30.0->sphinx<10,>=8.0->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (2026.6.17)
+Requirement already satisfied: soupsieve>=1.6.1 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from beautifulsoup4->pydata-sphinx-theme==0.18.0->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (2.8.4)
+Requirement already satisfied: contourpy>=1.0.1 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from matplotlib->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (1.3.3)
+Requirement already satisfied: cycler>=0.10 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from matplotlib->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (0.12.1)
+Requirement already satisfied: fonttools>=4.22.0 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from matplotlib->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (4.63.0)
+Requirement already satisfied: kiwisolver>=1.3.1 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from matplotlib->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (1.5.0)
+Requirement already satisfied: numpy>=1.25 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from matplotlib->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (2.5.0)
+Requirement already satisfied: pyparsing>=3 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from matplotlib->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (3.3.2)
+Requirement already satisfied: python-dateutil>=2.7 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from matplotlib->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (2.9.0.post0)
+Requirement already satisfied: six>=1.5 in ./opt/miniconda3/envs/testbed/lib/python3.14/site-packages (from python-dateutil>=2.7->matplotlib->mpl-sphinx-theme->-r /condaenv.t0szzdx2.requirements.txt (line 1)) (1.17.0)
+Downloading mpl_sphinx_theme-3.11.0-py3-none-any.whl (52 kB)
+Downloading pydata_sphinx_theme-0.18.0-py3-none-any.whl (6.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.2/6.2 MB 42.6 MB/s  0:00:00
+Downloading sphinxcontrib_svg2pdfconverter-2.1.0-py3-none-any.whl (9.3 kB)
+Downloading pikepdf-10.9.1-cp314-abi3-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (2.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 82.9 MB/s  0:00:00
+Downloading lxml-6.1.1-cp314-cp314-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl (5.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.2/5.2 MB 100.9 MB/s  0:00:00
+Downloading matplotlib-3.11.0-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (11.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 11.1/11.1 MB 79.9 MB/s  0:00:00
+Installing collected packages: lxml, pikepdf, matplotlib, sphinxcontrib-svg2pdfconverter, pydata-sphinx-theme, mpl-sphinx-theme
+  Attempting uninstall: pydata-sphinx-theme
+    Found existing installation: pydata-sphinx-theme 0.19.0
+    Uninstalling pydata-sphinx-theme-0.19.0:
+      Successfully uninstalled pydata-sphinx-theme-0.19.0
+
+Successfully installed lxml-6.1.1 matplotlib-3.11.0 mpl-sphinx-theme-3.11.0 pikepdf-10.9.1 pydata-sphinx-theme-0.18.0 sphinxcontrib-svg2pdfconverter-2.1.0
+2026-06-27 05:00:09,991 - INFO - done
+2026-06-27 05:00:09,991 - INFO - #
+# To activate this environment, use
+#
+#     $ conda activate testbed
+#
+# To deactivate an active environment, use
+#
+#     $ conda deactivate
+2026-06-27 05:00:10,083 - INFO - + conda activate testbed
++ local cmd=activate
++ case "$cmd" in
++ __conda_activate activate testbed
+2026-06-27 05:00:10,083 - INFO - + '[' -n '' ']'
++ local ask_conda
+2026-06-27 05:00:10,084 - INFO - ++ PS1='(base) '
+++ __conda_exe shell.posix activate testbed
+2026-06-27 05:00:10,084 - INFO - ++ /opt/miniconda3/bin/conda shell.posix activate testbed
+2026-06-27 05:00:10,152 - INFO - + ask_conda='PS1='\''(testbed) '\''
+export PATH='\''/opt/miniconda3/envs/testbed/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'\''
+export CONDA_PREFIX='\''/opt/miniconda3/envs/testbed'\''
+export CONDA_SHLVL='\''2'\''
+export CONDA_DEFAULT_ENV='\''testbed'\''
+export CONDA_PROMPT_MODIFIER='\''(testbed) '\''
+export CONDA_PREFIX_1='\''/opt/miniconda3'\''
+export CONDA_EXE='\''/opt/miniconda3/bin/conda'\''
+export _CE_M='\'''\''
+export _CE_CONDA='\'''\''
+export CONDA_PYTHON_EXE='\''/opt/miniconda3/bin/python'\''
+. "/opt/miniconda3/envs/testbed/etc/conda/activate.d/libglib_activate.sh"
+. "/opt/miniconda3/envs/testbed/etc/conda/activate.d/libxml2-split_activate.sh"'
++ eval 'PS1='\''(testbed) '\''
+export PATH='\''/opt/miniconda3/envs/testbed/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'\''
+export CONDA_PREFIX='\''/opt/miniconda3/envs/testbed'\''
+export CONDA_SHLVL='\''2'\''
+export CONDA_DEFAULT_ENV='\''testbed'\''
+export CONDA_PROMPT_MODIFIER='\''(testbed) '\''
+export CONDA_PREFIX_1='\''/opt/miniconda3'\''
+export CONDA_EXE='\''/opt/miniconda3/bin/conda'\''
+export _CE_M='\'''\''
+export _CE_CONDA='\'''\''
+export CONDA_PYTHON_EXE='\''/opt/miniconda3/bin/python'\''
+. "/opt/miniconda3/envs/testbed/etc/conda/activate.d/libglib_activate.sh"
+. "/opt/miniconda3/envs/testbed/etc/conda/activate.d/libxml2-split_activate.sh"'
+2026-06-27 05:00:10,152 - INFO - ++ PS1='(testbed) '
+++ export PATH=/opt/miniconda3/envs/testbed/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ PATH=/opt/miniconda3/envs/testbed/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ export CONDA_PREFIX=/opt/miniconda3/envs/testbed
+++ CONDA_PREFIX=/opt/miniconda3/envs/testbed
+2026-06-27 05:00:10,152 - INFO - ++ export CONDA_SHLVL=2
+++ CONDA_SHLVL=2
+2026-06-27 05:00:10,152 - INFO - ++ export CONDA_DEFAULT_ENV=testbed
+++ CONDA_DEFAULT_ENV=testbed
+++ export 'CONDA_PROMPT_MODIFIER=(testbed) '
+++ CONDA_PROMPT_MODIFIER='(testbed) '
+++ export CONDA_PREFIX_1=/opt/miniconda3
+++ CONDA_PREFIX_1=/opt/miniconda3
+++ export CONDA_EXE=/opt/miniconda3/bin/conda
+++ CONDA_EXE=/opt/miniconda3/bin/conda
+2026-06-27 05:00:10,152 - INFO - ++ export _CE_M=
+++ _CE_M=
+2026-06-27 05:00:10,152 - INFO - ++ export _CE_CONDA=
+++ _CE_CONDA=
+++ export CONDA_PYTHON_EXE=/opt/miniconda3/bin/python
+++ CONDA_PYTHON_EXE=/opt/miniconda3/bin/python
+++ . /opt/miniconda3/envs/testbed/etc/conda/activate.d/libglib_activate.sh
+2026-06-27 05:00:10,152 - INFO - +++ export GSETTINGS_SCHEMA_DIR_CONDA_BACKUP=
++++ GSETTINGS_SCHEMA_DIR_CONDA_BACKUP=
+2026-06-27 05:00:10,152 - INFO - +++ export GSETTINGS_SCHEMA_DIR=/opt/miniconda3/envs/testbed/share/glib-2.0/schemas
++++ GSETTINGS_SCHEMA_DIR=/opt/miniconda3/envs/testbed/share/glib-2.0/schemas
+2026-06-27 05:00:10,152 - INFO - ++ . /opt/miniconda3/envs/testbed/etc/conda/activate.d/libxml2-split_activate.sh
+2026-06-27 05:00:10,152 - INFO - +++ test -n ''
++++ xml_catalog_files_libxml2=
++++ XML_CATALOG_FILES=
+2026-06-27 05:00:10,152 - INFO - +++ conda_catalog_files=
++++ ifs_libxml2=' 	
+'
+2026-06-27 05:00:10,152 - INFO - +++ IFS=' '
+2026-06-27 05:00:10,153 - INFO - +++ rem=/opt/miniconda3/envs/testbed
+2026-06-27 05:00:10,153 - INFO - +++ for pre in ${rem}
+2026-06-27 05:00:10,153 - INFO - +++ test '' = /opt/miniconda3/envs/testbed
+2026-06-27 05:00:10,153 - INFO - +++ conda_catalog_files=/opt/miniconda3/envs/testbed
++++ rem=
+2026-06-27 05:00:10,153 - INFO - +++ IFS=' 	
+'
+2026-06-27 05:00:10,153 - INFO - +++ conda_catalog_files='file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog'
++++ export 'XML_CATALOG_FILES=file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog'
++++ XML_CATALOG_FILES='file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog'
+2026-06-27 05:00:10,153 - INFO - +++ unset conda_catalog_files ifs_libxml2 rem
+2026-06-27 05:00:10,153 - INFO - + __conda_hashr
+2026-06-27 05:00:10,153 - INFO - + '[' -n '' ']'
+2026-06-27 05:00:10,153 - INFO - + '[' -n '' ']'
++ hash -r
+2026-06-27 05:00:10,153 - INFO - + conda install python=3.11 -y
++ local cmd=install
++ case "$cmd" in
+2026-06-27 05:00:10,153 - INFO - + __conda_exe install python=3.11 -y
+2026-06-27 05:00:10,153 - INFO - + /opt/miniconda3/bin/conda install python=3.11 -y
+2026-06-27 05:00:11,362 - INFO - Channels:
+ - defaults
+ - conda-forge
+Platform: linux-64
+Collecting package metadata (repodata.json): ...working...
+2026-06-27 05:00:27,640 - INFO - done
+Solving environment: ...working...
+2026-06-27 05:00:40,958 - INFO - done
+2026-06-27 05:00:41,468 - INFO - ## Package Plan ##
+
+  environment location: /opt/miniconda3/envs/testbed
+
+  added / updated specs:
+    - python=3.11
+
+
+The following packages will be downloaded:
+
+    package                    |            build
+    ---------------------------|-----------------
+    backports.zstd-1.3.0       |  py311h89db63a_0         340 KB
+    blas-1.0                   |              mkl           6 KB
+    brotli-python-1.2.0        |  py311h3dd09e2_0         345 KB
+    certifi-2026.6.17          |  py311h06a4308_0         131 KB
+    cffi-2.0.0                 |  py311h4eded50_1         295 KB
+    contourpy-1.3.3            |  py311hdb19cb5_0        11.3 MB
+    coverage-7.13.4            |  py311h47b2149_0         564 KB
+    cpython-3.11.15            |  py311hd8ed1ab_1          47 KB  conda-forge
+    debugpy-1.8.16             |  py311hbdd6827_1         2.5 MB
+    docutils-0.21.2            |  py311h06a4308_1         922 KB
+    intel-openmp-2025.0.0      |    h06a4308_1172        19.3 MB
+    kiwisolver-1.4.9           |  py311h24d9097_0          76 KB
+    libblas-3.8.0              |11_h86c2bf4_netlib         194 KB  conda-forge
+    libcblas-3.8.0             |11_h86c2bf4_netlib          47 KB  conda-forge
+    libgfortran-ng-15.2.0      |      h69a702a_19          27 KB  conda-forge
+    libhwloc-2.12.1            |default_hafda6a7_1003         2.3 MB  conda-forge
+    liblapack-3.8.0            |11_h86c2bf4_netlib         2.9 MB  conda-forge
+    libnsl-2.0.1               |       hb9d3cd8_1          33 KB  conda-forge
+    markupsafe-3.0.3           |  py311h47b2149_0          28 KB
+    mkl-2025.0.0               |     h6d8faa4_942       113.4 MB
+    mkl-service-2.7.2          |  py311h365c7f6_0          75 KB
+    mkl_fft-2.2.0              |  py311h44c8d7b_0         182 KB
+    mkl_random-1.4.1           |  py311h86c3e14_0         393 KB
+    numpy-2.4.6                |  py311h4c24699_0          20 KB
+    numpy-base-2.4.6           |  py311h00548fb_0         8.6 MB
+    pandas-3.0.3               |  py311h86c3e14_0        14.2 MB
+    pillow-12.2.0              |  py311hf88fc01_0         1.0 MB  conda-forge
+    pip-26.1.2                 |     pyhc872135_0         1.1 MB
+    psutil-7.0.0               |  py311hee96239_1         547 KB
+    pycairo-1.29.0             |  py311h87a1573_0         127 KB
+    pygobject-3.56.3           |  py311h16ae287_0         436 KB  conda-forge
+    pyqt-5.15.11               |  py311h144e999_0         5.0 MB
+    pyqt5-sip-12.17.0          |  py311hee96239_0          83 KB
+    python-3.11.15             |h7508c33_1_cpython        29.5 MB  conda-forge
+    python-gil-3.11.15         |       hd8ed1ab_1          47 KB  conda-forge
+    python_abi-3.11            |          3_cp311           6 KB
+    pytokens-0.4.1             |  py311h47b2149_0         240 KB
+    pyyaml-6.0.3               |  py311h591646f_0         252 KB
+    pyzmq-27.1.0               |  py311hcf8288c_1         383 KB
+    roman-numerals-py-3.1.0    |  py311h06a4308_0          17 KB
+    rpds-py-0.28.0             |  py311h498d7c9_0         338 KB
+    sip-6.12.0                 |  py311h7934f7d_0         713 KB
+    sphinx-8.2.3               |  py311h893fd2c_1         3.0 MB
+    tbb-2022.3.0               |       h698db13_0         181 KB
+    tbb-devel-2022.3.0         |       h698db13_0         1.1 MB
+    tornado-6.5.7              |  py311h47b2149_0         863 KB
+    ukkonen-1.1.0              |  py311h24d9097_0          13 KB
+    unicodedata2-16.0.0        |  py311hee96239_0         397 KB
+    wheel-0.47.0               |  py311h06a4308_0          75 KB
+    wxpython-4.2.4             |  py311h03de2dd_0        14.0 MB  conda-forge
+    xorg-xorgproto-2024.1      |       h47b2149_2         550 KB
+    ------------------------------------------------------------
+                                           Total:       238.0 MB
+
+The following NEW packages will be INSTALLED:
+
+  blas               pkgs/main/linux-64::blas-1.0-mkl 
+  intel-openmp       pkgs/main/linux-64::intel-openmp-2025.0.0-h06a4308_1172 
+  libgfortran-ng     conda-forge/linux-64::libgfortran-ng-15.2.0-h69a702a_19 
+  libhwloc           conda-forge/linux-64::libhwloc-2.12.1-default_hafda6a7_1003 
+  libnsl             conda-forge/linux-64::libnsl-2.0.1-hb9d3cd8_1 
+  mkl                pkgs/main/linux-64::mkl-2025.0.0-h6d8faa4_942 
+  mkl-service        pkgs/main/linux-64::mkl-service-2.7.2-py311h365c7f6_0 
+  mkl_fft            pkgs/main/linux-64::mkl_fft-2.2.0-py311h44c8d7b_0 
+  mkl_random         pkgs/main/linux-64::mkl_random-1.4.1-py311h86c3e14_0 
+  numpy-base         pkgs/main/linux-64::numpy-base-2.4.6-py311h00548fb_0 
+  roman-numerals-py  pkgs/main/linux-64::roman-numerals-py-3.1.0-py311h06a4308_0 
+  tbb                pkgs/main/linux-64::tbb-2022.3.0-h698db13_0 
+  tbb-devel          pkgs/main/linux-64::tbb-devel-2022.3.0-h698db13_0 
+  wheel              pkgs/main/linux-64::wheel-0.47.0-py311h06a4308_0 
+
+The following packages will be UPDATED:
+
+  sip                conda-forge::sip-6.10.0-py314ha160325~ --> pkgs/main::sip-6.12.0-py311h7934f7d_0 
+
+The following packages will be SUPERSEDED by a higher-priority channel:
+
+  backports.zstd     conda-forge/noarch::backports.zstd-1.~ --> pkgs/main/linux-64::backports.zstd-1.3.0-py311h89db63a_0 
+  brotli-python      conda-forge::brotli-python-1.2.0-py31~ --> pkgs/main::brotli-python-1.2.0-py311h3dd09e2_0 
+  certifi            conda-forge/noarch::certifi-2026.6.17~ --> pkgs/main/linux-64::certifi-2026.6.17-py311h06a4308_0 
+  cffi               conda-forge::cffi-2.0.0-py314h4a8dc5f~ --> pkgs/main::cffi-2.0.0-py311h4eded50_1 
+  contourpy          conda-forge::contourpy-1.3.3-py314h97~ --> pkgs/main::contourpy-1.3.3-py311hdb19cb5_0 
+  coverage           conda-forge::coverage-7.14.3-py314h67~ --> pkgs/main::coverage-7.13.4-py311h47b2149_0 
+  debugpy            conda-forge::debugpy-1.8.21-py314h428~ --> pkgs/main::debugpy-1.8.16-py311hbdd6827_1 
+  docutils           conda-forge/noarch::docutils-0.22.4-p~ --> pkgs/main/linux-64::docutils-0.21.2-py311h06a4308_1 
+  kiwisolver         conda-forge::kiwisolver-1.5.0-py314h9~ --> pkgs/main::kiwisolver-1.4.9-py311h24d9097_0 
+  markupsafe         conda-forge::markupsafe-3.0.3-py314h6~ --> pkgs/main::markupsafe-3.0.3-py311h47b2149_0 
+  numpy              conda-forge::numpy-2.5.0-py314h2b2814~ --> pkgs/main::numpy-2.4.6-py311h4c24699_0 
+  pandas             conda-forge::pandas-3.0.3-py314hb4ffa~ --> pkgs/main::pandas-3.0.3-py311h86c3e14_0 
+  pip                  conda-forge::pip-26.1.2-pyh145f28c_0 --> pkgs/main::pip-26.1.2-pyhc872135_0 
+  psutil             conda-forge::psutil-7.2.2-py314h0f051~ --> pkgs/main::psutil-7.0.0-py311hee96239_1 
+  pycairo            conda-forge::pycairo-1.29.0-py314h9cd~ --> pkgs/main::pycairo-1.29.0-py311h87a1573_0 
+  pyqt               conda-forge::pyqt-5.15.11-py314h92491~ --> pkgs/main::pyqt-5.15.11-py311h144e999_0 
+  pyqt5-sip          conda-forge::pyqt5-sip-12.17.0-py314h~ --> pkgs/main::pyqt5-sip-12.17.0-py311hee96239_0 
+  python_abi         conda-forge/noarch::python_abi-3.14-8~ --> pkgs/main/linux-64::python_abi-3.11-3_cp311 
+  pytokens           conda-forge::pytokens-0.4.1-py314h0f0~ --> pkgs/main::pytokens-0.4.1-py311h47b2149_0 
+  pyyaml             conda-forge::pyyaml-6.0.3-py314h67df5~ --> pkgs/main::pyyaml-6.0.3-py311h591646f_0 
+  pyzmq              conda-forge::pyzmq-27.1.0-py312hda471~ --> pkgs/main::pyzmq-27.1.0-py311hcf8288c_1 
+  rpds-py            conda-forge::rpds-py-2026.5.1-py314h1~ --> pkgs/main::rpds-py-0.28.0-py311h498d7c9_0 
+  sphinx             conda-forge/noarch::sphinx-9.1.0-pyhd~ --> pkgs/main/linux-64::sphinx-8.2.3-py311h893fd2c_1 
+  tornado            conda-forge::tornado-6.5.7-py314h5bd0~ --> pkgs/main::tornado-6.5.7-py311h47b2149_0 
+  ukkonen            conda-forge::ukkonen-1.1.0-py314h9891~ --> pkgs/main::ukkonen-1.1.0-py311h24d9097_0 
+  unicodedata2       conda-forge::unicodedata2-17.0.1-py31~ --> pkgs/main::unicodedata2-16.0.0-py311hee96239_0 
+  xorg-xorgproto     conda-forge::xorg-xorgproto-2025.1-hb~ --> pkgs/main::xorg-xorgproto-2024.1-h47b2149_2 
+
+The following packages will be DOWNGRADED:
+
+  cpython                          3.14.6-py314hd8ed1ab_100 --> 3.11.15-py311hd8ed1ab_1 
+  libblas                        3.11.0-8_h4a7cf45_openblas --> 3.8.0-11_h86c2bf4_netlib 
+  libcblas                       3.11.0-8_h0358290_openblas --> 3.8.0-11_h86c2bf4_netlib 
+  liblapack                      3.11.0-8_h47877c9_openblas --> 3.8.0-11_h86c2bf4_netlib 
+  pillow                             12.2.0-py314h8ec4b1a_0 --> 12.2.0-py311hf88fc01_0 
+  pygobject                          3.56.3-py314h4bbdf5d_0 --> 3.56.3-py311h16ae287_0 
+  python                          3.14.6-habeac84_100_cp314 --> 3.11.15-h7508c33_1_cpython 
+  python-gil                            3.14.6-h4df99d1_100 --> 3.11.15-hd8ed1ab_1 
+  wxpython                            4.2.4-py314h98695b7_0 --> 4.2.4-py311h03de2dd_0
+2026-06-27 05:00:47,745 - INFO - Downloading and Extracting Packages: ...working... done
+Preparing transaction: ...working...
+2026-06-27 05:00:48,281 - INFO - done
+Verifying transaction: ...working...
+2026-06-27 05:00:49,653 - INFO - done
+2026-06-27 05:00:49,655 - INFO - Executing transaction: ...working...
+2026-06-27 05:00:54,882 - INFO - done
+2026-06-27 05:00:56,370 - INFO - + __conda_reactivate
++ local ask_conda
+2026-06-27 05:00:56,370 - INFO - ++ PS1='(testbed) '
+++ __conda_exe shell.posix reactivate
+2026-06-27 05:00:56,370 - INFO - ++ /opt/miniconda3/bin/conda shell.posix reactivate
+2026-06-27 05:00:56,436 - INFO - + ask_conda='. "/opt/miniconda3/envs/testbed/etc/conda/deactivate.d/libglib_deactivate.sh"
+PS1='\''(testbed) '\''
+export PATH='\''/opt/miniconda3/envs/testbed/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'\''
+export CONDA_SHLVL='\''2'\''
+export CONDA_PROMPT_MODIFIER='\''(testbed) '\''
+. "/opt/miniconda3/envs/testbed/etc/conda/activate.d/libglib_activate.sh"
+. "/opt/miniconda3/envs/testbed/etc/conda/activate.d/libxml2-split_activate.sh"'
++ eval '. "/opt/miniconda3/envs/testbed/etc/conda/deactivate.d/libglib_deactivate.sh"
+PS1='\''(testbed) '\''
+export PATH='\''/opt/miniconda3/envs/testbed/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'\''
+export CONDA_SHLVL='\''2'\''
+export CONDA_PROMPT_MODIFIER='\''(testbed) '\''
+. "/opt/miniconda3/envs/testbed/etc/conda/activate.d/libglib_activate.sh"
+. "/opt/miniconda3/envs/testbed/etc/conda/activate.d/libxml2-split_activate.sh"'
+++ . /opt/miniconda3/envs/testbed/etc/conda/deactivate.d/libglib_deactivate.sh
+2026-06-27 05:00:56,436 - INFO - +++ export GSETTINGS_SCHEMA_DIR=
++++ GSETTINGS_SCHEMA_DIR=
++++ unset GSETTINGS_SCHEMA_DIR_CONDA_BACKUP
++++ '[' -z ']'
++++ unset GSETTINGS_SCHEMA_DIR
+++ PS1='(testbed) '
+++ export PATH=/opt/miniconda3/envs/testbed/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ PATH=/opt/miniconda3/envs/testbed/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ export CONDA_SHLVL=2
+++ CONDA_SHLVL=2
+2026-06-27 05:00:56,436 - INFO - ++ export 'CONDA_PROMPT_MODIFIER=(testbed) '
+++ CONDA_PROMPT_MODIFIER='(testbed) '
+2026-06-27 05:00:56,436 - INFO - ++ . /opt/miniconda3/envs/testbed/etc/conda/activate.d/libglib_activate.sh
+2026-06-27 05:00:56,436 - INFO - +++ export GSETTINGS_SCHEMA_DIR_CONDA_BACKUP=
++++ GSETTINGS_SCHEMA_DIR_CONDA_BACKUP=
++++ export GSETTINGS_SCHEMA_DIR=/opt/miniconda3/envs/testbed/share/glib-2.0/schemas
++++ GSETTINGS_SCHEMA_DIR=/opt/miniconda3/envs/testbed/share/glib-2.0/schemas
+++ . /opt/miniconda3/envs/testbed/etc/conda/activate.d/libxml2-split_activate.sh
++++ test -n 'file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog'
+2026-06-27 05:00:56,436 - INFO - +++ xml_catalog_files_libxml2='file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog'
++++ XML_CATALOG_FILES='file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog '
+2026-06-27 05:00:56,436 - INFO - +++ conda_catalog_files=
+2026-06-27 05:00:56,436 - INFO - +++ ifs_libxml2=' 	
+'
++++ IFS=' '
+2026-06-27 05:00:56,436 - INFO - +++ rem=/opt/miniconda3/envs/testbed
+2026-06-27 05:00:56,436 - INFO - +++ for pre in ${rem}
++++ test '' = /opt/miniconda3/envs/testbed
+2026-06-27 05:00:56,436 - INFO - +++ conda_catalog_files=/opt/miniconda3/envs/testbed
++++ rem=
+2026-06-27 05:00:56,436 - INFO - +++ IFS=' 	
+'
++++ conda_catalog_files='file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog'
+2026-06-27 05:00:56,436 - INFO - +++ export 'XML_CATALOG_FILES=file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog'
++++ XML_CATALOG_FILES='file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog'
++++ unset conda_catalog_files ifs_libxml2 rem
+2026-06-27 05:00:56,436 - INFO - + __conda_hashr
++ '[' -n '' ']'
++ '[' -n '' ']'
++ hash -r
++ rm environment.yml
+2026-06-27 05:00:56,437 - INFO - + conda activate testbed
++ local cmd=activate
++ case "$cmd" in
++ __conda_activate activate testbed
++ '[' -n '' ']'
++ local ask_conda
+2026-06-27 05:00:56,437 - INFO - ++ PS1='(testbed) '
+++ __conda_exe shell.posix activate testbed
+2026-06-27 05:00:56,437 - INFO - ++ /opt/miniconda3/bin/conda shell.posix activate testbed
+2026-06-27 05:00:56,501 - INFO - + ask_conda='. "/opt/miniconda3/envs/testbed/etc/conda/deactivate.d/libglib_deactivate.sh"
+PS1='\''(testbed) '\''
+export PATH='\''/opt/miniconda3/envs/testbed/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'\''
+export CONDA_SHLVL='\''2'\''
+export CONDA_PROMPT_MODIFIER='\''(testbed) '\''
+. "/opt/miniconda3/envs/testbed/etc/conda/activate.d/libglib_activate.sh"
+. "/opt/miniconda3/envs/testbed/etc/conda/activate.d/libxml2-split_activate.sh"'
++ eval '. "/opt/miniconda3/envs/testbed/etc/conda/deactivate.d/libglib_deactivate.sh"
+PS1='\''(testbed) '\''
+export PATH='\''/opt/miniconda3/envs/testbed/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'\''
+export CONDA_SHLVL='\''2'\''
+export CONDA_PROMPT_MODIFIER='\''(testbed) '\''
+. "/opt/miniconda3/envs/testbed/etc/conda/activate.d/libglib_activate.sh"
+. "/opt/miniconda3/envs/testbed/etc/conda/activate.d/libxml2-split_activate.sh"'
+++ . /opt/miniconda3/envs/testbed/etc/conda/deactivate.d/libglib_deactivate.sh
++++ export GSETTINGS_SCHEMA_DIR=
++++ GSETTINGS_SCHEMA_DIR=
++++ unset GSETTINGS_SCHEMA_DIR_CONDA_BACKUP
+2026-06-27 05:00:56,501 - INFO - +++ '[' -z ']'
++++ unset GSETTINGS_SCHEMA_DIR
+++ PS1='(testbed) '
+++ export PATH=/opt/miniconda3/envs/testbed/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ PATH=/opt/miniconda3/envs/testbed/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ export CONDA_SHLVL=2
+++ CONDA_SHLVL=2
+++ export 'CONDA_PROMPT_MODIFIER=(testbed) '
+++ CONDA_PROMPT_MODIFIER='(testbed) '
+2026-06-27 05:00:56,501 - INFO - ++ . /opt/miniconda3/envs/testbed/etc/conda/activate.d/libglib_activate.sh
++++ export GSETTINGS_SCHEMA_DIR_CONDA_BACKUP=
++++ GSETTINGS_SCHEMA_DIR_CONDA_BACKUP=
++++ export GSETTINGS_SCHEMA_DIR=/opt/miniconda3/envs/testbed/share/glib-2.0/schemas
++++ GSETTINGS_SCHEMA_DIR=/opt/miniconda3/envs/testbed/share/glib-2.0/schemas
+2026-06-27 05:00:56,501 - INFO - ++ . /opt/miniconda3/envs/testbed/etc/conda/activate.d/libxml2-split_activate.sh
++++ test -n 'file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog'
+2026-06-27 05:00:56,501 - INFO - +++ xml_catalog_files_libxml2='file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog'
++++ XML_CATALOG_FILES='file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog '
+2026-06-27 05:00:56,502 - INFO - +++ conda_catalog_files=
+2026-06-27 05:00:56,502 - INFO - +++ ifs_libxml2=' 	
+'
++++ IFS=' '
+2026-06-27 05:00:56,502 - INFO - +++ rem=/opt/miniconda3/envs/testbed
+2026-06-27 05:00:56,502 - INFO - +++ for pre in ${rem}
+2026-06-27 05:00:56,502 - INFO - +++ test '' = /opt/miniconda3/envs/testbed
++++ conda_catalog_files=/opt/miniconda3/envs/testbed
+2026-06-27 05:00:56,502 - INFO - +++ rem=
++++ IFS=' 	
+'
+2026-06-27 05:00:56,502 - INFO - +++ conda_catalog_files='file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog'
+2026-06-27 05:00:56,502 - INFO - +++ export 'XML_CATALOG_FILES=file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog'
++++ XML_CATALOG_FILES='file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog file:///opt/miniconda3/envs/testbed/etc/xml/catalog file:///etc/xml/catalog'
++++ unset conda_catalog_files ifs_libxml2 rem
+2026-06-27 05:00:56,502 - INFO - + __conda_hashr
++ '[' -n '' ']'
+2026-06-27 05:00:56,502 - INFO - + '[' -n '' ']'
++ hash -r
+2026-06-27 05:00:56,502 - INFO - + python -m pip install contourpy==1.1.0 cycler==0.11.0 fonttools==4.42.1 ghostscript kiwisolver==1.4.5 numpy==1.25.2 packaging==23.1 pillow==10.0.0 pikepdf pyparsing==3.0.9 python-dateutil==2.8.2 six==1.16.0 setuptools==68.1.2 setuptools-scm==7.1.0 typing-extensions==4.7.1
+2026-06-27 05:00:56,748 - INFO - Collecting contourpy==1.1.0
+2026-06-27 05:00:56,787 - INFO - Downloading contourpy-1.1.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (5.7 kB)
+2026-06-27 05:00:56,808 - INFO - Collecting cycler==0.11.0
+2026-06-27 05:00:56,815 - INFO - Downloading cycler-0.11.0-py3-none-any.whl.metadata (785 bytes)
+2026-06-27 05:00:56,899 - INFO - Collecting fonttools==4.42.1
+2026-06-27 05:00:56,917 - INFO - Downloading fonttools-4.42.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (150 kB)
+2026-06-27 05:00:56,957 - INFO - Collecting ghostscript
+2026-06-27 05:00:56,963 - INFO - Downloading ghostscript-0.8.1-py3-none-any.whl.metadata (4.4 kB)
+2026-06-27 05:00:57,018 - INFO - Collecting kiwisolver==1.4.5
+2026-06-27 05:00:57,025 - INFO - Downloading kiwisolver-1.4.5-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.4 kB)
+2026-06-27 05:00:57,131 - INFO - Collecting numpy==1.25.2
+2026-06-27 05:00:57,138 - INFO - Downloading numpy-1.25.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (5.6 kB)
+2026-06-27 05:00:57,157 - INFO - Collecting packaging==23.1
+2026-06-27 05:00:57,163 - INFO - Downloading packaging-23.1-py3-none-any.whl.metadata (3.1 kB)
+2026-06-27 05:00:57,260 - INFO - Collecting pillow==10.0.0
+2026-06-27 05:00:57,266 - INFO - Downloading Pillow-10.0.0-cp311-cp311-manylinux_2_28_x86_64.whl.metadata (9.5 kB)
+2026-06-27 05:00:57,434 - INFO - Collecting pikepdf
+2026-06-27 05:00:57,443 - INFO - Downloading pikepdf-10.9.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (10 kB)
+2026-06-27 05:00:57,470 - INFO - Collecting pyparsing==3.0.9
+2026-06-27 05:00:57,476 - INFO - Downloading pyparsing-3.0.9-py3-none-any.whl.metadata (4.2 kB)
+2026-06-27 05:00:57,497 - INFO - Collecting python-dateutil==2.8.2
+2026-06-27 05:00:57,503 - INFO - Downloading python_dateutil-2.8.2-py2.py3-none-any.whl.metadata (8.2 kB)
+2026-06-27 05:00:57,524 - INFO - Collecting six==1.16.0
+2026-06-27 05:00:57,532 - INFO - Downloading six-1.16.0-py2.py3-none-any.whl.metadata (1.8 kB)
+2026-06-27 05:00:57,573 - INFO - Collecting setuptools==68.1.2
+2026-06-27 05:00:57,579 - INFO - Downloading setuptools-68.1.2-py3-none-any.whl.metadata (6.2 kB)
+2026-06-27 05:00:57,603 - INFO - Collecting setuptools-scm==7.1.0
+2026-06-27 05:00:57,608 - INFO - Downloading setuptools_scm-7.1.0-py3-none-any.whl.metadata (24 kB)
+2026-06-27 05:00:57,628 - INFO - Collecting typing-extensions==4.7.1
+2026-06-27 05:00:57,635 - INFO - Downloading typing_extensions-4.7.1-py3-none-any.whl.metadata (3.1 kB)
+2026-06-27 05:00:57,644 - INFO - INFO: pip is looking at multiple versions of pikepdf to determine which version is compatible with other requirements. This could take a while.
+2026-06-27 05:00:57,644 - INFO - Collecting pikepdf
+2026-06-27 05:00:57,650 - INFO - Downloading pikepdf-10.9.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (10 kB)
+2026-06-27 05:00:57,662 - INFO - Downloading pikepdf-10.8.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (10 kB)
+2026-06-27 05:00:57,674 - INFO - Downloading pikepdf-10.7.3-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (10 kB)
+2026-06-27 05:00:57,688 - INFO - Downloading pikepdf-10.7.2-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (10 kB)
+2026-06-27 05:00:57,705 - INFO - Downloading pikepdf-10.7.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (10 kB)
+2026-06-27 05:00:57,718 - INFO - Downloading pikepdf-10.6.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (11 kB)
+2026-06-27 05:00:57,733 - INFO - Downloading pikepdf-10.5.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (11 kB)
+2026-06-27 05:00:57,741 - INFO - INFO: pip is still looking at multiple versions of pikepdf to determine which version is compatible with other requirements. This could take a while.
+2026-06-27 05:00:57,747 - INFO - Downloading pikepdf-10.5.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (11 kB)
+2026-06-27 05:00:57,762 - INFO - Downloading pikepdf-10.3.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (8.4 kB)
+2026-06-27 05:00:57,778 - INFO - Downloading pikepdf-10.2.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (8.3 kB)
+2026-06-27 05:00:57,792 - INFO - Downloading pikepdf-10.1.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (8.3 kB)
+2026-06-27 05:00:57,809 - INFO - Downloading pikepdf-10.0.3-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (8.3 kB)
+2026-06-27 05:00:57,815 - INFO - INFO: This is taking longer than usual. You might need to provide the dependency resolver with stricter constraints to reduce runtime. See https://pip.pypa.io/warnings/backtracking for guidance. If you want to abort this run, press Ctrl + C.
+2026-06-27 05:00:57,823 - INFO - Downloading pikepdf-10.0.2-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (8.3 kB)
+2026-06-27 05:00:57,834 - INFO - Downloading pikepdf-10.0.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (8.3 kB)
+2026-06-27 05:00:57,847 - INFO - Downloading pikepdf-10.0.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (8.3 kB)
+2026-06-27 05:00:57,860 - INFO - Downloading pikepdf-9.11.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (8.2 kB)
+2026-06-27 05:00:57,874 - INFO - Downloading pikepdf-9.10.2-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (8.1 kB)
+2026-06-27 05:00:57,890 - INFO - Downloading pikepdf-9.10.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (8.1 kB)
+2026-06-27 05:00:57,905 - INFO - Downloading pikepdf-9.10.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (8.1 kB)
+2026-06-27 05:00:57,921 - INFO - Downloading pikepdf-9.9.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (8.1 kB)
+2026-06-27 05:00:57,939 - INFO - Downloading pikepdf-9.8.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.2 kB)
+2026-06-27 05:00:57,954 - INFO - Downloading pikepdf-9.8.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.2 kB)
+2026-06-27 05:00:57,970 - INFO - Downloading pikepdf-9.7.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.1 kB)
+2026-06-27 05:00:57,985 - INFO - Downloading pikepdf-9.6.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.1 kB)
+2026-06-27 05:00:57,999 - INFO - Downloading pikepdf-9.5.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.1 kB)
+2026-06-27 05:00:58,016 - INFO - Downloading pikepdf-9.5.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.1 kB)
+2026-06-27 05:00:58,035 - INFO - Downloading pikepdf-9.5.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.1 kB)
+2026-06-27 05:00:58,050 - INFO - Downloading pikepdf-9.4.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.2 kB)
+2026-06-27 05:00:58,066 - INFO - Downloading pikepdf-9.4.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.2 kB)
+2026-06-27 05:00:58,081 - INFO - Downloading pikepdf-9.4.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.2 kB)
+2026-06-27 05:00:58,096 - INFO - Downloading pikepdf-9.3.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.2 kB)
+2026-06-27 05:00:58,114 - INFO - Downloading pikepdf-9.2.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.2 kB)
+2026-06-27 05:00:58,136 - INFO - Downloading pikepdf-9.2.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.1 kB)
+2026-06-27 05:00:58,185 - INFO - Downloading pikepdf-9.1.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.1 kB)
+2026-06-27 05:00:58,231 - INFO - Downloading pikepdf-9.1.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.1 kB)
+2026-06-27 05:00:58,252 - INFO - Downloading pikepdf-9.1.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.2 kB)
+2026-06-27 05:00:58,271 - INFO - Downloading pikepdf-9.0.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.5 kB)
+2026-06-27 05:00:58,284 - INFO - Downloading pikepdf-8.15.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.5 kB)
+2026-06-27 05:00:58,299 - INFO - Downloading pikepdf-8.15.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.5 kB)
+2026-06-27 05:00:58,315 - INFO - Downloading pikepdf-8.14.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.6 kB)
+2026-06-27 05:00:58,328 - INFO - Downloading pikepdf-8.13.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.6 kB)
+2026-06-27 05:00:58,341 - INFO - Downloading pikepdf-8.12.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.6 kB)
+2026-06-27 05:00:58,355 - INFO - Downloading pikepdf-8.11.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.6 kB)
+2026-06-27 05:00:58,370 - INFO - Downloading pikepdf-8.11.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.6 kB)
+2026-06-27 05:00:58,386 - INFO - Downloading pikepdf-8.11.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.5 kB)
+2026-06-27 05:00:58,398 - INFO - Downloading pikepdf-8.10.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.5 kB)
+2026-06-27 05:00:58,410 - INFO - Downloading pikepdf-8.10.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.5 kB)
+2026-06-27 05:00:58,422 - INFO - Downloading pikepdf-8.9.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.5 kB)
+2026-06-27 05:00:58,434 - INFO - Downloading pikepdf-8.8.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.6 kB)
+2026-06-27 05:00:58,449 - INFO - Downloading pikepdf-8.7.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.6 kB)
+2026-06-27 05:00:58,465 - INFO - Downloading pikepdf-8.7.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.6 kB)
+2026-06-27 05:00:58,482 - INFO - Downloading pikepdf-8.6.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.6 kB)
+2026-06-27 05:00:58,495 - INFO - Downloading pikepdf-8.5.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.6 kB)
+2026-06-27 05:00:58,510 - INFO - Downloading pikepdf-8.5.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.6 kB)
+2026-06-27 05:00:58,523 - INFO - Downloading pikepdf-8.5.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.6 kB)
+2026-06-27 05:00:58,538 - INFO - Downloading pikepdf-8.5.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.6 kB)
+2026-06-27 05:00:58,554 - INFO - Downloading pikepdf-8.4.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.7 kB)
+2026-06-27 05:00:58,573 - INFO - Collecting deprecation (from pikepdf)
+2026-06-27 05:00:58,579 - INFO - Downloading deprecation-2.1.0-py2.py3-none-any.whl.metadata (4.6 kB)
+2026-06-27 05:00:58,763 - INFO - Collecting lxml>=4.8 (from pikepdf)
+2026-06-27 05:00:58,769 - INFO - Downloading lxml-6.1.1-cp311-cp311-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl.metadata (3.5 kB)
+2026-06-27 05:00:58,786 - INFO - Downloading contourpy-1.1.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (300 kB)
+2026-06-27 05:00:58,811 - INFO - Downloading cycler-0.11.0-py3-none-any.whl (6.4 kB)
+2026-06-27 05:00:58,853 - INFO - Downloading fonttools-4.42.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (4.9 MB)
+2026-06-27 05:00:59,077 - INFO - ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.9/4.9 MB 22.0 MB/s  0:00:00
+2026-06-27 05:00:59,077 - INFO - 
+2026-06-27 05:00:59,084 - INFO - Downloading kiwisolver-1.4.5-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (1.4 MB)
+2026-06-27 05:00:59,140 - INFO - ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.4/1.4 MB 25.9 MB/s  0:00:00
+2026-06-27 05:00:59,140 - INFO - 
+2026-06-27 05:00:59,148 - INFO - Downloading numpy-1.25.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (18.2 MB)
+2026-06-27 05:01:00,112 - INFO - ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 18.2/18.2 MB 18.8 MB/s  0:00:00
+2026-06-27 05:01:00,112 - INFO - 
+2026-06-27 05:01:00,119 - INFO - Downloading packaging-23.1-py3-none-any.whl (48 kB)
+2026-06-27 05:01:00,136 - INFO - Downloading Pillow-10.0.0-cp311-cp311-manylinux_2_28_x86_64.whl (3.4 MB)
+2026-06-27 05:01:00,209 - INFO - ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.4/3.4 MB 47.7 MB/s  0:00:00
+2026-06-27 05:01:00,217 - INFO - Downloading pyparsing-3.0.9-py3-none-any.whl (98 kB)
+2026-06-27 05:01:00,231 - INFO - Downloading python_dateutil-2.8.2-py2.py3-none-any.whl (247 kB)
+2026-06-27 05:01:00,247 - INFO - Downloading six-1.16.0-py2.py3-none-any.whl (11 kB)
+2026-06-27 05:01:00,263 - INFO - Downloading setuptools-68.1.2-py3-none-any.whl (805 kB)
+2026-06-27 05:01:00,284 - INFO - ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 805.1/805.1 kB 34.3 MB/s  0:00:00
+2026-06-27 05:01:00,284 - INFO - 
+2026-06-27 05:01:00,292 - INFO - Downloading setuptools_scm-7.1.0-py3-none-any.whl (43 kB)
+2026-06-27 05:01:00,305 - INFO - Downloading typing_extensions-4.7.1-py3-none-any.whl (33 kB)
+2026-06-27 05:01:00,320 - INFO - Downloading ghostscript-0.8.1-py3-none-any.whl (25 kB)
+2026-06-27 05:01:00,359 - INFO - Downloading pikepdf-8.4.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.3 MB)
+2026-06-27 05:01:00,408 - INFO - ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.3/2.3 MB 46.7 MB/s  0:00:00
+2026-06-27 05:01:00,408 - INFO - 
+2026-06-27 05:01:00,415 - INFO - Downloading lxml-6.1.1-cp311-cp311-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl (5.2 MB)
+2026-06-27 05:01:00,838 - INFO - ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.2/5.2 MB 11.8 MB/s  0:00:00
+2026-06-27 05:01:00,839 - INFO - 
+2026-06-27 05:01:00,846 - INFO - Downloading deprecation-2.1.0-py2.py3-none-any.whl (11 kB)
+2026-06-27 05:01:00,975 - INFO - Installing collected packages: ghostscript, typing-extensions, six, setuptools, pyparsing, pillow, packaging, numpy, lxml, kiwisolver, fonttools, cycler, setuptools-scm, python-dateutil, deprecation, contourpy, pikepdf
+2026-06-27 05:01:00,987 - INFO - Attempting uninstall: typing-extensions
+2026-06-27 05:01:00,988 - INFO - Found existing installation: typing_extensions 4.15.0
+2026-06-27 05:01:00,989 - INFO - Uninstalling typing_extensions-4.15.0:
+2026-06-27 05:01:01,059 - INFO - Successfully uninstalled typing_extensions-4.15.0
+2026-06-27 05:01:01,073 - INFO - Attempting uninstall: six
+2026-06-27 05:01:01,074 - INFO - Found existing installation: six 1.17.0
+2026-06-27 05:01:01,075 - INFO - Uninstalling six-1.17.0:
+2026-06-27 05:01:01,145 - INFO - Successfully uninstalled six-1.17.0
+2026-06-27 05:01:01,157 - INFO - Attempting uninstall: setuptools
+2026-06-27 05:01:01,159 - INFO - Found existing installation: setuptools 82.0.1
+2026-06-27 05:01:01,160 - INFO - Uninstalling setuptools-82.0.1:
+2026-06-27 05:01:01,228 - INFO - Successfully uninstalled setuptools-82.0.1
+2026-06-27 05:01:01,472 - INFO - Attempting uninstall: pyparsing
+2026-06-27 05:01:01,474 - INFO - Found existing installation: pyparsing 3.3.2
+2026-06-27 05:01:01,476 - INFO - Uninstalling pyparsing-3.3.2:
+2026-06-27 05:01:01,476 - INFO - Successfully uninstalled pyparsing-3.3.2
+2026-06-27 05:01:01,512 - INFO - Attempting uninstall: pillow
+2026-06-27 05:01:01,513 - INFO - Found existing installation: pillow 12.2.0
+2026-06-27 05:01:01,518 - INFO - Uninstalling pillow-12.2.0:
+2026-06-27 05:01:01,518 - INFO - Successfully uninstalled pillow-12.2.0
+2026-06-27 05:01:01,656 - INFO - Attempting uninstall: packaging
+2026-06-27 05:01:01,657 - INFO - Found existing installation: packaging 26.2
+2026-06-27 05:01:01,659 - INFO - Uninstalling packaging-26.2:
+2026-06-27 05:01:01,660 - INFO - Successfully uninstalled packaging-26.2
+2026-06-27 05:01:01,677 - INFO - Attempting uninstall: numpy
+2026-06-27 05:01:01,679 - INFO - Found existing installation: numpy 2.4.6
+2026-06-27 05:01:01,706 - INFO - Uninstalling numpy-2.4.6:
+2026-06-27 05:01:01,713 - INFO - Successfully uninstalled numpy-2.4.6
+2026-06-27 05:01:02,873 - INFO - Attempting uninstall: kiwisolver
+2026-06-27 05:01:02,876 - INFO - Found existing installation: kiwisolver 1.4.9
+2026-06-27 05:01:02,878 - INFO - Uninstalling kiwisolver-1.4.9:
+2026-06-27 05:01:02,878 - INFO - Successfully uninstalled kiwisolver-1.4.9
+2026-06-27 05:01:02,905 - INFO - Attempting uninstall: fonttools
+2026-06-27 05:01:02,910 - INFO - Found existing installation: fonttools 4.63.0
+2026-06-27 05:01:02,939 - INFO - Uninstalling fonttools-4.63.0:
+2026-06-27 05:01:02,944 - INFO - Successfully uninstalled fonttools-4.63.0
+2026-06-27 05:01:03,445 - INFO - Attempting uninstall: cycler
+2026-06-27 05:01:03,446 - INFO - Found existing installation: cycler 0.12.1
+2026-06-27 05:01:03,447 - INFO - Uninstalling cycler-0.12.1:
+2026-06-27 05:01:03,448 - INFO - Successfully uninstalled cycler-0.12.1
+2026-06-27 05:01:03,456 - INFO - Attempting uninstall: setuptools-scm
+2026-06-27 05:01:03,459 - INFO - Found existing installation: setuptools-scm 10.2.0
+2026-06-27 05:01:03,462 - INFO - Uninstalling setuptools-scm-10.2.0:
+2026-06-27 05:01:03,464 - INFO - Successfully uninstalled setuptools-scm-10.2.0
+2026-06-27 05:01:03,488 - INFO - Attempting uninstall: python-dateutil
+2026-06-27 05:01:03,489 - INFO - Found existing installation: python-dateutil 2.9.0.post0
+2026-06-27 05:01:03,491 - INFO - Uninstalling python-dateutil-2.9.0.post0:
+2026-06-27 05:01:03,491 - INFO - Successfully uninstalled python-dateutil-2.9.0.post0
+2026-06-27 05:01:03,525 - INFO - Attempting uninstall: contourpy
+2026-06-27 05:01:03,527 - INFO - Found existing installation: contourpy 1.3.3
+2026-06-27 05:01:03,529 - INFO - Uninstalling contourpy-1.3.3:
+2026-06-27 05:01:03,529 - INFO - Successfully uninstalled contourpy-1.3.3
+2026-06-27 05:01:03,592 - INFO - 
+2026-06-27 05:01:03,592 - INFO - ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+sip 6.12.0 requires packaging>=24.2, but you have packaging 23.1 which is incompatible.
+sip 6.12.0 requires setuptools>=75.8.1, but you have setuptools 68.1.2 which is incompatible.
+wheel 0.47.0 requires packaging>=24.0, but you have packaging 23.1 which is incompatible.
+mkl-fft 2.2.0 requires numpy>=1.26.4, but you have numpy 1.25.2 which is incompatible.
+jupyter-client 8.9.1 requires typing-extensions>=4.13.0, but you have typing-extensions 4.7.1 which is incompatible.
+mkl-random 1.4.1 requires numpy>=1.26.4, but you have numpy 1.25.2 which is incompatible.
+pandas 3.0.3 requires numpy>=1.26.0; python_version < "3.14", but you have numpy 1.25.2 which is incompatible.
+2026-06-27 05:01:03,595 - INFO - Successfully installed contourpy-1.1.0 cycler-0.11.0 deprecation-2.1.0 fonttools-4.42.1 ghostscript-0.8.1 kiwisolver-1.4.5 lxml-6.1.1 numpy-1.25.2 packaging-23.1 pikepdf-8.4.1 pillow-10.0.0 pyparsing-3.0.9 python-dateutil-2.8.2 setuptools-68.1.2 setuptools-scm-7.1.0 six-1.16.0 typing-extensions-4.7.1
+2026-06-27 05:01:03,595 - INFO - WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+2026-06-27 05:03:30,923 - INFO - ---> Removed intermediate container 0d541751bf2a
+2026-06-27 05:03:30,923 - INFO - ---> 09ca89e79f64
+2026-06-27 05:03:30,923 - INFO - Step 6/7 : WORKDIR /testbed/
+2026-06-27 05:03:30,923 - INFO - 
+2026-06-27 05:03:32,244 - INFO - ---> Running in 96e6a4ae3d74
+2026-06-27 05:03:40,941 - INFO - ---> Removed intermediate container 96e6a4ae3d74
+2026-06-27 05:03:40,941 - INFO - ---> 7e3814304c46
+2026-06-27 05:03:40,941 - INFO - Step 7/7 : RUN echo "source /opt/miniconda3/etc/profile.d/conda.sh && conda activate testbed" > /root/.bashrc
+2026-06-27 05:03:40,941 - INFO - 
+2026-06-27 05:03:41,216 - INFO - ---> Running in b6532a6d28dd
+2026-06-27 05:03:50,694 - INFO - ---> Removed intermediate container b6532a6d28dd
+2026-06-27 05:03:50,694 - INFO - ---> 68aa2eb70473
+2026-06-27 05:03:50,712 - INFO - Successfully built 68aa2eb70473
+2026-06-27 05:03:50,805 - INFO - Successfully tagged sweb.env.py.x86_64.efa6065ed5bf204410fd53:latest
+2026-06-27 05:03:50,805 - INFO - Image built successfully!

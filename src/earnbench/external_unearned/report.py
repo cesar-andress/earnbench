@@ -20,6 +20,8 @@ RESULTS_REQUIRED_COLUMNS = (
     "failed_mechanisms",
 )
 
+EXTERNAL_UNEARNED_RESULTS_CSV = "external_unearned_results.csv"
+
 EXTERNAL_UNEARNED_REPORT_MD = "external_unearned_report.md"
 EXTERNAL_UNEARNED_SUMMARY_JSON = "external_unearned_summary.json"
 EXTERNAL_UNEARNED_JOIN_CSV = "external_unearned_join.csv"

@@ -1,0 +1,2 @@
+2026-06-27 19:24:40,690 - INFO - Environment image sweb.env.py.x86_64.502d8fc6ebccd881244091:latest found for pydata__xarray-3677
+Building instance image sweb.eval.x86_64.pydata__xarray-3677:latest for pydata__xarray-3677

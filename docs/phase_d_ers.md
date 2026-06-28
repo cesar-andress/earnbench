@@ -63,8 +63,8 @@ are re-graded. Failed, skipped, or empty-patch attempts are counted in
 OUTPUT/
 ├── run_manifest.json
 ├── phase_d_summary.json
-├── agent_results.csv          # input to report rank-stability
-├── failures.csv
+├── agent_results.csv          # one row per eligible attempt (always)
+├── failures.csv               # per-stage failure events
 └── cells/
     └── <agent>/
         └── <instance_id>/     # nominal + π artifacts + report.json
@@ -76,6 +76,9 @@ OUTPUT/
             └── report.json
 ```
 
+`phase_d_summary.json` includes `by_failure_reason` counts aggregated from
+`agent_results.csv`.
+
 When `replicate > 0`, cell workspaces live under `cells/<agent>/r<replicate>/`.
 
 ### `agent_results.csv`
@@ -84,6 +87,28 @@ Long-format table with one row per graded `(agent, instance_id, replicate)`.
 Required columns for ERS include `agent`, `instance_id`, `y0`,
 `ef_exclude_invalid`, `ef_invalid_as_fail`, `failed_mechanisms`, and
 `invalid_pi_count`.
+
+Additional Phase D diagnostic columns (appended for backward compatibility):
+
+| Column | Meaning |
+|--------|---------|
+| `grade_status` | `ok` (EF aggregated), `partial` (aggregated with stage errors), `failed` (pipeline abort) |
+| `failure_reason` | Primary taxonomy label (empty when patch graded cleanly with `y0=1`) |
+| `failure_stage` | Stage where the primary failure was recorded |
+| `failure_detail` | Operator-facing detail string |
+
+Failure reason taxonomy:
+
+- `empty_patch` — patch file has no content
+- `malformed_patch` — patch missing or failed prepare validation
+- `patch_apply_failed` — harness could not apply the patch
+- `build_failed` — Docker preflight/build failure
+- `nominal_failed` — nominal harness ran but `y0=0` (measurement outcome)
+- `perturbation_failed` — π stage executor error
+- `timeout` — harness timeout
+- `harness_error` — other harness/executor failure
+
+Each cell also writes `cells/.../phase_d_diagnosis.json` with per-stage records.
 
 For primary ERS with one patch per `(agent, instance)`, use `replicates: 1` in
 Phase C arms so each agent×instance appears once. Policy-level analyses with

@@ -1,0 +1,2 @@
+2026-06-27 23:05:35,850 - INFO - Environment image sweb.env.py.x86_64.764c21123474adcba1e003:latest found for sphinx-doc__sphinx-9229
+Building instance image sweb.eval.x86_64.sphinx-doc__sphinx-9229:latest for sphinx-doc__sphinx-9229

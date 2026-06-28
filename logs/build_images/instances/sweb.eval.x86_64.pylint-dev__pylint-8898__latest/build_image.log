@@ -1,0 +1,1347 @@
+2026-06-27 20:18:20,544 - INFO - Building image sweb.eval.x86_64.pylint-dev__pylint-8898:latest
+Using dockerfile:
+FROM --platform=linux/x86_64 sweb.env.py.x86_64.ed3b3b6b345a31fa74f72e:latest
+
+COPY ./setup_repo.sh /root/
+RUN sed -i -e 's/\r$//' /root/setup_repo.sh
+RUN /bin/bash /root/setup_repo.sh
+
+WORKDIR /testbed/
+
+Adding (1) setup scripts to image build repo
+2026-06-27 20:18:20,544 - INFO - [SETUP SCRIPT] setup_repo.sh:
+#!/bin/bash
+set -euxo pipefail
+git clone -o origin  --single-branch https://github.com/pylint-dev/pylint /testbed
+chmod -R 777 /testbed
+cd /testbed
+git reset --hard 1f8c4d9eb185c16a2c1d881c054f015e1c2eb334
+git remote remove origin
+TARGET_TIMESTAMP=$(git show -s --format=%ci 1f8c4d9eb185c16a2c1d881c054f015e1c2eb334)
+git tag -l | while read tag; do TAG_COMMIT=$(git rev-list -n 1 "$tag"); TAG_TIME=$(git show -s --format=%ci "$TAG_COMMIT"); if [[ "$TAG_TIME" > "$TARGET_TIMESTAMP" ]]; then git tag -d "$tag"; fi; done
+git reflog expire --expire=now --all
+git gc --prune=now --aggressive
+AFTER_TIMESTAMP=$(date -d "$TARGET_TIMESTAMP + 1 second" '+%Y-%m-%d %H:%M:%S')
+COMMIT_COUNT=$(git log --oneline --all --since="$AFTER_TIMESTAMP" | wc -l)
+[ "$COMMIT_COUNT" -eq 0 ] || exit 1
+source /opt/miniconda3/bin/activate
+conda activate testbed
+echo "Current environment: $CONDA_DEFAULT_ENV"
+python -m pip install -e .
+git config --global user.email setup@swebench.config
+git config --global user.name SWE-bench
+git commit --allow-empty -am SWE-bench
+
+2026-06-27 20:18:20,544 - INFO - Building docker image sweb.eval.x86_64.pylint-dev__pylint-8898:latest in logs/build_images/instances/sweb.eval.x86_64.pylint-dev__pylint-8898__latest with platform linux/x86_64
+2026-06-27 20:18:20,548 - INFO - Step 1/5 : FROM --platform=linux/x86_64 sweb.env.py.x86_64.ed3b3b6b345a31fa74f72e:latest
+2026-06-27 20:18:20,548 - INFO - 
+2026-06-27 20:18:20,555 - INFO - ---> 8ee8ee6adab8
+2026-06-27 20:18:20,555 - INFO - Step 2/5 : COPY ./setup_repo.sh /root/
+2026-06-27 20:18:20,556 - INFO - 
+2026-06-27 20:18:22,346 - INFO - ---> f20b92731279
+2026-06-27 20:18:22,346 - INFO - Step 3/5 : RUN sed -i -e 's/\r$//' /root/setup_repo.sh
+2026-06-27 20:18:22,346 - INFO - 
+2026-06-27 20:18:22,408 - INFO - ---> Running in a891ed14bf8b
+2026-06-27 20:18:24,463 - INFO - ---> Removed intermediate container a891ed14bf8b
+2026-06-27 20:18:24,463 - INFO - ---> 8b0c193c1fa0
+2026-06-27 20:18:24,463 - INFO - Step 4/5 : RUN /bin/bash /root/setup_repo.sh
+2026-06-27 20:18:24,463 - INFO - 
+2026-06-27 20:18:24,535 - INFO - ---> Running in d341c2e385a8
+2026-06-27 20:18:24,652 - INFO - + git clone -o origin --single-branch https://github.com/pylint-dev/pylint /testbed
+2026-06-27 20:18:24,652 - INFO - Cloning into '/testbed'...
+2026-06-27 20:18:27,359 - INFO - + chmod -R 777 /testbed
+2026-06-27 20:18:27,375 - INFO - + cd /testbed
++ git reset --hard 1f8c4d9eb185c16a2c1d881c054f015e1c2eb334
+2026-06-27 20:18:27,478 - INFO - HEAD is now at 1f8c4d9eb Add test result that was hidden
+2026-06-27 20:18:27,479 - INFO - + git remote remove origin
+2026-06-27 20:18:27,486 - INFO - ++ git show -s --format=%ci 1f8c4d9eb185c16a2c1d881c054f015e1c2eb334
+2026-06-27 20:18:27,487 - INFO - + TARGET_TIMESTAMP='2023-07-29 09:34:01 -0400'
+2026-06-27 20:18:27,487 - INFO - + git tag -l
++ read tag
+2026-06-27 20:18:27,489 - INFO - ++ git rev-list -n 1 before-astroid
+2026-06-27 20:18:27,490 - INFO - + TAG_COMMIT=d463a2b7bd376ed11d270903760b6a9ac762ef21
+2026-06-27 20:18:27,491 - INFO - ++ git show -s --format=%ci d463a2b7bd376ed11d270903760b6a9ac762ef21
+2026-06-27 20:18:27,492 - INFO - + TAG_TIME='2013-06-17 18:34:50 +0200'
++ [[ 2013-06-17 18:34:50 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,492 - INFO - ++ git rev-list -n 1 pylint-1.2
+2026-06-27 20:18:27,493 - INFO - + TAG_COMMIT=62b1a57f0902eee896d156fa66f65b297302ad1e
+2026-06-27 20:18:27,493 - INFO - ++ git show -s --format=%ci 62b1a57f0902eee896d156fa66f65b297302ad1e
+2026-06-27 20:18:27,494 - INFO - + TAG_TIME='2014-04-22 11:14:42 +0200'
++ [[ 2014-04-22 11:14:42 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,494 - INFO - ++ git rev-list -n 1 pylint-1.3
+2026-06-27 20:18:27,495 - INFO - + TAG_COMMIT=4a2b946dc2e93536edb8f3c60d48918c81389cde
+2026-06-27 20:18:27,495 - INFO - ++ git show -s --format=%ci 4a2b946dc2e93536edb8f3c60d48918c81389cde
+2026-06-27 20:18:27,496 - INFO - + TAG_TIME='2014-07-26 07:49:30 +0200'
++ [[ 2014-07-26 07:49:30 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,497 - INFO - ++ git rev-list -n 1 pylint-1.4
+2026-06-27 20:18:27,497 - INFO - + TAG_COMMIT=de172c523fa0dcd2bb5582699a8495a6abeb31d9
+2026-06-27 20:18:27,498 - INFO - ++ git show -s --format=%ci de172c523fa0dcd2bb5582699a8495a6abeb31d9
+2026-06-27 20:18:27,499 - INFO - + TAG_TIME='2014-11-23 11:06:19 +0200'
++ [[ 2014-11-23 11:06:19 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,499 - INFO - ++ git rev-list -n 1 pylint-1.4.1
+2026-06-27 20:18:27,500 - INFO - + TAG_COMMIT=c82eb1a6108849d6abf42c02e9c33482d2898e77
+2026-06-27 20:18:27,500 - INFO - ++ git show -s --format=%ci c82eb1a6108849d6abf42c02e9c33482d2898e77
+2026-06-27 20:18:27,501 - INFO - + TAG_TIME='2015-01-16 21:44:07 +0200'
++ [[ 2015-01-16 21:44:07 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,501 - INFO - ++ git rev-list -n 1 pylint-1.4.2
+2026-06-27 20:18:27,502 - INFO - + TAG_COMMIT=95d4de589871d0419eea2fa151eb84846eafc60b
+2026-06-27 20:18:27,502 - INFO - ++ git show -s --format=%ci 95d4de589871d0419eea2fa151eb84846eafc60b
+2026-06-27 20:18:27,503 - INFO - + TAG_TIME='2015-03-11 14:50:14 +0200'
++ [[ 2015-03-11 14:50:14 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,503 - INFO - ++ git rev-list -n 1 pylint-1.4.3
+2026-06-27 20:18:27,504 - INFO - + TAG_COMMIT=c819abbc3120f6a4ee26ada8d2974a903c67b95d
+2026-06-27 20:18:27,504 - INFO - ++ git show -s --format=%ci c819abbc3120f6a4ee26ada8d2974a903c67b95d
+2026-06-27 20:18:27,505 - INFO - + TAG_TIME='2015-03-14 18:36:49 +0200'
++ [[ 2015-03-14 18:36:49 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,505 - INFO - ++ git rev-list -n 1 pylint-1.7.0
+2026-06-27 20:18:27,506 - INFO - + TAG_COMMIT=033201f7216512757dcda1f09ea6d4f7ba9fc2e3
+2026-06-27 20:18:27,506 - INFO - ++ git show -s --format=%ci 033201f7216512757dcda1f09ea6d4f7ba9fc2e3
+2026-06-27 20:18:27,507 - INFO - + TAG_TIME='2017-04-13 18:02:08 +0300'
++ [[ 2017-04-13 18:02:08 +0300 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,508 - INFO - ++ git rev-list -n 1 pylint-1.8.0
+2026-06-27 20:18:27,509 - INFO - + TAG_COMMIT=df53e1eb10c72c77036ef22e59e1b81f6b96582b
+2026-06-27 20:18:27,509 - INFO - ++ git show -s --format=%ci df53e1eb10c72c77036ef22e59e1b81f6b96582b
+2026-06-27 20:18:27,510 - INFO - + TAG_TIME='2017-12-15 12:26:10 +0100'
++ [[ 2017-12-15 12:26:10 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,510 - INFO - ++ git rev-list -n 1 pylint-1.8.1
+2026-06-27 20:18:27,511 - INFO - + TAG_COMMIT=4c481dea025850d9c53edef14670c74b1af88340
+2026-06-27 20:18:27,511 - INFO - ++ git show -s --format=%ci 4c481dea025850d9c53edef14670c74b1af88340
+2026-06-27 20:18:27,512 - INFO - + TAG_TIME='2017-12-15 12:46:44 +0100'
++ [[ 2017-12-15 12:46:44 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,512 - INFO - ++ git rev-list -n 1 pylint-2.0
+2026-06-27 20:18:27,513 - INFO - + TAG_COMMIT=add6e6485a3c3dc3492fd5b84a2772b2b1afdecc
+2026-06-27 20:18:27,513 - INFO - ++ git show -s --format=%ci add6e6485a3c3dc3492fd5b84a2772b2b1afdecc
+2026-06-27 20:18:27,514 - INFO - + TAG_TIME='2018-07-15 11:40:07 +0200'
++ [[ 2018-07-15 11:40:07 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,514 - INFO - ++ git rev-list -n 1 pylint-2.0.dev
+2026-06-27 20:18:27,515 - INFO - + TAG_COMMIT=b9565b182de3ee6190057b0d42a8adb086e5f5ef
+2026-06-27 20:18:27,515 - INFO - ++ git show -s --format=%ci b9565b182de3ee6190057b0d42a8adb086e5f5ef
+2026-06-27 20:18:27,516 - INFO - + TAG_TIME='2018-05-21 11:44:19 +0200'
++ [[ 2018-05-21 11:44:19 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,516 - INFO - ++ git rev-list -n 1 pylint-2.0.dev1
+2026-06-27 20:18:27,517 - INFO - + TAG_COMMIT=33f7250ef7d0bc0bf17dcece0a80ba9b9d501351
+2026-06-27 20:18:27,517 - INFO - ++ git show -s --format=%ci 33f7250ef7d0bc0bf17dcece0a80ba9b9d501351
+2026-06-27 20:18:27,518 - INFO - + TAG_TIME='2018-05-28 07:58:22 -0700'
++ [[ 2018-05-28 07:58:22 -0700 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,519 - INFO - ++ git rev-list -n 1 pylint-2.1.0
+2026-06-27 20:18:27,519 - INFO - + TAG_COMMIT=ea0043c35b83ebc03e07cc2dc9090a8d9ad9e5db
+2026-06-27 20:18:27,520 - INFO - ++ git show -s --format=%ci ea0043c35b83ebc03e07cc2dc9090a8d9ad9e5db
+2026-06-27 20:18:27,521 - INFO - + TAG_TIME='2018-08-01 08:46:14 +0200'
++ [[ 2018-08-01 08:46:14 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,521 - INFO - ++ git rev-list -n 1 pylint-2.2.0
+2026-06-27 20:18:27,522 - INFO - + TAG_COMMIT=1ac83855b38a8d053ec5d0403a5c0e6e8b191fbb
+2026-06-27 20:18:27,522 - INFO - ++ git show -s --format=%ci 1ac83855b38a8d053ec5d0403a5c0e6e8b191fbb
+2026-06-27 20:18:27,523 - INFO - + TAG_TIME='2018-11-25 18:28:22 +0100'
++ [[ 2018-11-25 18:28:22 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,523 - INFO - ++ git rev-list -n 1 pylint-2.2.1
+2026-06-27 20:18:27,524 - INFO - + TAG_COMMIT=71f7acae1e7cdbce039171641e795463156a9034
+2026-06-27 20:18:27,524 - INFO - ++ git show -s --format=%ci 71f7acae1e7cdbce039171641e795463156a9034
+2026-06-27 20:18:27,525 - INFO - + TAG_TIME='2018-11-27 10:18:03 +0100'
++ [[ 2018-11-27 10:18:03 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,525 - INFO - ++ git rev-list -n 1 pylint-2.2.2
+2026-06-27 20:18:27,526 - INFO - + TAG_COMMIT=55c638537ac956c463b79b16e73a0505ae544dfe
+2026-06-27 20:18:27,526 - INFO - ++ git show -s --format=%ci 55c638537ac956c463b79b16e73a0505ae544dfe
+2026-06-27 20:18:27,527 - INFO - + TAG_TIME='2018-11-28 09:40:28 +0100'
++ [[ 2018-11-28 09:40:28 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,527 - INFO - ++ git rev-list -n 1 pylint-2.3.0
+2026-06-27 20:18:27,528 - INFO - + TAG_COMMIT=b22c1d71fde5e62d5ce6ddb043f5f6b360a499b7
+2026-06-27 20:18:27,528 - INFO - ++ git show -s --format=%ci b22c1d71fde5e62d5ce6ddb043f5f6b360a499b7
+2026-06-27 20:18:27,529 - INFO - + TAG_TIME='2019-02-27 11:04:45 +0100'
++ [[ 2019-02-27 11:04:45 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,529 - INFO - ++ git rev-list -n 1 pylint-2.4.0
+2026-06-27 20:18:27,530 - INFO - + TAG_COMMIT=fce8bff8acc8dfa625529bde5c28691d94fad51e
+2026-06-27 20:18:27,530 - INFO - ++ git show -s --format=%ci fce8bff8acc8dfa625529bde5c28691d94fad51e
+2026-06-27 20:18:27,531 - INFO - + TAG_TIME='2019-09-24 11:53:07 +0200'
++ [[ 2019-09-24 11:53:07 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,531 - INFO - ++ git rev-list -n 1 pylint-2.4.1
+2026-06-27 20:18:27,532 - INFO - + TAG_COMMIT=5d2fbaf76f234ff572e6be84ac1252af2eeea8bb
+2026-06-27 20:18:27,532 - INFO - ++ git show -s --format=%ci 5d2fbaf76f234ff572e6be84ac1252af2eeea8bb
+2026-06-27 20:18:27,533 - INFO - + TAG_TIME='2019-09-25 10:52:28 +0200'
++ [[ 2019-09-25 10:52:28 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,533 - INFO - ++ git rev-list -n 1 pylint-2.4.2
+2026-06-27 20:18:27,534 - INFO - + TAG_COMMIT=f7850aa8d9403d86e7f6d16a8974736180b043f2
+2026-06-27 20:18:27,534 - INFO - ++ git show -s --format=%ci f7850aa8d9403d86e7f6d16a8974736180b043f2
+2026-06-27 20:18:27,535 - INFO - + TAG_TIME='2019-09-30 10:04:07 +0200'
++ [[ 2019-09-30 10:04:07 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,535 - INFO - ++ git rev-list -n 1 pylint-2.5.0
+2026-06-27 20:18:27,536 - INFO - + TAG_COMMIT=089f510623e468c60b2f44365fec3db942591d3d
+2026-06-27 20:18:27,536 - INFO - ++ git show -s --format=%ci 089f510623e468c60b2f44365fec3db942591d3d
+2026-06-27 20:18:27,537 - INFO - + TAG_TIME='2020-04-27 11:49:52 +0200'
++ [[ 2020-04-27 11:49:52 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,537 - INFO - ++ git rev-list -n 1 pylint-2.6.0
+2026-06-27 20:18:27,538 - INFO - + TAG_COMMIT=8197144d82469ed39d1f4f3c345efee198ec9212
+2026-06-27 20:18:27,538 - INFO - ++ git show -s --format=%ci 8197144d82469ed39d1f4f3c345efee198ec9212
+2026-06-27 20:18:27,539 - INFO - + TAG_TIME='2020-08-21 11:00:29 +0200'
++ [[ 2020-08-21 11:00:29 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,540 - INFO - ++ git rev-list -n 1 pylint-2.7.3
+2026-06-27 20:18:27,540 - INFO - + TAG_COMMIT=13dae7c5c6d16281f1415c88f845548d6cd9c823
+2026-06-27 20:18:27,541 - INFO - ++ git show -s --format=%ci 13dae7c5c6d16281f1415c88f845548d6cd9c823
+2026-06-27 20:18:27,542 - INFO - + TAG_TIME='2021-03-29 20:59:59 +0200'
++ [[ 2021-03-29 20:59:59 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,542 - INFO - ++ git rev-list -n 1 pylint-2.7.4
+2026-06-27 20:18:27,543 - INFO - + TAG_COMMIT=c92e3ab78778aa1afcf4ddca4829245d37fbc095
+2026-06-27 20:18:27,543 - INFO - ++ git show -s --format=%ci c92e3ab78778aa1afcf4ddca4829245d37fbc095
+2026-06-27 20:18:27,544 - INFO - + TAG_TIME='2021-03-30 09:26:02 +0200'
++ [[ 2021-03-30 09:26:02 +0200 > 2023-07-29 09:34:01 -0400 ]]
+2026-06-27 20:18:27,544 - INFO - + read tag
+2026-06-27 20:18:27,544 - INFO - ++ git rev-list -n 1 pylint-2.8.0
+2026-06-27 20:18:27,545 - INFO - + TAG_COMMIT=7dece5b2302f446d7d63829a34b1253ae6e32e6b
+2026-06-27 20:18:27,545 - INFO - ++ git show -s --format=%ci 7dece5b2302f446d7d63829a34b1253ae6e32e6b
+2026-06-27 20:18:27,546 - INFO - + TAG_TIME='2021-04-24 21:42:23 +0200'
++ [[ 2021-04-24 21:42:23 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,546 - INFO - ++ git rev-list -n 1 pylint-2.8.1
+2026-06-27 20:18:27,547 - INFO - + TAG_COMMIT=3eb0362dc42642e3e2774d7523a1e73d71394064
+2026-06-27 20:18:27,547 - INFO - ++ git show -s --format=%ci 3eb0362dc42642e3e2774d7523a1e73d71394064
+2026-06-27 20:18:27,548 - INFO - + TAG_TIME='2021-04-25 12:03:42 +0200'
++ [[ 2021-04-25 12:03:42 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,549 - INFO - ++ git rev-list -n 1 pylint-debian-version-0.18.1-1
+2026-06-27 20:18:27,550 - INFO - + TAG_COMMIT=43d357b32d4a770468350fa5b07536ef99e8cdf3
+2026-06-27 20:18:27,550 - INFO - ++ git show -s --format=%ci 43d357b32d4a770468350fa5b07536ef99e8cdf3
+2026-06-27 20:18:27,551 - INFO - + TAG_TIME='2009-08-27 17:41:26 +0200'
++ [[ 2009-08-27 17:41:26 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,551 - INFO - ++ git rev-list -n 1 pylint-debian-version-0.19.0-1
+2026-06-27 20:18:27,552 - INFO - + TAG_COMMIT=c0b9291cd18e8b0177168456e50bf6392190f591
+2026-06-27 20:18:27,552 - INFO - ++ git show -s --format=%ci c0b9291cd18e8b0177168456e50bf6392190f591
+2026-06-27 20:18:27,553 - INFO - + TAG_TIME='2009-12-18 14:41:44 +0100'
++ [[ 2009-12-18 14:41:44 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,553 - INFO - ++ git rev-list -n 1 pylint-debian-version-0.20.0-1
+2026-06-27 20:18:27,554 - INFO - + TAG_COMMIT=e8459da973c6f2bb28e8a91a0268a0f5873512d8
+2026-06-27 20:18:27,554 - INFO - ++ git show -s --format=%ci e8459da973c6f2bb28e8a91a0268a0f5873512d8
+2026-06-27 20:18:27,555 - INFO - + TAG_TIME='2010-03-23 18:08:03 +0100'
++ [[ 2010-03-23 18:08:03 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,555 - INFO - ++ git rev-list -n 1 pylint-debian-version-0.21.0-1
+2026-06-27 20:18:27,556 - INFO - + TAG_COMMIT=7060f000f837573ff3c69b0172505eb49d059600
+2026-06-27 20:18:27,556 - INFO - ++ git show -s --format=%ci 7060f000f837573ff3c69b0172505eb49d059600
+2026-06-27 20:18:27,557 - INFO - + TAG_TIME='2010-05-11 15:06:57 +0200'
++ [[ 2010-05-11 15:06:57 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,557 - INFO - ++ git rev-list -n 1 pylint-debian-version-0.21.1-1
+2026-06-27 20:18:27,558 - INFO - + TAG_COMMIT=ca72b55f8ed963cb97bb8954050650b98966ba52
+2026-06-27 20:18:27,558 - INFO - ++ git show -s --format=%ci ca72b55f8ed963cb97bb8954050650b98966ba52
+2026-06-27 20:18:27,559 - INFO - + TAG_TIME='2010-06-07 13:05:40 +0200'
++ [[ 2010-06-07 13:05:40 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,559 - INFO - ++ git rev-list -n 1 pylint-debian-version-0.21.2-1
+2026-06-27 20:18:27,560 - INFO - + TAG_COMMIT=83f89593751982ec8836f28f8b9814cb41ae169a
+2026-06-27 20:18:27,560 - INFO - ++ git show -s --format=%ci 83f89593751982ec8836f28f8b9814cb41ae169a
+2026-06-27 20:18:27,561 - INFO - + TAG_TIME='2010-08-26 11:34:21 +0200'
++ [[ 2010-08-26 11:34:21 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,561 - INFO - ++ git rev-list -n 1 pylint-debian-version-0.21.3-1
+2026-06-27 20:18:27,562 - INFO - + TAG_COMMIT=f046739ed5e6ea028eea938ca98f569ae2404eee
+2026-06-27 20:18:27,562 - INFO - ++ git show -s --format=%ci f046739ed5e6ea028eea938ca98f569ae2404eee
+2026-06-27 20:18:27,563 - INFO - + TAG_TIME='2010-09-28 18:20:29 +0200'
++ [[ 2010-09-28 18:20:29 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,563 - INFO - ++ git rev-list -n 1 pylint-debian-version-0.21.4-1
+2026-06-27 20:18:27,564 - INFO - + TAG_COMMIT=e53d8887876ab55a181ec1428e5fdf3b2786b881
+2026-06-27 20:18:27,564 - INFO - ++ git show -s --format=%ci e53d8887876ab55a181ec1428e5fdf3b2786b881
+2026-06-27 20:18:27,565 - INFO - + TAG_TIME='2010-10-27 15:19:56 +0200'
++ [[ 2010-10-27 15:19:56 +0200 > 2023-07-29 09:34:01 -0400 ]]
+2026-06-27 20:18:27,565 - INFO - + read tag
+2026-06-27 20:18:27,565 - INFO - ++ git rev-list -n 1 pylint-debian-version-0.22.0-1
+2026-06-27 20:18:27,566 - INFO - + TAG_COMMIT=519ed5e736a16e3570695a71aa48f714712395b7
+2026-06-27 20:18:27,566 - INFO - ++ git show -s --format=%ci 519ed5e736a16e3570695a71aa48f714712395b7
+2026-06-27 20:18:27,567 - INFO - + TAG_TIME='2010-11-15 18:30:13 +0100'
++ [[ 2010-11-15 18:30:13 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,567 - INFO - ++ git rev-list -n 1 pylint-debian-version-0.23.0-1
+2026-06-27 20:18:27,568 - INFO - + TAG_COMMIT=37d3d4ada60ec18281cc5730423a87633d06c4d1
+2026-06-27 20:18:27,568 - INFO - ++ git show -s --format=%ci 37d3d4ada60ec18281cc5730423a87633d06c4d1
+2026-06-27 20:18:27,569 - INFO - + TAG_TIME='2011-01-13 21:37:28 +0100'
++ [[ 2011-01-13 21:37:28 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,570 - INFO - ++ git rev-list -n 1 pylint-debian-version-0.24.0-1
+2026-06-27 20:18:27,570 - INFO - + TAG_COMMIT=66a9d5b64135801d6d61e7a01fe73584578ca7e2
+2026-06-27 20:18:27,571 - INFO - ++ git show -s --format=%ci 66a9d5b64135801d6d61e7a01fe73584578ca7e2
+2026-06-27 20:18:27,572 - INFO - + TAG_TIME='2011-07-20 18:17:03 +0200'
++ [[ 2011-07-20 18:17:03 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,572 - INFO - ++ git rev-list -n 1 pylint-debian-version-0.25.0-1
+2026-06-27 20:18:27,573 - INFO - + TAG_COMMIT=2670a4eb8e3aa5cda52628a59c2b01f2deac601c
+2026-06-27 20:18:27,573 - INFO - ++ git show -s --format=%ci 2670a4eb8e3aa5cda52628a59c2b01f2deac601c
+2026-06-27 20:18:27,574 - INFO - + TAG_TIME='2011-10-07 16:50:26 +0200'
++ [[ 2011-10-07 16:50:26 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,574 - INFO - ++ git rev-list -n 1 pylint-debian-version-0.25.1-1
+2026-06-27 20:18:27,575 - INFO - + TAG_COMMIT=0370344ea6f7a8c4b58689a65775d58af48e4649
+2026-06-27 20:18:27,575 - INFO - ++ git show -s --format=%ci 0370344ea6f7a8c4b58689a65775d58af48e4649
+2026-06-27 20:18:27,576 - INFO - + TAG_TIME='2011-12-08 16:54:34 +0100'
++ [[ 2011-12-08 16:54:34 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,576 - INFO - ++ git rev-list -n 1 pylint-debian-version-0.25.2-1
+2026-06-27 20:18:27,577 - INFO - + TAG_COMMIT=95a264fc452b1a164950cd6b937857c8886e40b4
+2026-06-27 20:18:27,577 - INFO - ++ git show -s --format=%ci 95a264fc452b1a164950cd6b937857c8886e40b4
+2026-06-27 20:18:27,578 - INFO - + TAG_TIME='2012-07-18 08:34:40 +0200'
++ [[ 2012-07-18 08:34:40 +0200 > 2023-07-29 09:34:01 -0400 ]]
+2026-06-27 20:18:27,578 - INFO - + read tag
+2026-06-27 20:18:27,578 - INFO - ++ git rev-list -n 1 pylint-debian-version-0.26.0-1
+2026-06-27 20:18:27,579 - INFO - + TAG_COMMIT=83081a760ef8a061b78ff8e0be69663ad9af9ca7
+2026-06-27 20:18:27,579 - INFO - ++ git show -s --format=%ci 83081a760ef8a061b78ff8e0be69663ad9af9ca7
+2026-06-27 20:18:27,580 - INFO - + TAG_TIME='2012-10-05 19:32:55 +0200'
++ [[ 2012-10-05 19:32:55 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,580 - INFO - ++ git rev-list -n 1 pylint-debian-version-0.27.0-1
+2026-06-27 20:18:27,581 - INFO - + TAG_COMMIT=95de4b5b1362bec782b0b821043af3f84a35301b
+2026-06-27 20:18:27,581 - INFO - ++ git show -s --format=%ci 95de4b5b1362bec782b0b821043af3f84a35301b
+2026-06-27 20:18:27,582 - INFO - + TAG_TIME='2013-02-27 11:09:36 +0100'
++ [[ 2013-02-27 11:09:36 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,582 - INFO - ++ git rev-list -n 1 pylint-debian-version-0.28.0-1
+2026-06-27 20:18:27,583 - INFO - + TAG_COMMIT=48bac2684cb4b7c9e7cd6226efca47c45cebbb5b
+2026-06-27 20:18:27,583 - INFO - ++ git show -s --format=%ci 48bac2684cb4b7c9e7cd6226efca47c45cebbb5b
+2026-06-27 20:18:27,584 - INFO - + TAG_TIME='2013-04-25 14:01:46 +0200'
++ [[ 2013-04-25 14:01:46 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,584 - INFO - ++ git rev-list -n 1 pylint-debian-version-0_13_0-1
+2026-06-27 20:18:27,585 - INFO - + TAG_COMMIT=32b44fa1f5066279cef616596f2d4d55d9996343
+2026-06-27 20:18:27,585 - INFO - ++ git show -s --format=%ci 32b44fa1f5066279cef616596f2d4d55d9996343
+2026-06-27 20:18:27,586 - INFO - + TAG_TIME='2007-03-01 10:58:56 +0100'
++ [[ 2007-03-01 10:58:56 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,586 - INFO - ++ git rev-list -n 1 pylint-debian-version-0_15_0-1
+2026-06-27 20:18:27,587 - INFO - + TAG_COMMIT=446d1ff2c79f18597223949bef45b7f53537abc5
+2026-06-27 20:18:27,587 - INFO - ++ git show -s --format=%ci 446d1ff2c79f18597223949bef45b7f53537abc5
+2026-06-27 20:18:27,588 - INFO - + TAG_TIME='2008-09-10 16:40:04 +0200'
++ [[ 2008-09-10 16:40:04 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,588 - INFO - ++ git rev-list -n 1 pylint-debian-version-0_15_1-1
+2026-06-27 20:18:27,589 - INFO - + TAG_COMMIT=978c3ff5abdaa621864b14aecc6a251deb752369
+2026-06-27 20:18:27,589 - INFO - ++ git show -s --format=%ci 978c3ff5abdaa621864b14aecc6a251deb752369
+2026-06-27 20:18:27,590 - INFO - + TAG_TIME='2008-09-15 14:54:41 +0200'
++ [[ 2008-09-15 14:54:41 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,590 - INFO - ++ git rev-list -n 1 pylint-debian-version-0_15_2-1
+2026-06-27 20:18:27,591 - INFO - + TAG_COMMIT=5d91cd4c763cbd713ddcc5f361a4efb13e945ab6
+2026-06-27 20:18:27,591 - INFO - ++ git show -s --format=%ci 5d91cd4c763cbd713ddcc5f361a4efb13e945ab6
+2026-06-27 20:18:27,592 - INFO - + TAG_TIME='2008-10-13 15:34:56 +0200'
++ [[ 2008-10-13 15:34:56 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,593 - INFO - ++ git rev-list -n 1 pylint-debian-version-1.0.0-1
+2026-06-27 20:18:27,593 - INFO - + TAG_COMMIT=a3b50c1a09ab09c5c02bd9a93d293b5366bc30db
+2026-06-27 20:18:27,594 - INFO - ++ git show -s --format=%ci a3b50c1a09ab09c5c02bd9a93d293b5366bc30db
+2026-06-27 20:18:27,595 - INFO - + TAG_TIME='2013-08-06 14:28:53 +0200'
++ [[ 2013-08-06 14:28:53 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,595 - INFO - ++ git rev-list -n 1 pylint-debian-version-1.1.0-1
+2026-06-27 20:18:27,596 - INFO - + TAG_COMMIT=cfb835625a790e05e7458cb37ab5578204c0e9c0
+2026-06-27 20:18:27,596 - INFO - ++ git show -s --format=%ci cfb835625a790e05e7458cb37ab5578204c0e9c0
+2026-06-27 20:18:27,597 - INFO - + TAG_TIME='2014-01-08 22:08:36 +0100'
++ [[ 2014-01-08 22:08:36 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,597 - INFO - ++ git rev-list -n 1 pylint-version-0.18.1
+2026-06-27 20:18:27,598 - INFO - + TAG_COMMIT=d877066a07a013e36b089c25af3f9b41f838271d
+2026-06-27 20:18:27,598 - INFO - ++ git show -s --format=%ci d877066a07a013e36b089c25af3f9b41f838271d
+2026-06-27 20:18:27,599 - INFO - + TAG_TIME='2009-08-27 17:07:18 +0200'
++ [[ 2009-08-27 17:07:18 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,599 - INFO - ++ git rev-list -n 1 pylint-version-0.19.0
+2026-06-27 20:18:27,600 - INFO - + TAG_COMMIT=458ccb85a67607a6eff8834093b84d402b8f965d
+2026-06-27 20:18:27,600 - INFO - ++ git show -s --format=%ci 458ccb85a67607a6eff8834093b84d402b8f965d
+2026-06-27 20:18:27,601 - INFO - + TAG_TIME='2009-12-18 14:41:31 +0100'
++ [[ 2009-12-18 14:41:31 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,601 - INFO - ++ git rev-list -n 1 pylint-version-0.20.0
+2026-06-27 20:18:27,602 - INFO - + TAG_COMMIT=425d410fac89f25dcb0f23a40bdc7925bfb15bdc
+2026-06-27 20:18:27,602 - INFO - ++ git show -s --format=%ci 425d410fac89f25dcb0f23a40bdc7925bfb15bdc
+2026-06-27 20:18:27,603 - INFO - + TAG_TIME='2010-03-23 16:57:00 +0100'
++ [[ 2010-03-23 16:57:00 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,603 - INFO - ++ git rev-list -n 1 pylint-version-0.21.0
+2026-06-27 20:18:27,604 - INFO - + TAG_COMMIT=190db2ffc8b23109f65a343e09348b9967f0ba70
+2026-06-27 20:18:27,604 - INFO - ++ git show -s --format=%ci 190db2ffc8b23109f65a343e09348b9967f0ba70
+2026-06-27 20:18:27,605 - INFO - + TAG_TIME='2010-05-11 12:27:30 +0200'
++ [[ 2010-05-11 12:27:30 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,605 - INFO - ++ git rev-list -n 1 pylint-version-0.21.1
+2026-06-27 20:18:27,606 - INFO - + TAG_COMMIT=ab1002a37d311819dd1b7caac2b5108ba9c13b46
+2026-06-27 20:18:27,606 - INFO - ++ git show -s --format=%ci ab1002a37d311819dd1b7caac2b5108ba9c13b46
+2026-06-27 20:18:27,607 - INFO - + TAG_TIME='2010-06-04 16:08:11 +0200'
++ [[ 2010-06-04 16:08:11 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,607 - INFO - ++ git rev-list -n 1 pylint-version-0.21.2
+2026-06-27 20:18:27,608 - INFO - + TAG_COMMIT=f2fd3680e3cbb9d58c6afd4e9cf5e88b594ba0c7
+2026-06-27 20:18:27,608 - INFO - ++ git show -s --format=%ci f2fd3680e3cbb9d58c6afd4e9cf5e88b594ba0c7
+2026-06-27 20:18:27,609 - INFO - + TAG_TIME='2010-08-26 10:05:18 +0200'
++ [[ 2010-08-26 10:05:18 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,609 - INFO - ++ git rev-list -n 1 pylint-version-0.21.3
+2026-06-27 20:18:27,610 - INFO - + TAG_COMMIT=18b0f8361e6b4fa7f67da810a5e0de6eda013ef5
+2026-06-27 20:18:27,610 - INFO - ++ git show -s --format=%ci 18b0f8361e6b4fa7f67da810a5e0de6eda013ef5
+2026-06-27 20:18:27,611 - INFO - + TAG_TIME='2010-09-28 15:02:43 +0200'
++ [[ 2010-09-28 15:02:43 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,611 - INFO - ++ git rev-list -n 1 pylint-version-0.21.4
+2026-06-27 20:18:27,612 - INFO - + TAG_COMMIT=2a67607fe43f5e96dff9df594790dd3e4d001afd
+2026-06-27 20:18:27,612 - INFO - ++ git show -s --format=%ci 2a67607fe43f5e96dff9df594790dd3e4d001afd
+2026-06-27 20:18:27,613 - INFO - + TAG_TIME='2010-10-27 14:01:50 +0200'
++ [[ 2010-10-27 14:01:50 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,614 - INFO - ++ git rev-list -n 1 pylint-version-0.22.0
+2026-06-27 20:18:27,614 - INFO - + TAG_COMMIT=566815597c3ebf327c8c84932f48c3649304c4e5
+2026-06-27 20:18:27,615 - INFO - ++ git show -s --format=%ci 566815597c3ebf327c8c84932f48c3649304c4e5
+2026-06-27 20:18:27,616 - INFO - + TAG_TIME='2010-11-15 15:56:13 +0100'
++ [[ 2010-11-15 15:56:13 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,616 - INFO - ++ git rev-list -n 1 pylint-version-0.23.0
+2026-06-27 20:18:27,617 - INFO - + TAG_COMMIT=673316bb83c4fac55bd854b66f2165e32c17a409
+2026-06-27 20:18:27,617 - INFO - ++ git show -s --format=%ci 673316bb83c4fac55bd854b66f2165e32c17a409
+2026-06-27 20:18:27,618 - INFO - + TAG_TIME='2011-01-11 15:41:15 +0100'
++ [[ 2011-01-11 15:41:15 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,618 - INFO - ++ git rev-list -n 1 pylint-version-0.24.0
+2026-06-27 20:18:27,619 - INFO - + TAG_COMMIT=9869a7d33ac2391bd15c742109c6c6d76d159658
+2026-06-27 20:18:27,619 - INFO - ++ git show -s --format=%ci 9869a7d33ac2391bd15c742109c6c6d76d159658
+2026-06-27 20:18:27,620 - INFO - + TAG_TIME='2011-07-20 17:59:51 +0200'
++ [[ 2011-07-20 17:59:51 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,620 - INFO - ++ git rev-list -n 1 pylint-version-0.25.0
+2026-06-27 20:18:27,621 - INFO - + TAG_COMMIT=3a5a922b0dedcbfcce26080e281e0b88a02dff8e
+2026-06-27 20:18:27,621 - INFO - ++ git show -s --format=%ci 3a5a922b0dedcbfcce26080e281e0b88a02dff8e
+2026-06-27 20:18:27,622 - INFO - + TAG_TIME='2011-10-07 12:18:12 +0200'
++ [[ 2011-10-07 12:18:12 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,622 - INFO - ++ git rev-list -n 1 pylint-version-0.25.1
+2026-06-27 20:18:27,623 - INFO - + TAG_COMMIT=e10f513f345f0bf6be6825e334a6b0defe97b0b6
+2026-06-27 20:18:27,623 - INFO - ++ git show -s --format=%ci e10f513f345f0bf6be6825e334a6b0defe97b0b6
+2026-06-27 20:18:27,624 - INFO - + TAG_TIME='2011-12-08 15:28:29 +0100'
++ [[ 2011-12-08 15:28:29 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,624 - INFO - ++ git rev-list -n 1 pylint-version-0.25.2
+2026-06-27 20:18:27,625 - INFO - + TAG_COMMIT=10eb5c99043ac2b3a99874dfb2a6bf93e59f47a4
+2026-06-27 20:18:27,625 - INFO - ++ git show -s --format=%ci 10eb5c99043ac2b3a99874dfb2a6bf93e59f47a4
+2026-06-27 20:18:27,626 - INFO - + TAG_TIME='2012-07-17 17:07:05 +0200'
++ [[ 2012-07-17 17:07:05 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,627 - INFO - ++ git rev-list -n 1 pylint-version-0.26.0
+2026-06-27 20:18:27,627 - INFO - + TAG_COMMIT=d1a36f1812324435d57dd3d2ad9fd95a22298aa7
+2026-06-27 20:18:27,628 - INFO - ++ git show -s --format=%ci d1a36f1812324435d57dd3d2ad9fd95a22298aa7
+2026-06-27 20:18:27,629 - INFO - + TAG_TIME='2012-10-05 19:32:21 +0200'
++ [[ 2012-10-05 19:32:21 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,629 - INFO - ++ git rev-list -n 1 pylint-version-0.27.0
+2026-06-27 20:18:27,630 - INFO - + TAG_COMMIT=8735492cfe2d15b869df4921b2532873bf190dc0
+2026-06-27 20:18:27,630 - INFO - ++ git show -s --format=%ci 8735492cfe2d15b869df4921b2532873bf190dc0
+2026-06-27 20:18:27,631 - INFO - + TAG_TIME='2013-02-26 23:40:56 +0100'
++ [[ 2013-02-26 23:40:56 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,631 - INFO - ++ git rev-list -n 1 pylint-version-0.28.0
+2026-06-27 20:18:27,632 - INFO - + TAG_COMMIT=88cb4cd5d6597c302d2426b59d1daa59570150eb
+2026-06-27 20:18:27,632 - INFO - ++ git show -s --format=%ci 88cb4cd5d6597c302d2426b59d1daa59570150eb
+2026-06-27 20:18:27,633 - INFO - + TAG_TIME='2013-04-25 13:34:37 +0200'
++ [[ 2013-04-25 13:34:37 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,633 - INFO - ++ git rev-list -n 1 pylint-version-0_13_0
+2026-06-27 20:18:27,634 - INFO - + TAG_COMMIT=2896333fe47afe6d93b754e311e4c759192c03a3
+2026-06-27 20:18:27,634 - INFO - ++ git show -s --format=%ci 2896333fe47afe6d93b754e311e4c759192c03a3
+2026-06-27 20:18:27,635 - INFO - + TAG_TIME='2007-02-28 09:27:43 +0100'
++ [[ 2007-02-28 09:27:43 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,635 - INFO - ++ git rev-list -n 1 pylint-version-0_15_0
+2026-06-27 20:18:27,636 - INFO - + TAG_COMMIT=c00dce38af105408f9d0603194555a713c552af3
+2026-06-27 20:18:27,636 - INFO - ++ git show -s --format=%ci c00dce38af105408f9d0603194555a713c552af3
+2026-06-27 20:18:27,637 - INFO - + TAG_TIME='2008-09-10 16:39:01 +0200'
++ [[ 2008-09-10 16:39:01 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,637 - INFO - ++ git rev-list -n 1 pylint-version-0_15_1
+2026-06-27 20:18:27,638 - INFO - + TAG_COMMIT=98e32fa1b60ea57a9cee9e94343805e8300b2af1
+2026-06-27 20:18:27,638 - INFO - ++ git show -s --format=%ci 98e32fa1b60ea57a9cee9e94343805e8300b2af1
+2026-06-27 20:18:27,639 - INFO - + TAG_TIME='2008-09-15 14:25:33 +0200'
++ [[ 2008-09-15 14:25:33 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,639 - INFO - ++ git rev-list -n 1 pylint-version-0_15_2
+2026-06-27 20:18:27,640 - INFO - + TAG_COMMIT=9d1a6291502a5ac65f84207312a9c1f92a75dd5c
+2026-06-27 20:18:27,640 - INFO - ++ git show -s --format=%ci 9d1a6291502a5ac65f84207312a9c1f92a75dd5c
+2026-06-27 20:18:27,641 - INFO - + TAG_TIME='2008-10-13 14:46:46 +0200'
++ [[ 2008-10-13 14:46:46 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,641 - INFO - ++ git rev-list -n 1 pylint-version-0_17_0
+2026-06-27 20:18:27,642 - INFO - + TAG_COMMIT=3d8b89c3e879585ec8368f413e791653179e9c0b
+2026-06-27 20:18:27,642 - INFO - ++ git show -s --format=%ci 3d8b89c3e879585ec8368f413e791653179e9c0b
+2026-06-27 20:18:27,643 - INFO - + TAG_TIME='2009-03-19 15:43:50 +0100'
++ [[ 2009-03-19 15:43:50 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,644 - INFO - ++ git rev-list -n 1 pylint-version-1.0.0
+2026-06-27 20:18:27,644 - INFO - + TAG_COMMIT=91707ba8582a3a2c02e04258195eeb8e5be20168
+2026-06-27 20:18:27,645 - INFO - ++ git show -s --format=%ci 91707ba8582a3a2c02e04258195eeb8e5be20168
+2026-06-27 20:18:27,646 - INFO - + TAG_TIME='2013-08-06 14:01:03 +0200'
++ [[ 2013-08-06 14:01:03 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,646 - INFO - ++ git rev-list -n 1 pylint-version-1.1.0
+2026-06-27 20:18:27,647 - INFO - + TAG_COMMIT=341cd1bb7b3405efa19596fb3f946abe8fe7ed1a
+2026-06-27 20:18:27,647 - INFO - ++ git show -s --format=%ci 341cd1bb7b3405efa19596fb3f946abe8fe7ed1a
+2026-06-27 20:18:27,648 - INFO - + TAG_TIME='2013-12-23 09:33:05 +0100'
++ [[ 2013-12-23 09:33:05 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,648 - INFO - ++ git rev-list -n 1 v2.10.0
+2026-06-27 20:18:27,649 - INFO - + TAG_COMMIT=ea448b8905c10bdd1935b33fd95524aa4e2e71d6
+2026-06-27 20:18:27,649 - INFO - ++ git show -s --format=%ci ea448b8905c10bdd1935b33fd95524aa4e2e71d6
+2026-06-27 20:18:27,650 - INFO - + TAG_TIME='2021-08-20 22:58:03 +0200'
++ [[ 2021-08-20 22:58:03 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,650 - INFO - ++ git rev-list -n 1 v2.10.1
+2026-06-27 20:18:27,651 - INFO - + TAG_COMMIT=bf332820cb63305e286eb58a707c6d8b90e6cbb6
+2026-06-27 20:18:27,651 - INFO - ++ git show -s --format=%ci bf332820cb63305e286eb58a707c6d8b90e6cbb6
+2026-06-27 20:18:27,652 - INFO - + TAG_TIME='2021-08-20 21:26:08 -0700'
++ [[ 2021-08-20 21:26:08 -0700 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,652 - INFO - ++ git rev-list -n 1 v2.10.2
+2026-06-27 20:18:27,653 - INFO - + TAG_COMMIT=591a23adcfdd2fe20b8cfdb9e4e07772c8f454f8
+2026-06-27 20:18:27,653 - INFO - ++ git show -s --format=%ci 591a23adcfdd2fe20b8cfdb9e4e07772c8f454f8
+2026-06-27 20:18:27,654 - INFO - + TAG_TIME='2021-08-21 19:28:13 +0200'
++ [[ 2021-08-21 19:28:13 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,655 - INFO - ++ git rev-list -n 1 v2.11.0
+2026-06-27 20:18:27,655 - INFO - + TAG_COMMIT=7add5d00ff5bb36a21bb5fe92cc8e67c5ca80e80
+2026-06-27 20:18:27,656 - INFO - ++ git show -s --format=%ci 7add5d00ff5bb36a21bb5fe92cc8e67c5ca80e80
+2026-06-27 20:18:27,657 - INFO - + TAG_TIME='2021-09-16 18:19:49 +0200'
++ [[ 2021-09-16 18:19:49 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,657 - INFO - ++ git rev-list -n 1 v2.11.1
+2026-06-27 20:18:27,658 - INFO - + TAG_COMMIT=d98e6e8adcdc5ebcd9c863f630e748cdba639b0a
+2026-06-27 20:18:27,658 - INFO - ++ git show -s --format=%ci d98e6e8adcdc5ebcd9c863f630e748cdba639b0a
+2026-06-27 20:18:27,659 - INFO - + TAG_TIME='2021-09-16 22:53:35 +0200'
++ [[ 2021-09-16 22:53:35 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,659 - INFO - ++ git rev-list -n 1 v2.12.0
+2026-06-27 20:18:27,660 - INFO - + TAG_COMMIT=f6d3d3989852c903f01ca03dde9cb07687c7603f
+2026-06-27 20:18:27,660 - INFO - ++ git show -s --format=%ci f6d3d3989852c903f01ca03dde9cb07687c7603f
+2026-06-27 20:18:27,661 - INFO - + TAG_TIME='2021-11-25 15:21:25 +0100'
++ [[ 2021-11-25 15:21:25 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,661 - INFO - ++ git rev-list -n 1 v2.12.1
+2026-06-27 20:18:27,662 - INFO - + TAG_COMMIT=2c151378138594c5b3483a7a00bbf8e144fc4506
+2026-06-27 20:18:27,662 - INFO - ++ git show -s --format=%ci 2c151378138594c5b3483a7a00bbf8e144fc4506
+2026-06-27 20:18:27,663 - INFO - + TAG_TIME='2021-11-25 17:02:06 +0100'
++ [[ 2021-11-25 17:02:06 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,663 - INFO - ++ git rev-list -n 1 v2.12.2
+2026-06-27 20:18:27,664 - INFO - + TAG_COMMIT=eec287fae66f8fc514d5daa9caee46fd0e0cb6d9
+2026-06-27 20:18:27,664 - INFO - ++ git show -s --format=%ci eec287fae66f8fc514d5daa9caee46fd0e0cb6d9
+2026-06-27 20:18:27,665 - INFO - + TAG_TIME='2021-12-03 18:26:57 +0100'
++ [[ 2021-12-03 18:26:57 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,665 - INFO - ++ git rev-list -n 1 v2.13.0
+2026-06-27 20:18:27,666 - INFO - + TAG_COMMIT=fd0eb6c2af0e3e98350e24047c4df7d5b8aad89a
+2026-06-27 20:18:27,666 - INFO - ++ git show -s --format=%ci fd0eb6c2af0e3e98350e24047c4df7d5b8aad89a
+2026-06-27 20:18:27,667 - INFO - + TAG_TIME='2022-03-24 23:13:17 +0100'
++ [[ 2022-03-24 23:13:17 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,668 - INFO - ++ git rev-list -n 1 v2.13.1
+2026-06-27 20:18:27,669 - INFO - + TAG_COMMIT=0e1ca11ac65cbe5a65437518fca1e25f1ad0e48e
+2026-06-27 20:18:27,669 - INFO - ++ git show -s --format=%ci 0e1ca11ac65cbe5a65437518fca1e25f1ad0e48e
+2026-06-27 20:18:27,670 - INFO - + TAG_TIME='2022-03-26 14:07:02 +0100'
++ [[ 2022-03-26 14:07:02 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,670 - INFO - ++ git rev-list -n 1 v2.13.2
+2026-06-27 20:18:27,671 - INFO - + TAG_COMMIT=2066cab9bbe43341b84014ac9610e275db586431
+2026-06-27 20:18:27,671 - INFO - ++ git show -s --format=%ci 2066cab9bbe43341b84014ac9610e275db586431
+2026-06-27 20:18:27,672 - INFO - + TAG_TIME='2022-03-27 14:44:20 +0200'
++ [[ 2022-03-27 14:44:20 +0200 > 2023-07-29 09:34:01 -0400 ]]
+2026-06-27 20:18:27,672 - INFO - + read tag
+2026-06-27 20:18:27,672 - INFO - ++ git rev-list -n 1 v2.13.3
+2026-06-27 20:18:27,673 - INFO - + TAG_COMMIT=7591ac04dcefc527c42fd7713c909d1319e83fab
+2026-06-27 20:18:27,673 - INFO - ++ git show -s --format=%ci 7591ac04dcefc527c42fd7713c909d1319e83fab
+2026-06-27 20:18:27,674 - INFO - + TAG_TIME='2022-03-29 10:49:23 +0200'
++ [[ 2022-03-29 10:49:23 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,674 - INFO - ++ git rev-list -n 1 v2.13.4
+2026-06-27 20:18:27,675 - INFO - + TAG_COMMIT=14ae9e8985a70af1b04aa996c04a1a8c3fa8f463
+2026-06-27 20:18:27,675 - INFO - ++ git show -s --format=%ci 14ae9e8985a70af1b04aa996c04a1a8c3fa8f463
+2026-06-27 20:18:27,676 - INFO - + TAG_TIME='2022-03-31 09:47:42 +0200'
++ [[ 2022-03-31 09:47:42 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,676 - INFO - ++ git rev-list -n 1 v2.13.5
+2026-06-27 20:18:27,677 - INFO - + TAG_COMMIT=95cbd2bd14576cb5d9eade4798e73e8601c884de
+2026-06-27 20:18:27,677 - INFO - ++ git show -s --format=%ci 95cbd2bd14576cb5d9eade4798e73e8601c884de
+2026-06-27 20:18:27,678 - INFO - + TAG_TIME='2022-04-06 22:03:24 +0200'
++ [[ 2022-04-06 22:03:24 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,678 - INFO - ++ git rev-list -n 1 v2.13.6
+2026-06-27 20:18:27,679 - INFO - + TAG_COMMIT=19d660edb9b03913fc3c3f6e19a0c1463c547d93
+2026-06-27 20:18:27,679 - INFO - ++ git show -s --format=%ci 19d660edb9b03913fc3c3f6e19a0c1463c547d93
+2026-06-27 20:18:27,680 - INFO - + TAG_TIME='2022-04-20 10:34:35 +0200'
++ [[ 2022-04-20 10:34:35 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,680 - INFO - ++ git rev-list -n 1 v2.13.7
+2026-06-27 20:18:27,681 - INFO - + TAG_COMMIT=3b2fbaec045697d53bdd4435e59dbfc2b286df4b
+2026-06-27 20:18:27,681 - INFO - ++ git show -s --format=%ci 3b2fbaec045697d53bdd4435e59dbfc2b286df4b
+2026-06-27 20:18:27,682 - INFO - + TAG_TIME='2022-04-20 13:37:00 +0200'
++ [[ 2022-04-20 13:37:00 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,683 - INFO - ++ git rev-list -n 1 v2.13.8
+2026-06-27 20:18:27,683 - INFO - + TAG_COMMIT=45cbae2bab9001bb2f159103490a02d63e75ee5b
+2026-06-27 20:18:27,684 - INFO - ++ git show -s --format=%ci 45cbae2bab9001bb2f159103490a02d63e75ee5b
+2026-06-27 20:18:27,685 - INFO - + TAG_TIME='2022-05-02 16:38:19 +0200'
++ [[ 2022-05-02 16:38:19 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,685 - INFO - ++ git rev-list -n 1 v2.13.9
+2026-06-27 20:18:27,686 - INFO - + TAG_COMMIT=57014d6a45672d76f6a58a9533ff998268525165
+2026-06-27 20:18:27,686 - INFO - ++ git show -s --format=%ci 57014d6a45672d76f6a58a9533ff998268525165
+2026-06-27 20:18:27,687 - INFO - + TAG_TIME='2022-05-13 17:30:49 +0200'
++ [[ 2022-05-13 17:30:49 +0200 > 2023-07-29 09:34:01 -0400 ]]
+2026-06-27 20:18:27,687 - INFO - + read tag
+2026-06-27 20:18:27,687 - INFO - ++ git rev-list -n 1 v2.14.0
+2026-06-27 20:18:27,688 - INFO - + TAG_COMMIT=e910a0778fb5e6ddea1ce056dd0fb951cf4eee18
+2026-06-27 20:18:27,688 - INFO - ++ git show -s --format=%ci e910a0778fb5e6ddea1ce056dd0fb951cf4eee18
+2026-06-27 20:18:27,689 - INFO - + TAG_TIME='2022-06-01 16:33:17 +0200'
++ [[ 2022-06-01 16:33:17 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,689 - INFO - ++ git rev-list -n 1 v2.14.0-b1
+2026-06-27 20:18:27,690 - INFO - + TAG_COMMIT=2dfff17ec794c9cc08eef19b288398e67bdcb239
+2026-06-27 20:18:27,690 - INFO - ++ git show -s --format=%ci 2dfff17ec794c9cc08eef19b288398e67bdcb239
+2026-06-27 20:18:27,691 - INFO - + TAG_TIME='2022-05-10 12:32:38 +0200'
++ [[ 2022-05-10 12:32:38 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,691 - INFO - ++ git rev-list -n 1 v2.14.1
+2026-06-27 20:18:27,692 - INFO - + TAG_COMMIT=6447553ab509c9e811b7da53168e17fe2cadf187
+2026-06-27 20:18:27,692 - INFO - ++ git show -s --format=%ci 6447553ab509c9e811b7da53168e17fe2cadf187
+2026-06-27 20:18:27,693 - INFO - + TAG_TIME='2022-06-06 22:27:46 +0200'
++ [[ 2022-06-06 22:27:46 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,693 - INFO - ++ git rev-list -n 1 v2.14.2
+2026-06-27 20:18:27,694 - INFO - + TAG_COMMIT=f881219a66deaf9cef6467ba27c3385bc98dad82
+2026-06-27 20:18:27,694 - INFO - ++ git show -s --format=%ci f881219a66deaf9cef6467ba27c3385bc98dad82
+2026-06-27 20:18:27,695 - INFO - + TAG_TIME='2022-06-15 08:43:02 +0200'
++ [[ 2022-06-15 08:43:02 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,695 - INFO - ++ git rev-list -n 1 v2.14.3
+2026-06-27 20:18:27,696 - INFO - + TAG_COMMIT=680edebc686cad664bbed934a490aeafa775f163
+2026-06-27 20:18:27,697 - INFO - ++ git show -s --format=%ci 680edebc686cad664bbed934a490aeafa775f163
+2026-06-27 20:18:27,698 - INFO - + TAG_TIME='2022-06-18 10:31:21 +0200'
++ [[ 2022-06-18 10:31:21 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,698 - INFO - ++ git rev-list -n 1 v2.14.4
+2026-06-27 20:18:27,699 - INFO - + TAG_COMMIT=bf29a5520e8d0e432ca715e0614a62052b3809e2
+2026-06-27 20:18:27,699 - INFO - ++ git show -s --format=%ci bf29a5520e8d0e432ca715e0614a62052b3809e2
+2026-06-27 20:18:27,700 - INFO - + TAG_TIME='2022-06-29 15:44:58 +0200'
++ [[ 2022-06-29 15:44:58 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,700 - INFO - ++ git rev-list -n 1 v2.14.5
+2026-06-27 20:18:27,701 - INFO - + TAG_COMMIT=566ffca72a1a08c9e7ec14383c4710d64165c592
+2026-06-27 20:18:27,701 - INFO - ++ git show -s --format=%ci 566ffca72a1a08c9e7ec14383c4710d64165c592
+2026-06-27 20:18:27,702 - INFO - + TAG_TIME='2022-07-17 21:44:17 +0200'
++ [[ 2022-07-17 21:44:17 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,702 - INFO - ++ git rev-list -n 1 v2.15.0
+2026-06-27 20:18:27,703 - INFO - + TAG_COMMIT=24eaec26f701cf8adddf27ffa8859e0bb5074a89
+2026-06-27 20:18:27,703 - INFO - ++ git show -s --format=%ci 24eaec26f701cf8adddf27ffa8859e0bb5074a89
+2026-06-27 20:18:27,704 - INFO - + TAG_TIME='2022-08-26 10:37:28 +0200'
++ [[ 2022-08-26 10:37:28 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,704 - INFO - ++ git rev-list -n 1 v2.15.1
+2026-06-27 20:18:27,705 - INFO - + TAG_COMMIT=c5aefa2d11850e7ef099d15439916241f1707df8
+2026-06-27 20:18:27,705 - INFO - ++ git show -s --format=%ci c5aefa2d11850e7ef099d15439916241f1707df8
+2026-06-27 20:18:27,706 - INFO - + TAG_TIME='2022-09-06 23:33:59 +0200'
++ [[ 2022-09-06 23:33:59 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,707 - INFO - ++ git rev-list -n 1 v2.15.10
+2026-06-27 20:18:27,707 - INFO - + TAG_COMMIT=ea12a608b8b1bbe99717051f33dd74b22e2fae52
+2026-06-27 20:18:27,708 - INFO - ++ git show -s --format=%ci ea12a608b8b1bbe99717051f33dd74b22e2fae52
+2026-06-27 20:18:27,709 - INFO - + TAG_TIME='2023-01-09 10:37:24 +0100'
++ [[ 2023-01-09 10:37:24 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,709 - INFO - ++ git rev-list -n 1 v2.15.2
+2026-06-27 20:18:27,710 - INFO - + TAG_COMMIT=5716ad10104a9553ef9d64404b044c04947889b2
+2026-06-27 20:18:27,710 - INFO - ++ git show -s --format=%ci 5716ad10104a9553ef9d64404b044c04947889b2
+2026-06-27 20:18:27,711 - INFO - + TAG_TIME='2022-09-07 14:47:49 +0200'
++ [[ 2022-09-07 14:47:49 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,711 - INFO - ++ git rev-list -n 1 v2.15.3
+2026-06-27 20:18:27,712 - INFO - + TAG_COMMIT=403dac602ee01e317a22800e0d63bdeb0c2faa7e
+2026-06-27 20:18:27,712 - INFO - ++ git show -s --format=%ci 403dac602ee01e317a22800e0d63bdeb0c2faa7e
+2026-06-27 20:18:27,713 - INFO - + TAG_TIME='2022-09-19 16:19:58 +0200'
++ [[ 2022-09-19 16:19:58 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,713 - INFO - ++ git rev-list -n 1 v2.15.4
+2026-06-27 20:18:27,714 - INFO - + TAG_COMMIT=20af036e38c8cb8c16df4a12307319d6df4bee54
+2026-06-27 20:18:27,714 - INFO - ++ git show -s --format=%ci 20af036e38c8cb8c16df4a12307319d6df4bee54
+2026-06-27 20:18:27,715 - INFO - + TAG_TIME='2022-10-10 15:13:15 +0200'
++ [[ 2022-10-10 15:13:15 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,715 - INFO - ++ git rev-list -n 1 v2.15.5
+2026-06-27 20:18:27,716 - INFO - + TAG_COMMIT=bb17694867b1668db0cd3ae00c8a960d7f4b9868
+2026-06-27 20:18:27,717 - INFO - ++ git show -s --format=%ci bb17694867b1668db0cd3ae00c8a960d7f4b9868
+2026-06-27 20:18:27,718 - INFO - + TAG_TIME='2022-10-21 23:16:06 +0200'
++ [[ 2022-10-21 23:16:06 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,718 - INFO - ++ git rev-list -n 1 v2.15.6
+2026-06-27 20:18:27,719 - INFO - + TAG_COMMIT=b2af2b299c1206e035f44db90b1569b3e3b13511
+2026-06-27 20:18:27,719 - INFO - ++ git show -s --format=%ci b2af2b299c1206e035f44db90b1569b3e3b13511
+2026-06-27 20:18:27,720 - INFO - + TAG_TIME='2022-11-19 09:22:48 +0100'
++ [[ 2022-11-19 09:22:48 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,720 - INFO - ++ git rev-list -n 1 v2.15.7
+2026-06-27 20:18:27,721 - INFO - + TAG_COMMIT=5a96370ff556fd71cc228ccb5c26b70e55041028
+2026-06-27 20:18:27,721 - INFO - ++ git show -s --format=%ci 5a96370ff556fd71cc228ccb5c26b70e55041028
+2026-06-27 20:18:27,722 - INFO - + TAG_TIME='2022-11-29 12:09:46 +0100'
++ [[ 2022-11-29 12:09:46 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,722 - INFO - ++ git rev-list -n 1 v2.15.8
+2026-06-27 20:18:27,723 - INFO - + TAG_COMMIT=1f84ed912d088a9c2152ad7bc9b1aff0a66f389f
+2026-06-27 20:18:27,723 - INFO - ++ git show -s --format=%ci 1f84ed912d088a9c2152ad7bc9b1aff0a66f389f
+2026-06-27 20:18:27,724 - INFO - + TAG_TIME='2022-12-05 13:53:45 +0100'
++ [[ 2022-12-05 13:53:45 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,725 - INFO - ++ git rev-list -n 1 v2.15.9
+2026-06-27 20:18:27,725 - INFO - + TAG_COMMIT=1ded4d081480cccd573ddc6c592adccdc6723bb5
+2026-06-27 20:18:27,726 - INFO - ++ git show -s --format=%ci 1ded4d081480cccd573ddc6c592adccdc6723bb5
+2026-06-27 20:18:27,727 - INFO - + TAG_TIME='2022-12-17 15:03:05 +0100'
++ [[ 2022-12-17 15:03:05 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,727 - INFO - ++ git rev-list -n 1 v2.16.0
+2026-06-27 20:18:27,728 - INFO - + TAG_COMMIT=dcb0198d164b7f4306f60d854a6bd97ff65a62a4
+2026-06-27 20:18:27,728 - INFO - ++ git show -s --format=%ci dcb0198d164b7f4306f60d854a6bd97ff65a62a4
+2026-06-27 20:18:27,729 - INFO - + TAG_TIME='2023-02-01 11:50:49 +0100'
++ [[ 2023-02-01 11:50:49 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,729 - INFO - ++ git rev-list -n 1 v2.16.0b0
+2026-06-27 20:18:27,730 - INFO - + TAG_COMMIT=361a1f7533ccfcec58eb10fb517cc5b278fec411
+2026-06-27 20:18:27,730 - INFO - ++ git show -s --format=%ci 361a1f7533ccfcec58eb10fb517cc5b278fec411
+2026-06-27 20:18:27,731 - INFO - + TAG_TIME='2023-01-13 11:26:46 +0100'
++ [[ 2023-01-13 11:26:46 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,731 - INFO - ++ git rev-list -n 1 v2.16.0b1
+2026-06-27 20:18:27,732 - INFO - + TAG_COMMIT=8885a575151715f99f1914f824cb3f4efa75f452
+2026-06-27 20:18:27,732 - INFO - ++ git show -s --format=%ci 8885a575151715f99f1914f824cb3f4efa75f452
+2026-06-27 20:18:27,733 - INFO - + TAG_TIME='2023-01-22 15:29:01 +0100'
++ [[ 2023-01-22 15:29:01 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,733 - INFO - ++ git rev-list -n 1 v2.16.1
+2026-06-27 20:18:27,734 - INFO - + TAG_COMMIT=f48ec66d04429721ddfdf1613e33f6545a3da72e
+2026-06-27 20:18:27,734 - INFO - ++ git show -s --format=%ci f48ec66d04429721ddfdf1613e33f6545a3da72e
+2026-06-27 20:18:27,735 - INFO - + TAG_TIME='2023-02-02 17:12:50 +0100'
++ [[ 2023-02-02 17:12:50 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,736 - INFO - ++ git rev-list -n 1 v2.16.2
+2026-06-27 20:18:27,736 - INFO - + TAG_COMMIT=0006ae993340aecf1eefdc402bc58a6e611a1586
+2026-06-27 20:18:27,737 - INFO - ++ git show -s --format=%ci 0006ae993340aecf1eefdc402bc58a6e611a1586
+2026-06-27 20:18:27,738 - INFO - + TAG_TIME='2023-02-13 17:24:13 +0100'
++ [[ 2023-02-13 17:24:13 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,738 - INFO - ++ git rev-list -n 1 v2.16.3
+2026-06-27 20:18:27,739 - INFO - + TAG_COMMIT=08bac36eeb5006c7eb2e574049566e232bdbf5ed
+2026-06-27 20:18:27,739 - INFO - ++ git show -s --format=%ci 08bac36eeb5006c7eb2e574049566e232bdbf5ed
+2026-06-27 20:18:27,740 - INFO - + TAG_TIME='2023-03-03 11:24:26 +0100'
++ [[ 2023-03-03 11:24:26 +0100 > 2023-07-29 09:34:01 -0400 ]]
+2026-06-27 20:18:27,740 - INFO - + read tag
+2026-06-27 20:18:27,740 - INFO - ++ git rev-list -n 1 v2.16.4
+2026-06-27 20:18:27,741 - INFO - + TAG_COMMIT=8e7b809806ef94818ae595d4b654f398a3030dbe
+2026-06-27 20:18:27,741 - INFO - ++ git show -s --format=%ci 8e7b809806ef94818ae595d4b654f398a3030dbe
+2026-06-27 20:18:27,742 - INFO - + TAG_TIME='2023-03-06 15:55:57 +0100'
++ [[ 2023-03-06 15:55:57 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,742 - INFO - ++ git rev-list -n 1 v2.17.0
+2026-06-27 20:18:27,743 - INFO - + TAG_COMMIT=2e78c414d24c9819936351c133b3edcad970abaa
+2026-06-27 20:18:27,743 - INFO - ++ git show -s --format=%ci 2e78c414d24c9819936351c133b3edcad970abaa
+2026-06-27 20:18:27,745 - INFO - + TAG_TIME='2023-03-08 12:34:38 +0100'
++ [[ 2023-03-08 12:34:38 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,745 - INFO - ++ git rev-list -n 1 v2.17.1
+2026-06-27 20:18:27,746 - INFO - + TAG_COMMIT=b9c1ab3cd5323f5cb305a12c9e105102e4200ead
+2026-06-27 20:18:27,746 - INFO - ++ git show -s --format=%ci b9c1ab3cd5323f5cb305a12c9e105102e4200ead
+2026-06-27 20:18:27,747 - INFO - + TAG_TIME='2023-03-22 17:30:33 +0100'
++ [[ 2023-03-22 17:30:33 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,747 - INFO - ++ git rev-list -n 1 v2.17.2
+2026-06-27 20:18:27,748 - INFO - + TAG_COMMIT=de0147e92586be56cdee9711dd3d3a7a7e1c9ef2
+2026-06-27 20:18:27,748 - INFO - ++ git show -s --format=%ci de0147e92586be56cdee9711dd3d3a7a7e1c9ef2
+2026-06-27 20:18:27,749 - INFO - + TAG_TIME='2023-04-03 14:16:52 +0200'
++ [[ 2023-04-03 14:16:52 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,749 - INFO - ++ git rev-list -n 1 v2.17.3
+2026-06-27 20:18:27,750 - INFO - + TAG_COMMIT=389e14c36819cb87190fd412d3f366a3283f0078
+2026-06-27 20:18:27,750 - INFO - ++ git show -s --format=%ci 389e14c36819cb87190fd412d3f366a3283f0078
+2026-06-27 20:18:27,751 - INFO - + TAG_TIME='2023-04-24 20:17:48 +0200'
++ [[ 2023-04-24 20:17:48 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,751 - INFO - ++ git rev-list -n 1 v2.17.4
+2026-06-27 20:18:27,752 - INFO - + TAG_COMMIT=fc34a4b6abe56f3ac07ca15d846b1c1955545f85
+2026-06-27 20:18:27,752 - INFO - ++ git show -s --format=%ci fc34a4b6abe56f3ac07ca15d846b1c1955545f85
+2026-06-27 20:18:27,753 - INFO - + TAG_TIME='2023-05-06 17:20:29 +0200'
++ [[ 2023-05-06 17:20:29 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,754 - INFO - ++ git rev-list -n 1 v2.17.5
+2026-06-27 20:18:27,755 - INFO - + TAG_COMMIT=fe161df35f639e0ded268426d50551d174c6bd13
+2026-06-27 20:18:27,755 - INFO - ++ git show -s --format=%ci fe161df35f639e0ded268426d50551d174c6bd13
+2026-06-27 20:18:27,756 - INFO - + TAG_TIME='2023-07-26 09:30:49 +0000'
++ [[ 2023-07-26 09:30:49 +0000 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,756 - INFO - ++ git rev-list -n 1 v2.17.6
+2026-06-27 20:18:27,757 - INFO - + TAG_COMMIT=b8a7cc512d4e3dc24c010eef0526d294557e40ef
+2026-06-27 20:18:27,757 - INFO - ++ git show -s --format=%ci b8a7cc512d4e3dc24c010eef0526d294557e40ef
+2026-06-27 20:18:27,758 - INFO - + TAG_TIME='2023-09-25 13:49:04 +0200'
++ [[ 2023-09-25 13:49:04 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v2.17.6
+2026-06-27 20:18:27,759 - INFO - Deleted tag 'v2.17.6' (was b8a7cc512)
+2026-06-27 20:18:27,759 - INFO - + read tag
+2026-06-27 20:18:27,759 - INFO - ++ git rev-list -n 1 v2.17.7
+2026-06-27 20:18:27,760 - INFO - + TAG_COMMIT=dade880a65386de8c4e0f88e464d8dc573457133
+2026-06-27 20:18:27,760 - INFO - ++ git show -s --format=%ci dade880a65386de8c4e0f88e464d8dc573457133
+2026-06-27 20:18:27,761 - INFO - + TAG_TIME='2023-09-30 21:20:21 +0000'
++ [[ 2023-09-30 21:20:21 +0000 > 2023-07-29 09:34:01 -0400 ]]
+2026-06-27 20:18:27,761 - INFO - + git tag -d v2.17.7
+2026-06-27 20:18:27,765 - INFO - Deleted tag 'v2.17.7' (was dade880a6)
+2026-06-27 20:18:27,765 - INFO - + read tag
+2026-06-27 20:18:27,765 - INFO - ++ git rev-list -n 1 v2.8.2
+2026-06-27 20:18:27,766 - INFO - + TAG_COMMIT=091cb92314dc701f10390136da78fbbb362e892e
+2026-06-27 20:18:27,766 - INFO - ++ git show -s --format=%ci 091cb92314dc701f10390136da78fbbb362e892e
+2026-06-27 20:18:27,767 - INFO - + TAG_TIME='2021-04-26 17:57:12 +0200'
++ [[ 2021-04-26 17:57:12 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,767 - INFO - ++ git rev-list -n 1 v2.8.3
+2026-06-27 20:18:27,768 - INFO - + TAG_COMMIT=735c958d3b36fb5d343b7bcb81b1055a430cb042
+2026-06-27 20:18:27,768 - INFO - ++ git show -s --format=%ci 735c958d3b36fb5d343b7bcb81b1055a430cb042
+2026-06-27 20:18:27,769 - INFO - + TAG_TIME='2021-05-31 20:58:10 +0200'
++ [[ 2021-05-31 20:58:10 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,769 - INFO - ++ git rev-list -n 1 v2.9.0
+2026-06-27 20:18:27,770 - INFO - + TAG_COMMIT=a56b52550b88ba4234f1332b54c5cfd3e49368b3
+2026-06-27 20:18:27,770 - INFO - ++ git show -s --format=%ci a56b52550b88ba4234f1332b54c5cfd3e49368b3
+2026-06-27 20:18:27,772 - INFO - + TAG_TIME='2021-06-29 21:13:47 +0200'
++ [[ 2021-06-29 21:13:47 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,772 - INFO - ++ git rev-list -n 1 v2.9.1
+2026-06-27 20:18:27,773 - INFO - + TAG_COMMIT=0bd80afbbc211e93e81b4264cd3686d96239d92e
+2026-06-27 20:18:27,773 - INFO - ++ git show -s --format=%ci 0bd80afbbc211e93e81b4264cd3686d96239d92e
+2026-06-27 20:18:27,774 - INFO - + TAG_TIME='2021-06-30 13:29:18 +0200'
++ [[ 2021-06-30 13:29:18 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,774 - INFO - ++ git rev-list -n 1 v2.9.2
+2026-06-27 20:18:27,775 - INFO - + TAG_COMMIT=cb83d73b5c2cc36f8f0c57d0d448257da305b751
+2026-06-27 20:18:27,775 - INFO - ++ git show -s --format=%ci cb83d73b5c2cc36f8f0c57d0d448257da305b751
+2026-06-27 20:18:27,776 - INFO - + TAG_TIME='2021-07-01 10:35:08 +0200'
++ [[ 2021-07-01 10:35:08 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,776 - INFO - ++ git rev-list -n 1 v2.9.3
+2026-06-27 20:18:27,777 - INFO - + TAG_COMMIT=aa688de05e469e33a20478144013946ccb752736
+2026-06-27 20:18:27,777 - INFO - ++ git show -s --format=%ci aa688de05e469e33a20478144013946ccb752736
+2026-06-27 20:18:27,778 - INFO - + TAG_TIME='2021-07-01 14:54:36 +0200'
++ [[ 2021-07-01 14:54:36 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,778 - INFO - ++ git rev-list -n 1 v2.9.4
+2026-06-27 20:18:27,779 - INFO - + TAG_COMMIT=867d61b2345a1322474ad2a9772c9e1ef3e218c3
+2026-06-27 20:18:27,779 - INFO - ++ git show -s --format=%ci 867d61b2345a1322474ad2a9772c9e1ef3e218c3
+2026-06-27 20:18:27,780 - INFO - + TAG_TIME='2021-07-20 19:23:47 +0200'
++ [[ 2021-07-20 19:23:47 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,781 - INFO - ++ git rev-list -n 1 v2.9.5
+2026-06-27 20:18:27,781 - INFO - + TAG_COMMIT=ec8219e48f031f93377cc7d862a6f3bf80d76dbf
+2026-06-27 20:18:27,782 - INFO - ++ git show -s --format=%ci ec8219e48f031f93377cc7d862a6f3bf80d76dbf
+2026-06-27 20:18:27,783 - INFO - + TAG_TIME='2021-07-21 10:01:37 +0200'
++ [[ 2021-07-21 10:01:37 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,783 - INFO - ++ git rev-list -n 1 v2.9.6
+2026-06-27 20:18:27,784 - INFO - + TAG_COMMIT=444f654e23de0772036c0e29c8e5745e48a8970c
+2026-06-27 20:18:27,784 - INFO - ++ git show -s --format=%ci 444f654e23de0772036c0e29c8e5745e48a8970c
+2026-06-27 20:18:27,785 - INFO - + TAG_TIME='2021-07-25 20:26:55 +0200'
++ [[ 2021-07-25 20:26:55 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,785 - INFO - ++ git rev-list -n 1 v3.0.0
+2026-06-27 20:18:27,786 - INFO - + TAG_COMMIT=4a7ad5ea9f1c5a98ccf736578a00554be0da6dc7
+2026-06-27 20:18:27,786 - INFO - ++ git show -s --format=%ci 4a7ad5ea9f1c5a98ccf736578a00554be0da6dc7
+2026-06-27 20:18:27,787 - INFO - + TAG_TIME='2023-10-02 19:19:30 +0200'
++ [[ 2023-10-02 19:19:30 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.0.0
+2026-06-27 20:18:27,788 - INFO - Deleted tag 'v3.0.0' (was 4a7ad5ea9)
+2026-06-27 20:18:27,788 - INFO - + read tag
+2026-06-27 20:18:27,788 - INFO - ++ git rev-list -n 1 v3.0.0a6
+2026-06-27 20:18:27,789 - INFO - + TAG_COMMIT=0a805f88671eda9820be5b75590db5f4199fc6ba
+2026-06-27 20:18:27,789 - INFO - ++ git show -s --format=%ci 0a805f88671eda9820be5b75590db5f4199fc6ba
+2026-06-27 20:18:27,790 - INFO - + TAG_TIME='2023-04-01 17:10:17 +0200'
++ [[ 2023-04-01 17:10:17 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ read tag
+2026-06-27 20:18:27,790 - INFO - ++ git rev-list -n 1 v3.0.0a7
+2026-06-27 20:18:27,791 - INFO - + TAG_COMMIT=3259bc81ec3c92a1f00040f3e036f85d0ffc5da2
+2026-06-27 20:18:27,791 - INFO - ++ git show -s --format=%ci 3259bc81ec3c92a1f00040f3e036f85d0ffc5da2
+2026-06-27 20:18:27,792 - INFO - + TAG_TIME='2023-08-15 22:09:11 +0200'
++ [[ 2023-08-15 22:09:11 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.0.0a7
+2026-06-27 20:18:27,793 - INFO - Deleted tag 'v3.0.0a7' (was 3259bc81e)
+2026-06-27 20:18:27,793 - INFO - + read tag
+2026-06-27 20:18:27,794 - INFO - ++ git rev-list -n 1 v3.0.0b0
+2026-06-27 20:18:27,794 - INFO - + TAG_COMMIT=31f348f162c8960867f340e5ce56358897ef9e57
+2026-06-27 20:18:27,795 - INFO - ++ git show -s --format=%ci 31f348f162c8960867f340e5ce56358897ef9e57
+2026-06-27 20:18:27,796 - INFO - + TAG_TIME='2023-09-30 22:23:51 +0200'
++ [[ 2023-09-30 22:23:51 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.0.0b0
+2026-06-27 20:18:27,797 - INFO - Deleted tag 'v3.0.0b0' (was 31f348f16)
+2026-06-27 20:18:27,797 - INFO - + read tag
+2026-06-27 20:18:27,797 - INFO - ++ git rev-list -n 1 v3.0.1
+2026-06-27 20:18:27,798 - INFO - + TAG_COMMIT=f2cded41f7f3d4b45236cbe107b366b6caf84bde
+2026-06-27 20:18:27,798 - INFO - ++ git show -s --format=%ci f2cded41f7f3d4b45236cbe107b366b6caf84bde
+2026-06-27 20:18:27,799 - INFO - + TAG_TIME='2023-10-05 22:09:46 +0200'
++ [[ 2023-10-05 22:09:46 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.0.1
+2026-06-27 20:18:27,800 - INFO - Deleted tag 'v3.0.1' (was f2cded41f)
+2026-06-27 20:18:27,800 - INFO - + read tag
+2026-06-27 20:18:27,800 - INFO - ++ git rev-list -n 1 v3.0.2
+2026-06-27 20:18:27,801 - INFO - + TAG_COMMIT=efee9618894795cc8847727108522aa79431ee25
+2026-06-27 20:18:27,801 - INFO - ++ git show -s --format=%ci efee9618894795cc8847727108522aa79431ee25
+2026-06-27 20:18:27,802 - INFO - + TAG_TIME='2023-10-22 09:48:35 -0400'
++ [[ 2023-10-22 09:48:35 -0400 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.0.2
+2026-06-27 20:18:27,803 - INFO - Deleted tag 'v3.0.2' (was efee96188)
+2026-06-27 20:18:27,803 - INFO - + read tag
+2026-06-27 20:18:27,803 - INFO - ++ git rev-list -n 1 v3.0.3
+2026-06-27 20:18:27,804 - INFO - + TAG_COMMIT=1a5ffc1f447b77071ffe18a9c6836c09147ee2ed
+2026-06-27 20:18:27,804 - INFO - ++ git show -s --format=%ci 1a5ffc1f447b77071ffe18a9c6836c09147ee2ed
+2026-06-27 20:18:27,805 - INFO - + TAG_TIME='2023-12-11 08:16:40 -0500'
++ [[ 2023-12-11 08:16:40 -0500 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.0.3
+2026-06-27 20:18:27,806 - INFO - Deleted tag 'v3.0.3' (was 1a5ffc1f4)
+2026-06-27 20:18:27,806 - INFO - + read tag
+2026-06-27 20:18:27,806 - INFO - ++ git rev-list -n 1 v3.0.4
+2026-06-27 20:18:27,807 - INFO - + TAG_COMMIT=811538121f07173bab6a8a1e0366ed56b020954c
+2026-06-27 20:18:27,807 - INFO - ++ git show -s --format=%ci 811538121f07173bab6a8a1e0366ed56b020954c
+2026-06-27 20:18:27,808 - INFO - + TAG_TIME='2024-02-23 15:45:24 -0500'
+2026-06-27 20:18:27,809 - INFO - + [[ 2024-02-23 15:45:24 -0500 > 2023-07-29 09:34:01 -0400 ]]
+2026-06-27 20:18:27,809 - INFO - + git tag -d v3.0.4
+2026-06-27 20:18:27,809 - INFO - Deleted tag 'v3.0.4' (was 811538121)
+2026-06-27 20:18:27,809 - INFO - + read tag
+2026-06-27 20:18:27,810 - INFO - ++ git rev-list -n 1 v3.1.0
+2026-06-27 20:18:27,811 - INFO - + TAG_COMMIT=053c2c3a25f97f043e10cdd41d2609e495a68f57
+2026-06-27 20:18:27,811 - INFO - ++ git show -s --format=%ci 053c2c3a25f97f043e10cdd41d2609e495a68f57
+2026-06-27 20:18:27,812 - INFO - + TAG_TIME='2024-02-25 16:13:04 +0100'
++ [[ 2024-02-25 16:13:04 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.1.0
+2026-06-27 20:18:27,813 - INFO - Deleted tag 'v3.1.0' (was 053c2c3a2)
+2026-06-27 20:18:27,813 - INFO - + read tag
+2026-06-27 20:18:27,813 - INFO - ++ git rev-list -n 1 v3.2.0
+2026-06-27 20:18:27,814 - INFO - + TAG_COMMIT=b738d233e2df7651abae847e2331e2621482e5fb
+2026-06-27 20:18:27,814 - INFO - ++ git show -s --format=%ci b738d233e2df7651abae847e2331e2621482e5fb
+2026-06-27 20:18:27,815 - INFO - + TAG_TIME='2024-05-14 07:47:02 -0400'
++ [[ 2024-05-14 07:47:02 -0400 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.2.0
+2026-06-27 20:18:27,816 - INFO - Deleted tag 'v3.2.0' (was b738d233e)
+2026-06-27 20:18:27,816 - INFO - + read tag
+2026-06-27 20:18:27,816 - INFO - ++ git rev-list -n 1 v3.2.1
+2026-06-27 20:18:27,817 - INFO - + TAG_COMMIT=9223172074c4ca2bb5bff3b2c5a40190cc527fcf
+2026-06-27 20:18:27,817 - INFO - ++ git show -s --format=%ci 9223172074c4ca2bb5bff3b2c5a40190cc527fcf
+2026-06-27 20:18:27,818 - INFO - + TAG_TIME='2024-05-18 12:13:00 -0400'
++ [[ 2024-05-18 12:13:00 -0400 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.2.1
+2026-06-27 20:18:27,819 - INFO - Deleted tag 'v3.2.1' (was 922317207)
+2026-06-27 20:18:27,819 - INFO - + read tag
+2026-06-27 20:18:27,819 - INFO - ++ git rev-list -n 1 v3.2.2
+2026-06-27 20:18:27,820 - INFO - + TAG_COMMIT=769ffd20bbf321a6cf23f5e7221a0b8221f51482
+2026-06-27 20:18:27,820 - INFO - ++ git show -s --format=%ci 769ffd20bbf321a6cf23f5e7221a0b8221f51482
+2026-06-27 20:18:27,821 - INFO - + TAG_TIME='2024-05-20 09:18:56 +0200'
++ [[ 2024-05-20 09:18:56 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.2.2
+2026-06-27 20:18:27,822 - INFO - Deleted tag 'v3.2.2' (was 769ffd20b)
+2026-06-27 20:18:27,822 - INFO - + read tag
+2026-06-27 20:18:27,822 - INFO - ++ git rev-list -n 1 v3.2.3
+2026-06-27 20:18:27,823 - INFO - + TAG_COMMIT=918d2168e15662df90cfb993df100e566f69d418
+2026-06-27 20:18:27,823 - INFO - ++ git show -s --format=%ci 918d2168e15662df90cfb993df100e566f69d418
+2026-06-27 20:18:27,824 - INFO - + TAG_TIME='2024-06-06 16:16:20 +0200'
++ [[ 2024-06-06 16:16:20 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.2.3
+2026-06-27 20:18:27,825 - INFO - Deleted tag 'v3.2.3' (was 918d2168e)
+2026-06-27 20:18:27,825 - INFO - + read tag
+2026-06-27 20:18:27,826 - INFO - ++ git rev-list -n 1 v3.2.4
+2026-06-27 20:18:27,826 - INFO - + TAG_COMMIT=425ad66da9467bac9074de3f2294f7851cb3320b
+2026-06-27 20:18:27,827 - INFO - ++ git show -s --format=%ci 425ad66da9467bac9074de3f2294f7851cb3320b
+2026-06-27 20:18:27,828 - INFO - + TAG_TIME='2024-06-25 21:14:33 +0200'
++ [[ 2024-06-25 21:14:33 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.2.4
+2026-06-27 20:18:27,829 - INFO - Deleted tag 'v3.2.4' (was 425ad66da)
+2026-06-27 20:18:27,829 - INFO - + read tag
+2026-06-27 20:18:27,829 - INFO - ++ git rev-list -n 1 v3.2.5
+2026-06-27 20:18:27,830 - INFO - + TAG_COMMIT=ae730ac7721d2cb206c153f680605b83d66fbc84
+2026-06-27 20:18:27,830 - INFO - ++ git show -s --format=%ci ae730ac7721d2cb206c153f680605b83d66fbc84
+2026-06-27 20:18:27,831 - INFO - + TAG_TIME='2024-06-28 14:58:01 +0200'
++ [[ 2024-06-28 14:58:01 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.2.5
+2026-06-27 20:18:27,832 - INFO - Deleted tag 'v3.2.5' (was ae730ac77)
+2026-06-27 20:18:27,832 - INFO - + read tag
+2026-06-27 20:18:27,832 - INFO - ++ git rev-list -n 1 v3.2.6
+2026-06-27 20:18:27,833 - INFO - + TAG_COMMIT=da1956664d6be3d008a90ad3f72bdd9d8a7ecfaa
+2026-06-27 20:18:27,833 - INFO - ++ git show -s --format=%ci da1956664d6be3d008a90ad3f72bdd9d8a7ecfaa
+2026-06-27 20:18:27,834 - INFO - + TAG_TIME='2024-07-21 16:08:39 +0200'
++ [[ 2024-07-21 16:08:39 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.2.6
+2026-06-27 20:18:27,835 - INFO - Deleted tag 'v3.2.6' (was da1956664)
+2026-06-27 20:18:27,835 - INFO - + read tag
+2026-06-27 20:18:27,835 - INFO - ++ git rev-list -n 1 v3.2.7
+2026-06-27 20:18:27,836 - INFO - + TAG_COMMIT=a98215b8c6a6203dd56366bcfe1cd946fb41282a
+2026-06-27 20:18:27,836 - INFO - ++ git show -s --format=%ci a98215b8c6a6203dd56366bcfe1cd946fb41282a
+2026-06-27 20:18:27,837 - INFO - + TAG_TIME='2024-08-31 10:20:57 -0400'
++ [[ 2024-08-31 10:20:57 -0400 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.2.7
+2026-06-27 20:18:27,838 - INFO - Deleted tag 'v3.2.7' (was a98215b8c)
+2026-06-27 20:18:27,838 - INFO - + read tag
+2026-06-27 20:18:27,838 - INFO - ++ git rev-list -n 1 v3.3.0
+2026-06-27 20:18:27,839 - INFO - + TAG_COMMIT=6350dfa900b11de442bc562564884037ca8bc4f6
+2026-06-27 20:18:27,839 - INFO - ++ git show -s --format=%ci 6350dfa900b11de442bc562564884037ca8bc4f6
+2026-06-27 20:18:27,840 - INFO - + TAG_TIME='2024-09-20 14:57:28 +0200'
++ [[ 2024-09-20 14:57:28 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.3.0
+2026-06-27 20:18:27,841 - INFO - Deleted tag 'v3.3.0' (was 6350dfa90)
+2026-06-27 20:18:27,841 - INFO - + read tag
+2026-06-27 20:18:27,842 - INFO - ++ git rev-list -n 1 v3.3.1
+2026-06-27 20:18:27,844 - INFO - + TAG_COMMIT=76bce72bc57cc8089e439cc9d22fed5806341ed4
+++ git show -s --format=%ci 76bce72bc57cc8089e439cc9d22fed5806341ed4
+2026-06-27 20:18:27,844 - INFO - + TAG_TIME='2024-09-24 06:33:28 +0200'
++ [[ 2024-09-24 06:33:28 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.3.1
+2026-06-27 20:18:27,845 - INFO - Deleted tag 'v3.3.1' (was 76bce72bc)
+2026-06-27 20:18:27,845 - INFO - + read tag
+2026-06-27 20:18:27,845 - INFO - ++ git rev-list -n 1 v3.3.2
+2026-06-27 20:18:27,846 - INFO - + TAG_COMMIT=a5a1bc3a9602d08f15ac90ad12f5b25bde375613
+2026-06-27 20:18:27,846 - INFO - ++ git show -s --format=%ci a5a1bc3a9602d08f15ac90ad12f5b25bde375613
+2026-06-27 20:18:27,847 - INFO - + TAG_TIME='2024-12-01 19:37:20 +0100'
++ [[ 2024-12-01 19:37:20 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.3.2
+2026-06-27 20:18:27,848 - INFO - Deleted tag 'v3.3.2' (was a5a1bc3a9)
+2026-06-27 20:18:27,848 - INFO - + read tag
+2026-06-27 20:18:27,848 - INFO - ++ git rev-list -n 1 v3.3.3
+2026-06-27 20:18:27,849 - INFO - + TAG_COMMIT=c28580be76fe1ec55a6cac41833c0bd68070d2f7
+2026-06-27 20:18:27,849 - INFO - ++ git show -s --format=%ci c28580be76fe1ec55a6cac41833c0bd68070d2f7
+2026-06-27 20:18:27,850 - INFO - + TAG_TIME='2024-12-23 18:28:05 -0800'
++ [[ 2024-12-23 18:28:05 -0800 > 2023-07-29 09:34:01 -0400 ]]
+2026-06-27 20:18:27,851 - INFO - + git tag -d v3.3.3
+2026-06-27 20:18:27,851 - INFO - Deleted tag 'v3.3.3' (was c28580be7)
+2026-06-27 20:18:27,852 - INFO - + read tag
+2026-06-27 20:18:27,852 - INFO - ++ git rev-list -n 1 v3.3.4
+2026-06-27 20:18:27,853 - INFO - + TAG_COMMIT=c2b01c3d0b6410d4c93eb1f32fb28f2116b1e68f
+2026-06-27 20:18:27,853 - INFO - ++ git show -s --format=%ci c2b01c3d0b6410d4c93eb1f32fb28f2116b1e68f
+2026-06-27 20:18:27,854 - INFO - + TAG_TIME='2025-01-28 14:06:04 +0100'
++ [[ 2025-01-28 14:06:04 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.3.4
+2026-06-27 20:18:27,855 - INFO - Deleted tag 'v3.3.4' (was c2b01c3d0)
+2026-06-27 20:18:27,855 - INFO - + read tag
+2026-06-27 20:18:27,855 - INFO - ++ git rev-list -n 1 v3.3.5
+2026-06-27 20:18:27,856 - INFO - + TAG_COMMIT=aaab3ccb541532d2bcdf0410ab93ff4fafc266f5
+2026-06-27 20:18:27,856 - INFO - ++ git show -s --format=%ci aaab3ccb541532d2bcdf0410ab93ff4fafc266f5
+2026-06-27 20:18:27,857 - INFO - + TAG_TIME='2025-03-09 07:41:40 +0100'
++ [[ 2025-03-09 07:41:40 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.3.5
+2026-06-27 20:18:27,858 - INFO - Deleted tag 'v3.3.5' (was aaab3ccb5)
+2026-06-27 20:18:27,858 - INFO - + read tag
+2026-06-27 20:18:27,858 - INFO - ++ git rev-list -n 1 v3.3.5a0
+2026-06-27 20:18:27,859 - INFO - + TAG_COMMIT=1052bc8b2fed14105fa291dd3dff104aa2db4694
+2026-06-27 20:18:27,859 - INFO - ++ git show -s --format=%ci 1052bc8b2fed14105fa291dd3dff104aa2db4694
+2026-06-27 20:18:27,860 - INFO - + TAG_TIME='2025-03-08 23:10:27 +0100'
++ [[ 2025-03-08 23:10:27 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.3.5a0
+2026-06-27 20:18:27,861 - INFO - Deleted tag 'v3.3.5a0' (was 1052bc8b2)
+2026-06-27 20:18:27,861 - INFO - + read tag
+2026-06-27 20:18:27,861 - INFO - ++ git rev-list -n 1 v3.3.6
+2026-06-27 20:18:27,862 - INFO - + TAG_COMMIT=7ac5a4d4f77576df3a00e63f86ca86e0e1780b47
+2026-06-27 20:18:27,862 - INFO - ++ git show -s --format=%ci 7ac5a4d4f77576df3a00e63f86ca86e0e1780b47
+2026-06-27 20:18:27,863 - INFO - + TAG_TIME='2025-03-20 07:18:44 -0400'
++ [[ 2025-03-20 07:18:44 -0400 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.3.6
+2026-06-27 20:18:27,864 - INFO - Deleted tag 'v3.3.6' (was 7ac5a4d4f)
+2026-06-27 20:18:27,864 - INFO - + read tag
+2026-06-27 20:18:27,864 - INFO - ++ git rev-list -n 1 v3.3.7
+2026-06-27 20:18:27,865 - INFO - + TAG_COMMIT=f798a4a3508bcbb8ad0773ae14bf32d28dcfdcbe
+2026-06-27 20:18:27,865 - INFO - ++ git show -s --format=%ci f798a4a3508bcbb8ad0773ae14bf32d28dcfdcbe
+2026-06-27 20:18:27,867 - INFO - + TAG_TIME='2025-05-04 15:56:48 +0000'
++ [[ 2025-05-04 15:56:48 +0000 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.3.7
+2026-06-27 20:18:27,867 - INFO - Deleted tag 'v3.3.7' (was f798a4a35)
+2026-06-27 20:18:27,868 - INFO - + read tag
+2026-06-27 20:18:27,868 - INFO - ++ git rev-list -n 1 v3.3.8
+2026-06-27 20:18:27,869 - INFO - + TAG_COMMIT=98942ba4126a6fe1657bad77027bcc11016d16da
+2026-06-27 20:18:27,869 - INFO - ++ git show -s --format=%ci 98942ba4126a6fe1657bad77027bcc11016d16da
+2026-06-27 20:18:27,870 - INFO - + TAG_TIME='2025-08-09 11:08:50 +0200'
++ [[ 2025-08-09 11:08:50 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.3.8
+2026-06-27 20:18:27,871 - INFO - Deleted tag 'v3.3.8' (was 98942ba41)
+2026-06-27 20:18:27,871 - INFO - + read tag
+2026-06-27 20:18:27,871 - INFO - ++ git rev-list -n 1 v3.3.9
+2026-06-27 20:18:27,872 - INFO - + TAG_COMMIT=4cab7ca4eae88b75960fcf2479b8ddd377dd4ce2
+2026-06-27 20:18:27,872 - INFO - ++ git show -s --format=%ci 4cab7ca4eae88b75960fcf2479b8ddd377dd4ce2
+2026-06-27 20:18:27,873 - INFO - + TAG_TIME='2025-10-05 18:28:22 +0000'
++ [[ 2025-10-05 18:28:22 +0000 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v3.3.9
+2026-06-27 20:18:27,874 - INFO - Deleted tag 'v3.3.9' (was 4cab7ca4e)
+2026-06-27 20:18:27,874 - INFO - + read tag
+2026-06-27 20:18:27,874 - INFO - ++ git rev-list -n 1 v4.0.0
+2026-06-27 20:18:27,875 - INFO - + TAG_COMMIT=0939ac584f16288138ee43002758d912de531be6
+2026-06-27 20:18:27,875 - INFO - ++ git show -s --format=%ci 0939ac584f16288138ee43002758d912de531be6
+2026-06-27 20:18:27,876 - INFO - + TAG_TIME='2025-10-12 17:10:24 +0200'
++ [[ 2025-10-12 17:10:24 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v4.0.0
+2026-06-27 20:18:27,877 - INFO - Deleted tag 'v4.0.0' (was 0939ac584)
+2026-06-27 20:18:27,877 - INFO - + read tag
+2026-06-27 20:18:27,877 - INFO - ++ git rev-list -n 1 v4.0.1
+2026-06-27 20:18:27,878 - INFO - + TAG_COMMIT=9a3035053154ba0c3ca3b300d6bc9fa72b95d552
+2026-06-27 20:18:27,878 - INFO - ++ git show -s --format=%ci 9a3035053154ba0c3ca3b300d6bc9fa72b95d552
+2026-06-27 20:18:27,879 - INFO - + TAG_TIME='2025-10-15 07:39:08 +0200'
++ [[ 2025-10-15 07:39:08 +0200 > 2023-07-29 09:34:01 -0400 ]]
+2026-06-27 20:18:27,880 - INFO - + git tag -d v4.0.1
+2026-06-27 20:18:27,880 - INFO - Deleted tag 'v4.0.1' (was 9a3035053)
+2026-06-27 20:18:27,880 - INFO - + read tag
+2026-06-27 20:18:27,881 - INFO - ++ git rev-list -n 1 v4.0.2
+2026-06-27 20:18:27,881 - INFO - + TAG_COMMIT=0eb92d25fd38ba5bad2f8d2ea7df63ad23e18ae3
+2026-06-27 20:18:27,882 - INFO - ++ git show -s --format=%ci 0eb92d25fd38ba5bad2f8d2ea7df63ad23e18ae3
+2026-06-27 20:18:27,883 - INFO - + TAG_TIME='2025-10-20 09:00:36 -0400'
++ [[ 2025-10-20 09:00:36 -0400 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v4.0.2
+2026-06-27 20:18:27,884 - INFO - Deleted tag 'v4.0.2' (was 0eb92d25f)
+2026-06-27 20:18:27,884 - INFO - + read tag
+2026-06-27 20:18:27,884 - INFO - ++ git rev-list -n 1 v4.0.3
+2026-06-27 20:18:27,885 - INFO - + TAG_COMMIT=84b6552b86e210097ac29de7ef64b152efb4a454
+2026-06-27 20:18:27,885 - INFO - ++ git show -s --format=%ci 84b6552b86e210097ac29de7ef64b152efb4a454
+2026-06-27 20:18:27,886 - INFO - + TAG_TIME='2025-11-13 15:56:42 +0100'
++ [[ 2025-11-13 15:56:42 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v4.0.3
+2026-06-27 20:18:27,887 - INFO - Deleted tag 'v4.0.3' (was 84b6552b8)
+2026-06-27 20:18:27,887 - INFO - + read tag
+2026-06-27 20:18:27,887 - INFO - ++ git rev-list -n 1 v4.0.4
+2026-06-27 20:18:27,888 - INFO - + TAG_COMMIT=e16f942166511d6fb4427e503a734152fae0c4fe
+2026-06-27 20:18:27,888 - INFO - ++ git show -s --format=%ci e16f942166511d6fb4427e503a734152fae0c4fe
+2026-06-27 20:18:27,889 - INFO - + TAG_TIME='2025-11-30 08:24:33 -0500'
++ [[ 2025-11-30 08:24:33 -0500 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v4.0.4
+2026-06-27 20:18:27,890 - INFO - Deleted tag 'v4.0.4' (was e16f94216)
+2026-06-27 20:18:27,890 - INFO - + read tag
+2026-06-27 20:18:27,890 - INFO - ++ git rev-list -n 1 v4.0.5
+2026-06-27 20:18:27,891 - INFO - + TAG_COMMIT=88e1ab7545a4af4aea15c305a154c164a95ab842
+2026-06-27 20:18:27,891 - INFO - ++ git show -s --format=%ci 88e1ab7545a4af4aea15c305a154c164a95ab842
+2026-06-27 20:18:27,892 - INFO - + TAG_TIME='2026-02-20 10:02:31 +0100'
++ [[ 2026-02-20 10:02:31 +0100 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v4.0.5
+2026-06-27 20:18:27,893 - INFO - Deleted tag 'v4.0.5' (was 88e1ab754)
+2026-06-27 20:18:27,893 - INFO - + read tag
+2026-06-27 20:18:27,894 - INFO - ++ git rev-list -n 1 v4.0.6
+2026-06-27 20:18:27,894 - INFO - + TAG_COMMIT=8a396357098337ba8be714fffdf2d00947a9778c
+2026-06-27 20:18:27,895 - INFO - ++ git show -s --format=%ci 8a396357098337ba8be714fffdf2d00947a9778c
+2026-06-27 20:18:27,896 - INFO - + TAG_TIME='2026-06-14 16:38:18 +0200'
++ [[ 2026-06-14 16:38:18 +0200 > 2023-07-29 09:34:01 -0400 ]]
++ git tag -d v4.0.6
+2026-06-27 20:18:27,897 - INFO - Deleted tag 'v4.0.6' (was 8a3963570)
+2026-06-27 20:18:27,897 - INFO - + read tag
+2026-06-27 20:18:27,897 - INFO - + git reflog expire --expire=now --all
+2026-06-27 20:18:27,898 - INFO - + git gc --prune=now --aggressive
+2026-06-27 20:18:30,377 - INFO - ++ date -d '2023-07-29 09:34:01 -0400 + 1 second' '+%Y-%m-%d %H:%M:%S'
+2026-06-27 20:18:30,377 - INFO - + AFTER_TIMESTAMP='2023-07-29 13:34:02'
+2026-06-27 20:18:30,378 - INFO - ++ git log --oneline --all '--since=2023-07-29 13:34:02'
+++ wc -l
+2026-06-27 20:18:30,380 - INFO - + COMMIT_COUNT=0
++ '[' 0 -eq 0 ']'
++ source /opt/miniconda3/bin/activate
+2026-06-27 20:18:30,380 - INFO - ++ _CONDA_ROOT=/opt/miniconda3
+++ . /opt/miniconda3/etc/profile.d/conda.sh
++++ export CONDA_EXE=/opt/miniconda3/bin/conda
++++ CONDA_EXE=/opt/miniconda3/bin/conda
++++ export _CE_M=
++++ _CE_M=
++++ export _CE_CONDA=
++++ _CE_CONDA=
++++ export CONDA_PYTHON_EXE=/opt/miniconda3/bin/python
++++ CONDA_PYTHON_EXE=/opt/miniconda3/bin/python
+2026-06-27 20:18:30,380 - INFO - +++ '[' -z '' ']'
++++ export CONDA_SHLVL=0
++++ CONDA_SHLVL=0
++++ '[' -n '' ']'
+2026-06-27 20:18:30,380 - INFO - +++++ dirname /opt/miniconda3/bin/conda
+2026-06-27 20:18:30,381 - INFO - ++++ dirname /opt/miniconda3/bin
+2026-06-27 20:18:30,381 - INFO - +++ PATH=/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
++++ export PATH
++++ '[' -z '' ']'
++++ PS1=
+2026-06-27 20:18:30,381 - INFO - ++ conda activate
+2026-06-27 20:18:30,381 - INFO - ++ local cmd=activate
+++ case "$cmd" in
+++ __conda_activate activate
+2026-06-27 20:18:30,381 - INFO - ++ '[' -n '' ']'
+++ local ask_conda
+2026-06-27 20:18:30,381 - INFO - +++ PS1=
++++ __conda_exe shell.posix activate
+2026-06-27 20:18:30,381 - INFO - +++ /opt/miniconda3/bin/conda shell.posix activate
+2026-06-27 20:18:30,430 - INFO - ++ ask_conda='PS1='\''(base) '\''
+export PATH='\''/opt/miniconda3/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'\''
+export CONDA_PREFIX='\''/opt/miniconda3'\''
+export CONDA_SHLVL='\''1'\''
+export CONDA_DEFAULT_ENV='\''base'\''
+export CONDA_PROMPT_MODIFIER='\''(base) '\''
+export CONDA_EXE='\''/opt/miniconda3/bin/conda'\''
+export _CE_M='\'''\''
+export _CE_CONDA='\'''\''
+export CONDA_PYTHON_EXE='\''/opt/miniconda3/bin/python'\'''
+++ eval 'PS1='\''(base) '\''
+export PATH='\''/opt/miniconda3/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'\''
+export CONDA_PREFIX='\''/opt/miniconda3'\''
+export CONDA_SHLVL='\''1'\''
+export CONDA_DEFAULT_ENV='\''base'\''
+export CONDA_PROMPT_MODIFIER='\''(base) '\''
+export CONDA_EXE='\''/opt/miniconda3/bin/conda'\''
+export _CE_M='\'''\''
+export _CE_CONDA='\'''\''
+export CONDA_PYTHON_EXE='\''/opt/miniconda3/bin/python'\'''
++++ PS1='(base) '
++++ export PATH=/opt/miniconda3/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
++++ PATH=/opt/miniconda3/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
++++ export CONDA_PREFIX=/opt/miniconda3
++++ CONDA_PREFIX=/opt/miniconda3
++++ export CONDA_SHLVL=1
++++ CONDA_SHLVL=1
++++ export CONDA_DEFAULT_ENV=base
++++ CONDA_DEFAULT_ENV=base
++++ export 'CONDA_PROMPT_MODIFIER=(base) '
++++ CONDA_PROMPT_MODIFIER='(base) '
++++ export CONDA_EXE=/opt/miniconda3/bin/conda
++++ CONDA_EXE=/opt/miniconda3/bin/conda
++++ export _CE_M=
++++ _CE_M=
++++ export _CE_CONDA=
++++ _CE_CONDA=
++++ export CONDA_PYTHON_EXE=/opt/miniconda3/bin/python
++++ CONDA_PYTHON_EXE=/opt/miniconda3/bin/python
+++ __conda_hashr
+2026-06-27 20:18:30,430 - INFO - ++ '[' -n '' ']'
+++ '[' -n '' ']'
+++ hash -r
++ conda activate testbed
++ local cmd=activate
++ case "$cmd" in
++ __conda_activate activate testbed
++ '[' -n '' ']'
++ local ask_conda
+2026-06-27 20:18:30,430 - INFO - ++ PS1='(base) '
+++ __conda_exe shell.posix activate testbed
+2026-06-27 20:18:30,431 - INFO - ++ /opt/miniconda3/bin/conda shell.posix activate testbed
+2026-06-27 20:18:30,485 - INFO - + ask_conda='PS1='\''(testbed) '\''
+export PATH='\''/opt/miniconda3/envs/testbed/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'\''
+export CONDA_PREFIX='\''/opt/miniconda3/envs/testbed'\''
+export CONDA_SHLVL='\''2'\''
+export CONDA_DEFAULT_ENV='\''testbed'\''
+export CONDA_PROMPT_MODIFIER='\''(testbed) '\''
+export CONDA_PREFIX_1='\''/opt/miniconda3'\''
+export CONDA_EXE='\''/opt/miniconda3/bin/conda'\''
+export _CE_M='\'''\''
+export _CE_CONDA='\'''\''
+export CONDA_PYTHON_EXE='\''/opt/miniconda3/bin/python'\'''
++ eval 'PS1='\''(testbed) '\''
+export PATH='\''/opt/miniconda3/envs/testbed/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'\''
+export CONDA_PREFIX='\''/opt/miniconda3/envs/testbed'\''
+export CONDA_SHLVL='\''2'\''
+export CONDA_DEFAULT_ENV='\''testbed'\''
+export CONDA_PROMPT_MODIFIER='\''(testbed) '\''
+export CONDA_PREFIX_1='\''/opt/miniconda3'\''
+export CONDA_EXE='\''/opt/miniconda3/bin/conda'\''
+export _CE_M='\'''\''
+export _CE_CONDA='\'''\''
+export CONDA_PYTHON_EXE='\''/opt/miniconda3/bin/python'\'''
+++ PS1='(testbed) '
+++ export PATH=/opt/miniconda3/envs/testbed/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ PATH=/opt/miniconda3/envs/testbed/bin:/opt/miniconda3/condabin:/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ export CONDA_PREFIX=/opt/miniconda3/envs/testbed
+++ CONDA_PREFIX=/opt/miniconda3/envs/testbed
+++ export CONDA_SHLVL=2
+++ CONDA_SHLVL=2
+++ export CONDA_DEFAULT_ENV=testbed
+++ CONDA_DEFAULT_ENV=testbed
+++ export 'CONDA_PROMPT_MODIFIER=(testbed) '
+++ CONDA_PROMPT_MODIFIER='(testbed) '
+++ export CONDA_PREFIX_1=/opt/miniconda3
+++ CONDA_PREFIX_1=/opt/miniconda3
+++ export CONDA_EXE=/opt/miniconda3/bin/conda
+++ CONDA_EXE=/opt/miniconda3/bin/conda
+++ export _CE_M=
+++ _CE_M=
+++ export _CE_CONDA=
+++ _CE_CONDA=
+++ export CONDA_PYTHON_EXE=/opt/miniconda3/bin/python
+++ CONDA_PYTHON_EXE=/opt/miniconda3/bin/python
++ __conda_hashr
++ '[' -n '' ']'
++ '[' -n '' ']'
++ hash -r
+2026-06-27 20:18:30,485 - INFO - Current environment: testbed
+2026-06-27 20:18:30,485 - INFO - + echo 'Current environment: testbed'
++ python -m pip install -e .
+2026-06-27 20:18:30,490 - INFO - Error processing line 1 of /opt/miniconda3/envs/testbed/lib/python3.9/site-packages/distutils-precedence.pth:
+2026-06-27 20:18:30,493 - INFO - Traceback (most recent call last):
+    File "/opt/miniconda3/envs/testbed/lib/python3.9/site.py", line 177, in addpackage
+      exec(line)
+    File "<string>", line 1, in <module>
+  ModuleNotFoundError: No module named '_distutils_hack'
+
+Remainder of file ignored
+2026-06-27 20:18:30,616 - INFO - Obtaining file:///testbed
+2026-06-27 20:18:30,618 - INFO - Installing build dependencies: started
+2026-06-27 20:18:31,041 - INFO - Installing build dependencies: finished with status 'done'
+2026-06-27 20:18:31,042 - INFO - Checking if build backend supports build_editable: started
+2026-06-27 20:18:31,213 - INFO - Checking if build backend supports build_editable: finished with status 'done'
+2026-06-27 20:18:31,214 - INFO - Getting requirements to build editable: started
+2026-06-27 20:18:31,397 - INFO - Getting requirements to build editable: finished with status 'done'
+2026-06-27 20:18:31,398 - INFO - Preparing editable metadata (pyproject.toml): started
+2026-06-27 20:18:31,531 - INFO - Preparing editable metadata (pyproject.toml): finished with status 'done'
+2026-06-27 20:18:31,535 - INFO - Requirement already satisfied: platformdirs>=2.2.0 in /opt/miniconda3/envs/testbed/lib/python3.9/site-packages (from pylint==3.0.0b1) (4.4.0)
+2026-06-27 20:18:31,618 - INFO - Collecting astroid<=3.1.0-dev0,>=3.0.0a8 (from pylint==3.0.0b1)
+2026-06-27 20:18:31,739 - INFO - Downloading astroid-3.0.3-py3-none-any.whl.metadata (4.5 kB)
+2026-06-27 20:18:31,789 - INFO - Collecting isort<6,>=4.2.5 (from pylint==3.0.0b1)
+2026-06-27 20:18:31,795 - INFO - Downloading isort-5.13.2-py3-none-any.whl.metadata (12 kB)
+2026-06-27 20:18:31,817 - INFO - Collecting mccabe<0.8,>=0.6 (from pylint==3.0.0b1)
+2026-06-27 20:18:31,823 - INFO - Downloading mccabe-0.7.0-py2.py3-none-any.whl.metadata (5.0 kB)
+2026-06-27 20:18:31,829 - INFO - Requirement already satisfied: tomlkit>=0.10.1 in /opt/miniconda3/envs/testbed/lib/python3.9/site-packages (from pylint==3.0.0b1) (0.11.8)
+2026-06-27 20:18:31,829 - INFO - Requirement already satisfied: typing-extensions>=3.10.0 in /opt/miniconda3/envs/testbed/lib/python3.9/site-packages (from pylint==3.0.0b1) (4.15.0)
+2026-06-27 20:18:31,844 - INFO - Collecting dill>=0.2 (from pylint==3.0.0b1)
+2026-06-27 20:18:31,851 - INFO - Downloading dill-0.4.1-py3-none-any.whl.metadata (10 kB)
+2026-06-27 20:18:31,857 - INFO - Requirement already satisfied: tomli>=1.1.0 in /opt/miniconda3/envs/testbed/lib/python3.9/site-packages (from pylint==3.0.0b1) (2.4.1)
+2026-06-27 20:18:31,865 - INFO - Downloading astroid-3.0.3-py3-none-any.whl (275 kB)
+2026-06-27 20:18:31,916 - INFO - Downloading isort-5.13.2-py3-none-any.whl (92 kB)
+2026-06-27 20:18:31,927 - INFO - Downloading mccabe-0.7.0-py2.py3-none-any.whl (7.3 kB)
+2026-06-27 20:18:31,940 - INFO - Downloading dill-0.4.1-py3-none-any.whl (120 kB)
+2026-06-27 20:18:31,947 - INFO - Building wheels for collected packages: pylint
+2026-06-27 20:18:31,948 - INFO - Building editable for pylint (pyproject.toml): started
+2026-06-27 20:18:32,093 - INFO - Building editable for pylint (pyproject.toml): finished with status 'done'
+2026-06-27 20:18:32,093 - INFO - Created wheel for pylint: filename=pylint-3.0.0b1-0.editable-py3-none-any.whl size=25475 sha256=b4e1a5cd2c2cdfb3e58ca9bc3f4882f38440c424c7deb080d94c4cd2cd0bd860
+2026-06-27 20:18:32,093 - INFO - Stored in directory: /tmp/pip-ephem-wheel-cache-_igqy261/wheels/7d/66/67/70d1ee2124ccf21d601c352e25cdca10f611f7c8b3f9ffb9e4
+2026-06-27 20:18:32,095 - INFO - Successfully built pylint
+2026-06-27 20:18:32,113 - INFO - Installing collected packages: mccabe, isort, dill, astroid, pylint
+2026-06-27 20:18:32,198 - INFO - Attempting uninstall: astroid
+2026-06-27 20:18:32,199 - INFO - Found existing installation: astroid 3.0.0a6
+2026-06-27 20:18:32,203 - INFO - Uninstalling astroid-3.0.0a6:
+2026-06-27 20:18:32,258 - INFO - Successfully uninstalled astroid-3.0.0a6
+2026-06-27 20:18:32,340 - INFO - 
+2026-06-27 20:18:32,343 - INFO - Successfully installed astroid-3.0.3 dill-0.4.1 isort-5.13.2 mccabe-0.7.0 pylint-3.0.0b1
+2026-06-27 20:18:32,343 - INFO - WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+2026-06-27 20:18:32,371 - INFO - + git config --global user.email setup@swebench.config
+2026-06-27 20:18:32,372 - INFO - + git config --global user.name SWE-bench
+2026-06-27 20:18:32,373 - INFO - + git commit --allow-empty -am SWE-bench
+2026-06-27 20:18:32,434 - INFO - [main c9d550837] SWE-bench
+2026-06-27 20:18:35,123 - INFO - ---> Removed intermediate container d341c2e385a8
+2026-06-27 20:18:35,123 - INFO - ---> bac66205b46b
+2026-06-27 20:18:35,123 - INFO - Step 5/5 : WORKDIR /testbed/
+2026-06-27 20:18:35,123 - INFO - 
+2026-06-27 20:18:35,211 - INFO - ---> Running in 8df001bb3797
+2026-06-27 20:18:37,098 - INFO - ---> Removed intermediate container 8df001bb3797
+2026-06-27 20:18:37,098 - INFO - ---> 6cd80b9dfdd6
+2026-06-27 20:18:37,106 - INFO - Successfully built 6cd80b9dfdd6
+2026-06-27 20:18:37,121 - INFO - Successfully tagged sweb.eval.x86_64.pylint-dev__pylint-8898:latest
+2026-06-27 20:18:37,121 - INFO - Image built successfully!

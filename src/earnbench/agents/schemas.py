@@ -12,6 +12,7 @@ ATTEMPT_STATUSES = frozenset(
     {
         "ok",
         "no_patch",
+        "invalid_patch",
         "error",
         "skipped",
     }
@@ -33,6 +34,19 @@ ATTEMPT_CSV_COLUMNS = (
     "started_at_utc",
     "completed_at_utc",
     "error",
+    "repair_applied",
+    "original_patch",
+    "repaired_patch",
+)
+
+ATTEMPT_CSV_OPTIONAL_COLUMNS = (
+    "repair_applied",
+    "original_patch",
+    "repaired_patch",
+)
+
+ATTEMPT_CSV_REQUIRED_COLUMNS = tuple(
+    column for column in ATTEMPT_CSV_COLUMNS if column not in ATTEMPT_CSV_OPTIONAL_COLUMNS
 )
 
 FAILURE_CSV_COLUMNS = ("agent", "instance_id", "replicate", "stage", "error", "timestamp_utc")
@@ -120,6 +134,9 @@ class AttemptRecord:
     started_at_utc: str
     completed_at_utc: str
     error: str = ""
+    repair_applied: bool = False
+    original_patch: str = ""
+    repaired_patch: str = ""
 
     def validate(self) -> list[str]:
         errors: list[str] = []
@@ -147,6 +164,9 @@ class AttemptRecord:
             "started_at_utc": self.started_at_utc,
             "completed_at_utc": self.completed_at_utc,
             "error": self.error,
+            "repair_applied": self.repair_applied,
+            "original_patch": self.original_patch,
+            "repaired_patch": self.repaired_patch,
         }
 
     @classmethod
@@ -167,6 +187,9 @@ class AttemptRecord:
             started_at_utc=str(data["started_at_utc"]),
             completed_at_utc=str(data["completed_at_utc"]),
             error=str(data.get("error", "")),
+            repair_applied=bool(data.get("repair_applied", False)),
+            original_patch=str(data.get("original_patch", "")),
+            repaired_patch=str(data.get("repaired_patch", "")),
         )
 
 
@@ -263,6 +286,7 @@ class PhaseCSummary:
     attempt_count: int
     ok_count: int
     no_patch_count: int
+    invalid_patch_count: int
     error_count: int
     skipped_count: int
     by_agent: dict[str, dict[str, int]]
@@ -274,6 +298,7 @@ class PhaseCSummary:
             "attempt_count": self.attempt_count,
             "ok_count": self.ok_count,
             "no_patch_count": self.no_patch_count,
+            "invalid_patch_count": self.invalid_patch_count,
             "error_count": self.error_count,
             "skipped_count": self.skipped_count,
             "by_agent": self.by_agent,

@@ -1,0 +1,2 @@
+2026-06-27 14:26:02,432 - INFO - Environment image sweb.env.py.x86_64.89a9e6df7ab7bcb9e010c8:latest found for matplotlib__matplotlib-13989
+Building instance image sweb.eval.x86_64.matplotlib__matplotlib-13989:latest for matplotlib__matplotlib-13989

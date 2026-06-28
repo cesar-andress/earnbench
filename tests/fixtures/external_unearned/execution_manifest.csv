@@ -1,0 +1,4 @@
+external_id,instance_id,patch_ref,y0_policy
+EU001,psf__requests-1724,patches/EU001.patch,prod_only
+EU002,psf__requests-1724,patches/EU002.patch,prod_only
+EU003,psf__requests-1724,patches/EU003.patch,prod_only

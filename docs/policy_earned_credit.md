@@ -12,7 +12,8 @@ This command aggregates **outcome-level EF@Π** over stochastic agent replicates
 earnbench report policy-ef \
   --agent-results agent_results.csv \
   --output OUT \
-  --bootstrap 10000
+  --bootstrap 10000 \
+  --seed 0
 ```
 
 ## Input CSV (long format)
@@ -29,7 +30,7 @@ earnbench report policy-ef \
 | `y0` | Nominal pass (`true`/`false`) |
 | `ef_pi` | Outcome-level EF@Π |
 | `ef_status` | `defined` or `undefined` |
-| `failed_mechanisms` | Channel list for the attempt |
+| `failed_mechanisms` | Channel list for the attempt (alias: `failed`) |
 | `invalid_pi_count` | Invalid π count |
 | `status` | Harness row status |
 

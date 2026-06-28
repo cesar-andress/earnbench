@@ -1,0 +1,2 @@
+2026-06-27 22:05:09,095 - INFO - Environment image sweb.env.py.x86_64.aa92880033da20ca313928:latest found for scikit-learn__scikit-learn-14983
+Building instance image sweb.eval.x86_64.scikit-learn__scikit-learn-14983:latest for scikit-learn__scikit-learn-14983

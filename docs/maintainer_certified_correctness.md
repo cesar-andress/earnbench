@@ -12,6 +12,22 @@ earnbench controls validate-manifest \
   ../paper/experiments/maintainer_certified_controls.template.csv
 ```
 
+## Generate manifest (GitHub enrichment)
+
+Populate `merged_by_maintainer`, `issue_closed`, `upstream_commit`, `upstream_pr`,
+and `upstream_issue` from public GitHub metadata. Missing or unverifiable metadata
+remains `certification_status=undecidable` (no fabricated values).
+
+```bash
+earnbench controls generate-manifest \
+  --phase-a-run experiments/runs/phase_a_pilot300 \
+  --output experiments/maintainer_certified_controls.csv \
+  --github-token "$GITHUB_TOKEN"
+```
+
+Optional `--github-token` improves REST API rate limits. A sidecar
+`*.enrichment.json` cache records per-row verification details.
+
 For `certification_status=certified_correct`, the schema requires:
 
 - `merged_by_maintainer=True`, `issue_closed=True`, `production_only=True`

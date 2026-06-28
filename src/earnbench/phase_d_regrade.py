@@ -13,12 +13,30 @@ from typing import Any
 from earnbench.adapters.swebench import prepare_exploit, supported_perturbations
 from earnbench.adapters.swebench_config import SWEBenchRunConfig
 from earnbench.adapters.swebench_metadata import load_verified_instance
-from earnbench.agents.schemas import ATTEMPT_CSV_COLUMNS, AttemptRecord
+from earnbench.agents.schemas import ATTEMPT_CSV_COLUMNS, ATTEMPT_CSV_REQUIRED_COLUMNS, AttemptRecord
 from earnbench.phase_a_batch import _write_json
 from earnbench.phase_b_batch import (
     BATCH_PI_ORDER,
     run_exploit_nominal_stage,
     run_exploit_perturbation_stage,
+)
+from earnbench.phase_d_statistics import (
+    STATISTICS_JSON,
+    build_phase_d_statistics,
+    write_phase_d_statistics,
+)
+from earnbench.phase_d_diagnostics import (
+    CellDiagnostics,
+    FAILURE_NOMINAL_FAILED,
+    GRADE_STATUS_FAILED,
+    GRADE_STATUS_OK,
+    classify_post_stage,
+    classify_stage_exception,
+    classify_validate_patch,
+    failure_record,
+    finalize_cell_diagnostics,
+    summarize_failure_reasons,
+    write_cell_diagnosis,
 )
 from earnbench.provenance import build_provenance, resolve_git_commit, utc_timestamp
 from earnbench.scheduler import (
@@ -61,6 +79,10 @@ AGENT_RESULTS_COLUMNS = (
     "failed_mechanisms",
     "run_id",
     "config_digest",
+    "grade_status",
+    "failure_reason",
+    "failure_stage",
+    "failure_detail",
 )
 
 FAILURE_COLUMNS = (
@@ -68,7 +90,9 @@ FAILURE_COLUMNS = (
     "instance_id",
     "replicate",
     "stage",
+    "failure_reason",
     "error",
+    "failure_detail",
     "timestamp_utc",
 )
 
@@ -110,8 +134,8 @@ class PhaseDTask:
 @dataclass(frozen=True, slots=True)
 class PhaseDCellResult:
     task_key: str
-    row: dict[str, Any] | None
-    failure: dict[str, str] | None
+    row: dict[str, Any]
+    failures: tuple[dict[str, str], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +144,7 @@ class PhaseDRunResult:
     agent_results_csv: Path
     failures_path: Path
     summary_path: Path
+    statistics_path: Path
     graded_count: int
     failure_count: int
     skipped_count: int
@@ -132,6 +157,7 @@ class PhaseDSummary:
     failure_count: int
     skipped_ineligible_count: int
     by_agent: dict[str, dict[str, int]]
+    by_failure_reason: dict[str, int]
     summarized_at_utc: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -142,6 +168,7 @@ class PhaseDSummary:
             "failure_count": self.failure_count,
             "skipped_ineligible_count": self.skipped_ineligible_count,
             "by_agent": self.by_agent,
+            "by_failure_reason": self.by_failure_reason,
             "summarized_at_utc": self.summarized_at_utc,
         }
 
@@ -167,7 +194,7 @@ def load_attempts_csv(path: Path) -> list[AttemptRecord]:
         if reader.fieldnames is None:
             msg = f"{path} is empty or missing a header row"
             raise PhaseDError(msg)
-        missing = [col for col in ATTEMPT_CSV_COLUMNS if col not in reader.fieldnames]
+        missing = [col for col in ATTEMPT_CSV_REQUIRED_COLUMNS if col not in reader.fieldnames]
         if missing:
             msg = f"{path} missing required columns: {', '.join(missing)}"
             raise PhaseDError(msg)
@@ -214,7 +241,9 @@ def build_agent_result_row(
     attempt: AttemptRecord,
     csv_row: dict[str, Any],
     report_payload: dict[str, Any],
+    diagnostics: CellDiagnostics | None = None,
 ) -> dict[str, Any]:
+    diag = diagnostics or CellDiagnostics(grade_status=GRADE_STATUS_OK)
     return {
         "agent": attempt.agent,
         "provider": attempt.provider,
@@ -241,6 +270,49 @@ def build_agent_result_row(
         "failed_mechanisms": _format_failed_mechanisms(report_payload),
         "run_id": csv_row.get("run_id"),
         "config_digest": csv_row.get("config_digest"),
+        "grade_status": diag.grade_status,
+        "failure_reason": diag.failure_reason,
+        "failure_stage": diag.failure_stage,
+        "failure_detail": diag.failure_detail,
+    }
+
+
+def build_synthetic_agent_result_row(
+    *,
+    attempt: AttemptRecord,
+    run_id: str,
+    diagnostics: CellDiagnostics,
+) -> dict[str, Any]:
+    return {
+        "agent": attempt.agent,
+        "provider": attempt.provider,
+        "model": attempt.model,
+        "instance_id": attempt.instance_id,
+        "replicate": attempt.replicate,
+        "attempt_status": attempt.status,
+        "patch_path": attempt.patch_path,
+        "y0": False,
+        "y_vtest": "",
+        "y_verif": "",
+        "y_env": "",
+        "pi_vtest_status": "",
+        "pi_verif_status": "",
+        "pi_env_status": "",
+        "valid_pi_count": "",
+        "ef_pi": "",
+        "ef_exclude_invalid": "",
+        "ef_invalid_as_fail": "",
+        "invalid_pi_count": "",
+        "invalid_pi_rate": "",
+        "ef_sensitivity_gap": "",
+        "ef_status": "undefined",
+        "failed_mechanisms": "",
+        "run_id": run_id,
+        "config_digest": "",
+        "grade_status": diagnostics.grade_status,
+        "failure_reason": diagnostics.failure_reason,
+        "failure_stage": diagnostics.failure_stage,
+        "failure_detail": diagnostics.failure_detail,
     }
 
 
@@ -289,12 +361,42 @@ def load_agent_results_rows(path: Path) -> dict[str, dict[str, Any]]:
                 str(raw.get("instance_id", "")),
                 int(raw.get("replicate") or 0),
             )
-            rows[key] = {col: raw.get(col, "") for col in AGENT_RESULTS_COLUMNS}
+            rows[key] = {
+                col: raw.get(col, "") for col in AGENT_RESULTS_COLUMNS
+            }
     return rows
 
 
 def _cell_complete(work_root: Path, instance_id: str) -> bool:
     return artifact_stage_complete(work_root, instance_id, "aggregate")
+
+
+def _append_failure(
+    failures: list[dict[str, str]],
+    diagnostics: CellDiagnostics,
+    *,
+    attempt: AttemptRecord,
+    stage: str,
+    failure_reason: str,
+    error: str,
+    failure_detail: str = "",
+) -> None:
+    record = failure_record(
+        agent=attempt.agent,
+        instance_id=attempt.instance_id,
+        replicate=attempt.replicate,
+        stage=stage,
+        failure_reason=failure_reason,
+        error=error,
+        failure_detail=failure_detail,
+    )
+    failures.append(record)
+    diagnostics.record(
+        stage,
+        status="failed",
+        failure_reason=failure_reason,
+        detail=failure_detail or error,
+    )
 
 
 def run_phase_d_cell(
@@ -311,17 +413,36 @@ def run_phase_d_cell(
     instance_id = attempt.instance_id
     work_root = task.work_root
     key = task.task_key
+    instance_dir = work_root / instance_id
+    diagnostics = CellDiagnostics()
+    failures: list[dict[str, str]] = []
 
     def skip_stage(stage: str) -> bool:
         return resume and artifact_stage_complete(work_root, instance_id, stage)
 
-    try:
-        if not task.patch_path.is_file():
-            msg = f"patch file not found: {task.patch_path}"
-            raise FileNotFoundError(msg)
+    validation = classify_validate_patch(patch_path=task.patch_path)
+    if validation is not None:
+        reason, detail = validation
+        _append_failure(
+            failures,
+            diagnostics,
+            attempt=attempt,
+            stage="validate",
+            failure_reason=reason,
+            error=detail,
+        )
+        row = build_synthetic_agent_result_row(
+            attempt=attempt,
+            run_id=run_id,
+            diagnostics=diagnostics,
+        )
+        return PhaseDCellResult(task_key=key, row=row, failures=tuple(failures))
 
-        patch_content = task.patch_path.read_text(encoding="utf-8")
-        if not skip_stage("prepare"):
+    patch_content = task.patch_path.read_text(encoding="utf-8")
+    can_continue = True
+
+    if can_continue and not skip_stage("prepare"):
+        try:
             prepare_exploit(
                 metadata_path=metadata_path,
                 instance_id=instance_id,
@@ -333,8 +454,24 @@ def run_phase_d_cell(
                 patch_class="agent_patch",
                 y0_policy="prod_only",
             )
+            diagnostics.record("prepare", status="completed")
+        except Exception as exc:
+            reason, detail = classify_stage_exception("prepare", exc)
+            _append_failure(
+                failures,
+                diagnostics,
+                attempt=attempt,
+                stage="prepare",
+                failure_reason=reason,
+                error=str(exc),
+                failure_detail=detail,
+            )
+            can_continue = False
+    elif skip_stage("prepare"):
+        diagnostics.record("prepare", status="skipped")
 
-        if not skip_stage("preflight"):
+    if can_continue and not skip_stage("preflight"):
+        try:
             run_preflight_stage(
                 metadata_path=metadata_path,
                 instance_id=instance_id,
@@ -342,8 +479,38 @@ def run_phase_d_cell(
                 run_config=run_config,
                 build_missing_images=build_missing_images,
             )
+            classified = classify_post_stage(stage="preflight", instance_dir=instance_dir)
+            if classified is not None:
+                reason, detail = classified
+                _append_failure(
+                    failures,
+                    diagnostics,
+                    attempt=attempt,
+                    stage="preflight",
+                    failure_reason=reason,
+                    error=detail,
+                    failure_detail=detail,
+                )
+                can_continue = False
+            else:
+                diagnostics.record("preflight", status="completed")
+        except Exception as exc:
+            reason, detail = classify_stage_exception("preflight", exc)
+            _append_failure(
+                failures,
+                diagnostics,
+                attempt=attempt,
+                stage="preflight",
+                failure_reason=reason,
+                error=str(exc),
+                failure_detail=detail,
+            )
+            can_continue = False
+    elif skip_stage("preflight"):
+        diagnostics.record("preflight", status="skipped")
 
-        if not skip_stage("nominal"):
+    if can_continue and not skip_stage("nominal"):
+        try:
             run_exploit_nominal_stage(
                 metadata_path=metadata_path,
                 instance_id=instance_id,
@@ -352,9 +519,50 @@ def run_phase_d_cell(
                 run_id=run_id,
                 y0_policy="prod_only",
             )
+            classified = classify_post_stage(stage="nominal", instance_dir=instance_dir)
+            if classified is not None:
+                reason, detail = classified
+                if reason == FAILURE_NOMINAL_FAILED:
+                    diagnostics.record(
+                        "nominal",
+                        status="completed",
+                        failure_reason=reason,
+                        detail=detail,
+                    )
+                else:
+                    _append_failure(
+                        failures,
+                        diagnostics,
+                        attempt=attempt,
+                        stage="nominal",
+                        failure_reason=reason,
+                        error=detail,
+                        failure_detail=detail,
+                    )
+                    can_continue = False
+            else:
+                diagnostics.record("nominal", status="completed")
+        except Exception as exc:
+            reason, detail = classify_stage_exception("nominal", exc)
+            _append_failure(
+                failures,
+                diagnostics,
+                attempt=attempt,
+                stage="nominal",
+                failure_reason=reason,
+                error=str(exc),
+                failure_detail=detail,
+            )
+            can_continue = False
+    elif skip_stage("nominal"):
+        diagnostics.record("nominal", status="skipped")
 
+    if can_continue:
         for perturbation_id in BATCH_PI_ORDER:
-            if not skip_stage(perturbation_id):
+            if skip_stage(perturbation_id):
+                diagnostics.record(perturbation_id, status="skipped")
+                continue
+            try:
                 run_exploit_perturbation_stage(
                     metadata_path=metadata_path,
                     instance_id=instance_id,
@@ -365,36 +573,92 @@ def run_phase_d_cell(
                     y0_policy="prod_only",
                     family="",
                 )
+                classified = classify_post_stage(
+                    stage=perturbation_id,
+                    instance_dir=instance_dir,
+                )
+                if classified is not None:
+                    reason, detail = classified
+                    _append_failure(
+                        failures,
+                        diagnostics,
+                        attempt=attempt,
+                        stage=perturbation_id,
+                        failure_reason=reason,
+                        error=detail,
+                        failure_detail=detail,
+                    )
+                    diagnostics.record(
+                        perturbation_id,
+                        status="failed",
+                        failure_reason=reason,
+                        detail=detail,
+                    )
+                else:
+                    diagnostics.record(perturbation_id, status="completed")
+            except Exception as exc:
+                reason, detail = classify_stage_exception(perturbation_id, exc)
+                _append_failure(
+                    failures,
+                    diagnostics,
+                    attempt=attempt,
+                    stage=perturbation_id,
+                    failure_reason=reason,
+                    error=str(exc),
+                    failure_detail=detail,
+                )
+                diagnostics.record(
+                    perturbation_id,
+                    status="failed",
+                    failure_reason=reason,
+                    detail=detail,
+                )
 
-        csv_row = aggregate_instance(
-            metadata_path=metadata_path,
-            output_dir=work_root,
-            instance_id=instance_id,
-            scheduled_perturbations=task.scheduled_perturbations,
-            run_id=run_id,
-        )
-        report_path = work_root / instance_id / "report.json"
-        report_payload = json.loads(report_path.read_text(encoding="utf-8"))
-        row = build_agent_result_row(
-            attempt=attempt,
-            csv_row=csv_row,
-            report_payload=report_payload,
-        )
-        return PhaseDCellResult(task_key=key, row=row, failure=None)
-    except Exception as exc:
-        logger.exception("Phase D cell failed for %s", key)
-        return PhaseDCellResult(
-            task_key=key,
-            row=None,
-            failure={
-                "agent": attempt.agent,
-                "instance_id": instance_id,
-                "replicate": str(attempt.replicate),
-                "stage": "pipeline",
-                "error": str(exc),
-                "timestamp_utc": utc_timestamp(),
-            },
-        )
+    aggregated = False
+    y0: bool | None = None
+    if can_continue and (instance_dir / "meta.json").is_file():
+        try:
+            csv_row = aggregate_instance(
+                metadata_path=metadata_path,
+                output_dir=work_root,
+                instance_id=instance_id,
+                scheduled_perturbations=task.scheduled_perturbations,
+                run_id=run_id,
+            )
+            report_path = instance_dir / "report.json"
+            report_payload = json.loads(report_path.read_text(encoding="utf-8"))
+            aggregated = True
+            y0 = bool(csv_row.get("y0"))
+            finalize_cell_diagnostics(diagnostics, aggregated=True, y0=y0)
+            write_cell_diagnosis(instance_dir, diagnostics)
+            row = build_agent_result_row(
+                attempt=attempt,
+                csv_row=csv_row,
+                report_payload=report_payload,
+                diagnostics=diagnostics,
+            )
+            return PhaseDCellResult(task_key=key, row=row, failures=tuple(failures))
+        except Exception as exc:
+            logger.exception("Phase D aggregate failed for %s", key)
+            _append_failure(
+                failures,
+                diagnostics,
+                attempt=attempt,
+                stage="aggregate",
+                failure_reason=classify_stage_exception("aggregate", exc)[0],
+                error=str(exc),
+                failure_detail=str(exc),
+            )
+
+    finalize_cell_diagnostics(diagnostics, aggregated=False, y0=y0)
+    if instance_dir.exists():
+        write_cell_diagnosis(instance_dir, diagnostics)
+    row = build_synthetic_agent_result_row(
+        attempt=attempt,
+        run_id=run_id,
+        diagnostics=diagnostics,
+    )
+    return PhaseDCellResult(task_key=key, row=row, failures=tuple(failures))
 
 
 def _build_tasks(
@@ -507,19 +771,15 @@ def run_phase_d(config: PhaseDRegradeConfig) -> PhaseDRunResult:
     if config.workers <= 1:
         for task in pending:
             result = _run_one(task)
-            if result.row is not None:
-                result_rows[result.task_key] = result.row
-            if result.failure is not None:
-                failures.append(result.failure)
+            result_rows[result.task_key] = result.row
+            failures.extend(result.failures)
     else:
         with ThreadPoolExecutor(max_workers=config.workers) as pool:
             futures = {pool.submit(_run_one, task): task for task in pending}
             for future in as_completed(futures):
                 result = future.result()
-                if result.row is not None:
-                    result_rows[result.task_key] = result.row
-                if result.failure is not None:
-                    failures.append(result.failure)
+                result_rows[result.task_key] = result.row
+                failures.extend(result.failures)
 
     agent_results_csv = write_agent_results_csv(output_dir, result_rows)
     failures_path = write_failures_csv(output_dir, failures)
@@ -530,12 +790,24 @@ def run_phase_d(config: PhaseDRegradeConfig) -> PhaseDRunResult:
         failure_count=len(failures),
         skipped_ineligible_count=skipped_ineligible,
         by_agent=_summarize_by_agent(result_rows),
+        by_failure_reason=summarize_failure_reasons(result_rows),
         summarized_at_utc=utc_timestamp(),
     )
     summary_path = output_dir / PHASE_D_SUMMARY_JSON
     summary_path.write_text(
         json.dumps(summary.to_dict(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
+    )
+
+    statistics_path = write_phase_d_statistics(
+        output_dir,
+        build_phase_d_statistics(
+            output_dir=output_dir,
+            rows=result_rows,
+            failure_rows=failures,
+            run_id=effective_run_id,
+            skipped_ineligible_count=skipped_ineligible,
+        ),
     )
 
     completed_at = utc_timestamp()
@@ -550,6 +822,7 @@ def run_phase_d(config: PhaseDRegradeConfig) -> PhaseDRunResult:
             "skipped_ineligible_count": summary.skipped_ineligible_count,
             "skipped_resume_count": skipped_resume,
             "eligible_attempt_count": len(eligible),
+            "by_failure_reason": summary.by_failure_reason,
         },
     )
 
@@ -558,6 +831,7 @@ def run_phase_d(config: PhaseDRegradeConfig) -> PhaseDRunResult:
         agent_results_csv=agent_results_csv,
         failures_path=failures_path,
         summary_path=summary_path,
+        statistics_path=statistics_path,
         graded_count=len(result_rows),
         failure_count=len(failures),
         skipped_count=skipped_ineligible + skipped_resume,
@@ -595,12 +869,24 @@ def summarize_phase_d(*, output_dir: Path) -> PhaseDSummary:
             manifest.get("summary", {}).get("skipped_ineligible_count", 0)
         ),
         by_agent=_summarize_by_agent(rows),
+        by_failure_reason=summarize_failure_reasons(rows),
         summarized_at_utc=utc_timestamp(),
     )
     summary_path = output_dir / PHASE_D_SUMMARY_JSON
     summary_path.write_text(
         json.dumps(summary.to_dict(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
+    )
+    write_phase_d_statistics(
+        output_dir,
+        build_phase_d_statistics(
+            output_dir=output_dir,
+            rows=rows,
+            run_id=str(manifest.get("run_id", "")),
+            skipped_ineligible_count=int(
+                manifest.get("summary", {}).get("skipped_ineligible_count", 0)
+            ),
+        ),
     )
     return summary
 
@@ -618,14 +904,17 @@ def _count_failures(path: Path) -> int:
 __all__ = [
     "AGENT_RESULTS_COLUMNS",
     "AGENT_RESULTS_CSV",
+    "FAILURE_COLUMNS",
     "PhaseDCellResult",
     "PhaseDError",
     "PhaseDRegradeConfig",
     "PhaseDRunResult",
     "PhaseDSummary",
     "PhaseDTask",
+    "STATISTICS_JSON",
     "agent_work_root",
     "build_agent_result_row",
+    "build_synthetic_agent_result_row",
     "filter_eligible_attempts",
     "load_attempts_csv",
     "resolve_patch_path",
