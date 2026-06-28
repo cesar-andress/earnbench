@@ -81,7 +81,7 @@ def test_invalid_rows_excluded_and_counted() -> None:
         ]
     )
     assert payload["primary_row_count"] == 1
-    assert payload["excluded_from_primary"]["invalid_pi_status"] == 1
+    assert payload["excluded_from_primary"]["invalid_status"] == 1
     invalid = {row["channel"]: row for row in payload["invalid_distribution"]}
     assert invalid["env"]["invalid_count"] == 1
 
@@ -170,3 +170,50 @@ def test_generate_registry_structure_report(tmp_path: Path) -> None:
     assert result.dimensionality_json.is_file()
     assert result.invalid_distribution_csv.is_file()
     assert "Registry Structure Validation" in result.report_md.read_text(encoding="utf-8")
+
+
+def test_phase_a_like_primary_cohort_filtering() -> None:
+    rows = [
+        _base_row(
+            instance_id="full-ok",
+            pi_vtest_status="ok",
+            pi_verif_status="ok",
+            pi_env_status="ok",
+        ),
+        _base_row(
+            instance_id="partial-missing",
+            pi_vtest_status="ok",
+            pi_verif_status="ok",
+            pi_env_status="missing",
+            y_env="",
+        ),
+        _base_row(
+            instance_id="invalid-env",
+            pi_vtest_status="ok",
+            pi_verif_status="ok",
+            pi_env_status="invalid",
+            y_env="",
+            invalid_pi_count="1",
+        ),
+        _base_row(instance_id="nominal-fail", y0="0"),
+    ]
+    payload = analyze_registry_structure(rows)
+
+    assert payload["y0_row_count"] == 3
+    assert payload["primary_row_count"] == 1
+    assert payload["excluded_from_primary"]["missing_status"] == 1
+    assert payload["excluded_from_primary"]["invalid_status"] == 1
+    assert payload["excluded_from_primary"].get("y0_false") == 1
+
+    cofailure = {
+        (row["channel_a"], row["channel_b"]): row
+        for row in payload["cofailure_matrix"]
+    }
+    vtest_verif = cofailure[("vtest", "verif")]
+    assert vtest_verif["observed_row_count"] == 3
+    assert vtest_verif["either_fail_count"] == 0
+
+    invalid = {row["channel"]: row for row in payload["invalid_distribution"]}
+    assert invalid["env"]["invalid_count"] == 1
+    assert invalid["env"]["missing_count"] == 1
+    assert invalid["vtest"]["ok_count"] == 3

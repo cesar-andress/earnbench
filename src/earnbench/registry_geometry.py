@@ -77,6 +77,17 @@ MARGINAL_COLUMNS = (
 
 HIGH_COFAILURE_JACCARD = 0.70
 
+PRIMARY_EXCLUSION_KEYS = (
+    "y0_false",
+    "invalid_status",
+    "error_status",
+    "missing_status",
+    "not_applicable_status",
+    "missing_outcome",
+    "ef_undefined",
+    "unknown_status",
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ParsedRow:
@@ -90,7 +101,9 @@ class ParsedRow:
     pi_vtest_status: str
     pi_verif_status: str
     pi_env_status: str
+    channel_status_kinds: dict[str, str]
     ef_pi: float | None
+    ef_status: str
     invalid_pi_count: int
     primary_eligible: bool
     exclusion_reason: str | None
@@ -133,8 +146,78 @@ def _parse_optional_int(value: object, *, default: int = 0) -> int:
     return int(value)
 
 
+def _normalize_pi_status_kind(status: object) -> str:
+    """Map summary.csv pi_*_status values to normalized lifecycle kinds."""
+    text = str(status if status is not None else "").strip().lower()
+    if text in {"ok", "success", "fail"}:
+        return "ok"
+    if text == "invalid":
+        return "invalid"
+    if text == "error":
+        return "error"
+    if text in {"missing", ""}:
+        return "missing"
+    if text in {"not_applicable", "not-applicable", "n/a", "na"}:
+        return "not_applicable"
+    return "unknown"
+
+
+def _is_measured_status_kind(kind: str) -> bool:
+    return kind == "ok"
+
+
+def _channel_status_kind(row: ParsedRow, channel: str) -> str:
+    return row.channel_status_kinds[channel]
+
+
+def _channel_is_observed(row: ParsedRow, channel: str) -> bool:
+    return _is_measured_status_kind(_channel_status_kind(row, channel)) and (
+        _channel_outcome(row, channel) is not None
+    )
+
+
+def _compute_primary_exclusion_reason(
+    *,
+    y0: bool,
+    kinds: dict[str, str],
+    outcomes: dict[str, bool | None],
+    ef_status: str,
+) -> str | None:
+    if not y0:
+        return "y0_false"
+    if any(kinds[channel] == "invalid" for channel in CHANNELS):
+        return "invalid_status"
+    if any(kinds[channel] == "error" for channel in CHANNELS):
+        return "error_status"
+    if any(kinds[channel] == "missing" for channel in CHANNELS):
+        return "missing_status"
+    if any(kinds[channel] == "not_applicable" for channel in CHANNELS):
+        return "not_applicable_status"
+    if any(kinds[channel] == "unknown" for channel in CHANNELS):
+        return "unknown_status"
+    if any(
+        kinds[channel] == "ok" and outcomes[channel] is None for channel in CHANNELS
+    ):
+        return "missing_outcome"
+    ef_status_norm = ef_status.strip().lower()
+    if ef_status_norm and ef_status_norm != "defined":
+        return "ef_undefined"
+    return None
+
+
+def _excluded_from_primary_breakdown(parsed: list[ParsedRow]) -> dict[str, int]:
+    counter = Counter(
+        row.exclusion_reason for row in parsed if row.exclusion_reason is not None
+    )
+    return {
+        key: counter.get(key, 0)
+        for key in PRIMARY_EXCLUSION_KEYS
+        if counter.get(key, 0) > 0
+    }
+
+
 def _is_valid_pi_status(status: str) -> bool:
-    return status.strip().lower() in {"success", "fail"}
+    return _is_measured_status_kind(_normalize_pi_status_kind(status))
 
 
 def _channel_status(row: ParsedRow, channel: str) -> str:
@@ -189,7 +272,14 @@ def _pairwise_failure_stats(
     only_a = 0
     only_b = 0
     neither = 0
+    observed_rows = 0
     for row in rows:
+        if not (
+            _channel_is_observed(row, channel_a)
+            and _channel_is_observed(row, channel_b)
+        ):
+            continue
+        observed_rows += 1
         fail_a = _channel_outcome(row, channel_a) is False
         fail_b = _channel_outcome(row, channel_b) is False
         if fail_a and fail_b:
@@ -210,6 +300,7 @@ def _pairwise_failure_stats(
         "channel_b": channel_b,
         "count_both_fail": both_fail,
         "count_either_fail": either_fail,
+        "observed_row_count": observed_rows,
         "jaccard": jaccard,
         "phi": phi,
         "redundancy_estimate": jaccard,
@@ -257,15 +348,15 @@ def _parse_row(raw: dict[str, Any]) -> ParsedRow:
 
     invalid_pi_count = _parse_optional_int(raw.get("invalid_pi_count"))
     ef_pi = _parse_optional_float(raw.get("ef_pi"))
+    ef_status = str(raw.get("ef_status", "")).strip()
+    kinds = {channel: _normalize_pi_status_kind(statuses[channel]) for channel in CHANNELS}
 
-    exclusion_reason: str | None = None
-    if not y0:
-        exclusion_reason = "y0_false"
-    elif any(not _is_valid_pi_status(statuses[ch]) for ch in CHANNELS):
-        exclusion_reason = "invalid_pi_status"
-    elif any(outcomes[ch] is None for ch in CHANNELS):
-        exclusion_reason = "missing_pi_outcome"
-
+    exclusion_reason = _compute_primary_exclusion_reason(
+        y0=y0,
+        kinds=kinds,
+        outcomes=outcomes,
+        ef_status=ef_status,
+    )
     primary_eligible = exclusion_reason is None
 
     return ParsedRow(
@@ -279,7 +370,9 @@ def _parse_row(raw: dict[str, Any]) -> ParsedRow:
         pi_vtest_status=statuses["vtest"],
         pi_verif_status=statuses["verif"],
         pi_env_status=statuses["env"],
+        channel_status_kinds=kinds,
         ef_pi=ef_pi,
+        ef_status=ef_status,
         invalid_pi_count=invalid_pi_count,
         primary_eligible=primary_eligible,
         exclusion_reason=exclusion_reason,
@@ -392,23 +485,22 @@ def analyze_registry_geometry(rows: list[dict[str, Any]]) -> dict[str, Any]:
     parsed = [_parse_row(row) for row in rows]
     y0_rows = [row for row in parsed if row.y0]
     primary_rows = [row for row in parsed if row.primary_eligible]
-
-    exclusion_counts = Counter(
-        row.exclusion_reason for row in y0_rows if row.exclusion_reason is not None
+    exclusion_breakdown = _excluded_from_primary_breakdown(parsed)
+    partial_measurement_rows = len(
+        [
+            row
+            for row in y0_rows
+            if not row.primary_eligible
+            and row.exclusion_reason in {"missing_status", "missing_outcome"}
+        ]
     )
-    invalid_status_rows = [
-        row
-        for row in y0_rows
-        if row.exclusion_reason == "invalid_pi_status"
-        or row.invalid_pi_count > 0
-    ]
 
     profile_rows = _profile_rows(primary_rows)
     cofailure_rows: list[dict[str, Any]] = []
     correlation_rows: list[dict[str, Any]] = []
     for index, channel_a in enumerate(CHANNELS):
         for channel_b in CHANNELS[index:]:
-            stats = _pairwise_failure_stats(primary_rows, channel_a, channel_b)
+            stats = _pairwise_failure_stats(y0_rows, channel_a, channel_b)
             cofailure_rows.append(
                 {key: stats[key] for key in COFAILURE_COLUMNS}
             )
@@ -440,8 +532,8 @@ def analyze_registry_geometry(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "y0_row_count": len(y0_rows),
         "primary_row_count": len(primary_rows),
         "excluded_from_primary": {
-            "counts_by_reason": dict(sorted(exclusion_counts.items())),
-            "invalid_or_partial_y0_rows": len(invalid_status_rows),
+            "counts_by_reason": exclusion_breakdown,
+            "partial_measurement_y0_rows": partial_measurement_rows,
         },
         "profiles": profile_rows,
         "cofailure_matrix": cofailure_rows,
@@ -496,17 +588,26 @@ def _render_report_md(payload: dict[str, Any], *, summary_path: Path) -> str:
         "",
         f"- Input rows: {payload['input_row_count']}",
         f"- Y0 rows: {payload['y0_row_count']}",
-        f"- Primary rows (Y0 + all valid π): {payload['primary_row_count']}",
+        f"- Primary rows (Y0 + all three channels measured `ok` with outcomes): "
+        f"{payload['primary_row_count']}",
         "",
         "### Excluded from primary",
         "",
+        "Status kinds follow Phase A `OutcomeStatus` (`ok`, `invalid`, `error`, "
+        "`missing`, `not_applicable`). Phase B-style `success`/`fail` are treated as "
+        "measured (`ok`). Pairwise co-failure uses Y0 rows where both channels are "
+        "observed, even if a third channel is missing.",
+        "",
     ]
     excluded = payload["excluded_from_primary"]
-    for reason, count in excluded["counts_by_reason"].items():
-        lines.append(f"- `{reason}`: {count}")
+    if excluded["counts_by_reason"]:
+        for reason, count in excluded["counts_by_reason"].items():
+            lines.append(f"- `{reason}`: {count}")
+    else:
+        lines.append("- None")
     lines.append(
-        f"- Invalid/partial Y0 rows (status or invalid_pi_count): "
-        f"{excluded['invalid_or_partial_y0_rows']}"
+        f"- Partial-measurement Y0 rows (missing channel/outcome): "
+        f"{excluded['partial_measurement_y0_rows']}"
     )
     lines.extend(["", "## Exploitation profiles", ""])
     lines.append("| Profile | Count | Fraction | Mean EF | Median EF |")

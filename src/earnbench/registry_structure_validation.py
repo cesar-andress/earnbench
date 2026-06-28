@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import math
 import statistics
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -16,6 +16,7 @@ from earnbench.registry_geometry import (
     ParsedRow,
     _ablated_ef,
     _channel_outcome,
+    _excluded_from_primary_breakdown,
     _full_ef,
     _only_failed_channel,
     _pairwise_failure_stats,
@@ -39,6 +40,7 @@ COFAILURE_COLUMNS = (
     "channel_b",
     "both_fail_count",
     "either_fail_count",
+    "observed_row_count",
     "jaccard_overlap",
     "phi_correlation",
     "odds_ratio",
@@ -82,11 +84,15 @@ SAME_EF_PROFILE_COLUMNS = (
 
 INVALID_DISTRIBUTION_COLUMNS = (
     "channel",
+    "ok_count",
     "invalid_count",
     "error_count",
-    "measured_count",
+    "missing_count",
+    "not_applicable_count",
+    "unknown_count",
     "invalid_rate",
     "error_rate",
+    "missing_rate",
     "bias_risk_note",
 )
 
@@ -131,6 +137,7 @@ def _cofailure_rows(primary_rows: list[ParsedRow]) -> list[dict[str, Any]]:
                     "channel_b": channel_b,
                     "both_fail_count": both_fail,
                     "either_fail_count": either_fail,
+                    "observed_row_count": stats["observed_row_count"],
                     "jaccard_overlap": stats["jaccard"],
                     "phi_correlation": stats["phi"],
                     "odds_ratio": _odds_ratio(both_fail, only_a, only_b, neither),
@@ -385,44 +392,56 @@ def _dimensionality_analysis(primary_rows: list[ParsedRow]) -> dict[str, Any]:
 
 
 def _channel_status_key(row: ParsedRow, channel: str) -> str:
-    return {
-        "vtest": row.pi_vtest_status,
-        "verif": row.pi_verif_status,
-        "env": row.pi_env_status,
-    }[channel].strip().lower()
+    return row.channel_status_kinds[channel]
 
 
-def _invalid_distribution_rows(parsed_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    y0_rows = [row for row in parsed_rows if row.y0]
+def _invalid_distribution_rows(parsed: list[ParsedRow]) -> list[dict[str, Any]]:
+    y0_rows = [row for row in parsed if row.y0]
     rows: list[dict[str, Any]] = []
     for channel in CHANNELS:
+        ok_count = 0
         invalid_count = 0
         error_count = 0
-        measured_count = 0
+        missing_count = 0
+        not_applicable_count = 0
+        unknown_count = 0
         for row in y0_rows:
-            status = _channel_status_key(row, channel)
-            if status in {"success", "fail"}:
-                measured_count += 1
-            elif status == "invalid":
+            kind = _channel_status_key(row, channel)
+            if kind == "ok":
+                ok_count += 1
+            elif kind == "invalid":
                 invalid_count += 1
-            elif status == "error":
+            elif kind == "error":
                 error_count += 1
+            elif kind == "missing":
+                missing_count += 1
+            elif kind == "not_applicable":
+                not_applicable_count += 1
+            else:
+                unknown_count += 1
         denominator = len(y0_rows)
         invalid_rate = invalid_count / denominator if denominator else None
         error_rate = error_count / denominator if denominator else None
+        missing_rate = missing_count / denominator if denominator else None
         bias_note = ""
         if invalid_rate is not None and invalid_rate >= 0.10:
             bias_note = "High INVALID rate may bias primary structure estimates."
         elif error_rate is not None and error_rate >= 0.10:
             bias_note = "High ERROR rate may reduce measurable channel coverage."
+        elif missing_rate is not None and missing_rate >= 0.10:
+            bias_note = "High MISSING rate reduces full multichannel primary cohort size."
         rows.append(
             {
                 "channel": channel,
+                "ok_count": ok_count,
                 "invalid_count": invalid_count,
                 "error_count": error_count,
-                "measured_count": measured_count,
+                "missing_count": missing_count,
+                "not_applicable_count": not_applicable_count,
+                "unknown_count": unknown_count,
                 "invalid_rate": invalid_rate,
                 "error_rate": error_rate,
+                "missing_rate": missing_rate,
                 "bias_risk_note": bias_note,
             }
         )
@@ -434,12 +453,9 @@ def analyze_registry_structure(rows: list[dict[str, Any]]) -> dict[str, Any]:
     parsed = [_parse_row(row) for row in rows]
     y0_rows = [row for row in parsed if row.y0]
     primary_rows = [row for row in parsed if row.primary_eligible]
+    exclusion_breakdown = _excluded_from_primary_breakdown(parsed)
 
-    exclusion_counts = Counter(
-        row.exclusion_reason for row in y0_rows if row.exclusion_reason is not None
-    )
-
-    cofailure_rows = _cofailure_rows(primary_rows)
+    cofailure_rows = _cofailure_rows(y0_rows)
     overlap_rows = _overlap_rows(cofailure_rows)
     unique_rows = _unique_detection_rows(primary_rows)
     information_rows = _information_content_rows(primary_rows, unique_rows)
@@ -480,7 +496,7 @@ def analyze_registry_structure(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "input_row_count": len(parsed),
         "y0_row_count": len(y0_rows),
         "primary_row_count": len(primary_rows),
-        "excluded_from_primary": dict(sorted(exclusion_counts.items())),
+        "excluded_from_primary": exclusion_breakdown,
         "cofailure_matrix": cofailure_rows,
         "overlap": overlap_rows,
         "unique_detection": unique_rows,
@@ -526,9 +542,15 @@ def _render_report_md(payload: dict[str, Any], *, summary_path: Path) -> str:
         "",
         f"- Input rows: {payload['input_row_count']}",
         f"- Y0 rows: {payload['y0_row_count']}",
-        f"- Primary rows (Y0 + all valid π): {payload['primary_row_count']}",
+        f"- Primary rows (Y0 + all three channels measured `ok` with outcomes): "
+        f"{payload['primary_row_count']}",
         "",
         "### Excluded from primary channel-structure estimates",
+        "",
+        "Lifecycle kinds: `ok` (measured), `invalid`, `error`, `missing`, "
+        "`not_applicable`, `unknown`. Phase A uses `ok`; Phase B may use "
+        "`success`/`fail` (normalized to `ok`). Pairwise analyses include Y0 "
+        "rows where both channels in the pair are observed.",
         "",
     ]
     if payload["excluded_from_primary"]:
@@ -536,6 +558,14 @@ def _render_report_md(payload: dict[str, Any], *, summary_path: Path) -> str:
             lines.append(f"- `{reason}`: {count}")
     else:
         lines.append("- None")
+
+    lines.extend(["", "## Channel status distribution (Y0 rows)", ""])
+    for row in payload["invalid_distribution"]:
+        lines.append(
+            f"- `{row['channel']}`: ok={row['ok_count']}, invalid={row['invalid_count']}, "
+            f"error={row['error_count']}, missing={row['missing_count']}, "
+            f"not_applicable={row['not_applicable_count']}, unknown={row['unknown_count']}"
+        )
 
     lines.extend(["", "## Co-failure and overlap", ""])
     for row in payload["overlap"]:
@@ -569,13 +599,16 @@ def _render_report_md(payload: dict[str, Any], *, summary_path: Path) -> str:
                 f"- Dominant explained variance: {explained[0]:.4f}"
             )
 
-    lines.extend(["", "## INVALID localisation", ""])
+    lines.extend(["", "## Measurement-status localisation (Y0 rows)", ""])
     for row in payload["invalid_distribution"]:
         invalid_rate = row["invalid_rate"]
-        rate_text = f"{invalid_rate:.4f}" if invalid_rate is not None else "—"
+        missing_rate = row["missing_rate"]
+        invalid_text = f"{invalid_rate:.4f}" if invalid_rate is not None else "—"
+        missing_text = f"{missing_rate:.4f}" if missing_rate is not None else "—"
         note = row["bias_risk_note"] or "—"
         lines.append(
-            f"- `{row['channel']}`: invalid_rate={rate_text}; {note}"
+            f"- `{row['channel']}`: invalid_rate={invalid_text}, "
+            f"missing_rate={missing_text}; {note}"
         )
 
     lines.extend(["", "## Same EF, different profile", ""])

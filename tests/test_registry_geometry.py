@@ -104,8 +104,8 @@ def test_invalid_rows_excluded_from_primary_but_counted() -> None:
     payload = analyze_registry_geometry(rows)
     assert payload["primary_row_count"] == 1
     assert payload["y0_row_count"] == 2
-    assert payload["excluded_from_primary"]["counts_by_reason"]["invalid_pi_status"] == 1
-    assert payload["excluded_from_primary"]["invalid_or_partial_y0_rows"] == 1
+    assert payload["excluded_from_primary"]["counts_by_reason"]["invalid_status"] == 1
+    assert payload["excluded_from_primary"]["partial_measurement_y0_rows"] == 0
 
 
 def test_same_ef_different_profiles() -> None:
