@@ -14,4 +14,14 @@ htmlcov/
 venv/
 .env
 examples/*.report.json
-logs/build_images/
+
+# SWE-bench harness logs and Docker build artifacts (local only; not for Zenodo)
+logs/
+
+# Batch run outputs (typically under the paper repo)
+experiments/runs/
+
+# Per-instance SWE-bench caches created during grading
+**/.swebench_cache/
+**/.swebench_work/
+**/.swebench_work_*/
