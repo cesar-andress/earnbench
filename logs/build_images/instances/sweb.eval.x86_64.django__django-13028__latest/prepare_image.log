@@ -1,2 +1,0 @@
-2026-06-27 12:59:40,860 - INFO - Environment image sweb.env.py.x86_64.e83e37f52c09532c62acfb:latest found for django__django-13028
-Building instance image sweb.eval.x86_64.django__django-13028:latest for django__django-13028

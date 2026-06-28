@@ -1,2 +1,0 @@
-2026-06-27 05:09:56,165 - INFO - Environment image sweb.env.py.x86_64.c795f4b88616b8462021ed:latest found for sympy__sympy-14531
-Building instance image sweb.eval.x86_64.sympy__sympy-14531:latest for sympy__sympy-14531

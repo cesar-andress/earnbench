@@ -1,2 +1,0 @@
-2026-06-27 20:10:10,973 - INFO - Environment image sweb.env.py.x86_64.042cc8c7538a70394bfed6:latest found for pylint-dev__pylint-6386
-Building instance image sweb.eval.x86_64.pylint-dev__pylint-6386:latest for pylint-dev__pylint-6386

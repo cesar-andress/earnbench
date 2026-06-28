@@ -1,2 +1,0 @@
-2026-06-27 12:34:20,135 - INFO - Environment image sweb.env.py.x86_64.2baaea72acc974f6c02079:latest found for django__django-11451
-Building instance image sweb.eval.x86_64.django__django-11451:latest for django__django-11451

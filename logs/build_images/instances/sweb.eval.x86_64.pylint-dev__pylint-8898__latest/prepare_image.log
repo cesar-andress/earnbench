@@ -1,2 +1,0 @@
-2026-06-27 20:18:20,543 - INFO - Environment image sweb.env.py.x86_64.ed3b3b6b345a31fa74f72e:latest found for pylint-dev__pylint-8898
-Building instance image sweb.eval.x86_64.pylint-dev__pylint-8898:latest for pylint-dev__pylint-8898
