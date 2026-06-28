@@ -33,7 +33,7 @@ supplement (separate dataset deposit per `paper/experiments/zenodo_output_policy
 
 - [x] `CITATION.cff` present (CFF 1.2.0)
 - [x] `title`, `version`, `abstract`, `keywords`, `repository-code` populated
-- [x] Author placeholder present (`EarnBench contributors`) — replace with real names before final deposit
+- [x] Author metadata present (César Andrés; ORCID 0009-0001-8968-3404)
 - [x] `date-released` set for RC (`2026-06-28`)
 - [ ] `doi` field added after Zenodo deposit (post-release update or second deposit)
 - [ ] Related identifiers: paper DOI, benchmark DOI when available

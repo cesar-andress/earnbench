@@ -9,7 +9,7 @@ description = "Executable counterfactual measurement of earned success for SWE a
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
-authors = [{ name = "EarnBench contributors" }]
+authors = [{ name = "César Andrés", email = "cesar.andress@ucjc.edu" }]
 keywords = [
   "benchmark",
   "software-engineering",

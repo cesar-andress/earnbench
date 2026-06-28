@@ -5,8 +5,9 @@
   "publication_date": "2026-06-28",
   "creators": [
     {
-      "name": "EarnBench contributors",
-      "affiliation": "See paper author list at publication; update this field before final Zenodo deposit"
+      "name": "Andrés, César",
+      "affiliation": "CRIA-BDHS Research Group, Higher Polytechnic School of Technology and Science, Universidad Camilo José Cela, Madrid, Spain",
+      "orcid": "0009-0001-8968-3404"
     }
   ],
   "keywords": [
@@ -21,5 +22,5 @@
   "license": "mit",
   "access_right": "open",
   "version": "0.1.0-rc1",
-  "notes": "Release candidate metadata. Before deposit: finalize creator names, ORCIDs, affiliations; add related_identifiers for the paper supplement DOI and TOSEM DOI when available; enable GitHub–Zenodo integration after tagging v0.1.0-rc1. Do not invent DOIs."
+  "notes": "Release candidate metadata. Add related_identifiers for the paper supplement DOI and TOSEM DOI when available. Do not invent DOIs."
 }

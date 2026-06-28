@@ -3,7 +3,11 @@ title: EarnBench
 message: "If you use this software, please cite it as below."
 type: software
 authors:
-  - name: EarnBench contributors
+  - given-names: César
+    family-names: Andrés
+    orcid: "https://orcid.org/0009-0001-8968-3404"
+    affiliation: "CRIA-BDHS Research Group, Higher Polytechnic School of Technology and Science, Universidad Camilo José Cela, Madrid, Spain"
+    email: cesar.andress@ucjc.edu
 license: MIT
 repository-code: "https://github.com/cesar-andress/earnbench"
 url: "https://github.com/cesar-andress/earnbench"
