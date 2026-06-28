@@ -228,7 +228,7 @@ def test_run_phase_d_writes_agent_results_schema(tmp_path: Path) -> None:
                 "pi_env.v1": True,
             },
         )
-        return PhaseDCellResult(task_key=task.task_key, row=row, failure=None)
+        return PhaseDCellResult(task_key=task.task_key, row=row, failures=())
 
     with patch("earnbench.phase_d_regrade.run_phase_d_cell", side_effect=_mock_cell):
         result = run_phase_d(
@@ -249,6 +249,8 @@ def test_run_phase_d_writes_agent_results_schema(tmp_path: Path) -> None:
     assert rows[0]["agent"] == "ollama_devstral"
     assert rows[0]["y0"] in {"True", "true", "1"}
     assert rows[0]["ef_status"] == "defined"
+    assert rows[0]["grade_status"] == "ok"
+    assert rows[0]["failure_reason"] == ""
 
 
 def test_run_phase_d_resume_skips_completed_cell(tmp_path: Path) -> None:
@@ -270,7 +272,7 @@ def test_run_phase_d_resume_skips_completed_cell(tmp_path: Path) -> None:
             y0=True,
             pi_success={"pi_verif.v1": True, "pi_env.v1": True},
         )
-        return PhaseDCellResult(task_key=task.task_key, row=row, failure=None)
+        return PhaseDCellResult(task_key=task.task_key, row=row, failures=())
 
     config = PhaseDRegradeConfig(
         phase_c_run=phase_c,
@@ -301,11 +303,16 @@ def test_run_phase_d_records_missing_patch_failure(tmp_path: Path) -> None:
             run_config=_run_config(),
         )
     )
-    assert result.graded_count == 0
+    assert result.graded_count == 1
     assert result.failure_count == 1
+    with result.agent_results_csv.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert len(rows) == 1
+    assert rows[0]["grade_status"] == "failed"
+    assert rows[0]["failure_reason"] == "malformed_patch"
     with result.failures_path.open(encoding="utf-8", newline="") as handle:
         failures = list(csv.DictReader(handle))
-    assert failures[0]["stage"] == "pipeline"
+    assert failures[0]["stage"] == "validate"
     assert "patch file not found" in failures[0]["error"]
 
 
@@ -416,6 +423,10 @@ def test_agent_results_accepted_by_rank_stability(tmp_path: Path) -> None:
             "invalid_pi_count": 0,
             "run_id": "r1",
             "config_digest": "d1",
+            "grade_status": "ok",
+            "failure_reason": "",
+            "failure_stage": "",
+            "failure_detail": "",
         }
     )
     rows[task_key("beta", "inst-1", 0)].update(
@@ -435,12 +446,45 @@ def test_agent_results_accepted_by_rank_stability(tmp_path: Path) -> None:
             "invalid_pi_count": 0,
             "run_id": "r1",
             "config_digest": "d1",
+            "grade_status": "ok",
+            "failure_reason": "",
+            "failure_stage": "",
+            "failure_detail": "",
         }
     )
     path = write_agent_results_csv(tmp_path, rows)
     loaded = load_agent_results(path)
     payload = analyze_rank_stability(loaded, bootstrap_draws=50, bootstrap_seed=0)
     assert payload["agent_count"] == 2
+
+
+def test_run_phase_d_summary_includes_failure_reason_counts(tmp_path: Path) -> None:
+    phase_c = tmp_path / "phase_c"
+    phase_c.mkdir()
+    _write_attempts_csv(
+        phase_c / "attempts.csv",
+        [
+            _attempt_row(status="ok", patch_path="patches/missing_a.patch"),
+            _attempt_row(
+                status="ok",
+                patch_path="patches/missing_b.patch",
+                agent="other_agent",
+            ),
+        ],
+    )
+    output = tmp_path / "phase_d"
+    result = run_phase_d(
+        PhaseDRegradeConfig(
+            phase_c_run=phase_c,
+            metadata_path=METADATA_FIXTURE,
+            output_dir=output,
+            run_config=_run_config(),
+        )
+    )
+    summary = json.loads(result.summary_path.read_text(encoding="utf-8"))
+    assert summary["graded_count"] == 2
+    assert summary["by_failure_reason"]["malformed_patch"] == 2
+    assert result.failure_count == 2
 
 
 def test_summarize_phase_d_reads_completed_run(tmp_path: Path) -> None:
@@ -460,7 +504,7 @@ def test_summarize_phase_d_reads_completed_run(tmp_path: Path) -> None:
             y0=True,
             pi_success={"pi_verif.v1": True, "pi_env.v1": True},
         )
-        return PhaseDCellResult(task_key=task.task_key, row=row, failure=None)
+        return PhaseDCellResult(task_key=task.task_key, row=row, failures=())
 
     with patch("earnbench.phase_d_regrade.run_phase_d_cell", side_effect=_mock_cell):
         run_phase_d(

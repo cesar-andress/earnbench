@@ -58,6 +58,7 @@ class PhaseCRunResult:
     attempt_count: int
     ok_count: int
     no_patch_count: int
+    invalid_patch_count: int
     error_count: int
     skipped_count: int
     failures_path: Path
@@ -331,6 +332,7 @@ def _execute_task(
     *,
     output_dir: Path,
     metadata_path: Path,
+    repair_patch: bool = False,
 ) -> AttemptRecord:
     arms = _arm_lookup(manifest)
     arm = arms[task.agent_id]
@@ -362,6 +364,7 @@ def _execute_task(
         patch_path=patch_path,
         trajectory_path=trajectory_path,
         scaffold_id=manifest.scaffold_id,
+        repair_patch=repair_patch,
     )
     return adapter.collect_attempt(context)
 
@@ -372,6 +375,7 @@ def run_phase_c(
     output_dir: Path | None = None,
     workers: int = 1,
     resume: bool = False,
+    repair_patch: bool = False,
 ) -> PhaseCRunResult:
     """Execute Phase C patch collection for all manifest tasks."""
     manifest = load_run_manifest(manifest_path)
@@ -398,6 +402,7 @@ def run_phase_c(
             task,
             output_dir=resolved_output,
             metadata_path=metadata_path,
+            repair_patch=repair_patch,
         )
 
     if workers <= 1:
@@ -490,6 +495,9 @@ def run_phase_c(
 
     ok_count = sum(1 for record in all_records if record.status == "ok")
     no_patch_count = sum(1 for record in all_records if record.status == "no_patch")
+    invalid_patch_count = sum(
+        1 for record in all_records if record.status == "invalid_patch"
+    )
     error_count = sum(1 for record in all_records if record.status == "error")
     skipped_count = sum(1 for record in all_records if record.status == "skipped")
     skipped_count += len(skipped_records)
@@ -499,6 +507,7 @@ def run_phase_c(
         attempt_count=len(all_records),
         ok_count=ok_count,
         no_patch_count=no_patch_count,
+        invalid_patch_count=invalid_patch_count,
         error_count=error_count,
         skipped_count=skipped_count,
         failures_path=failures_path,
@@ -529,7 +538,14 @@ def summarize_phase_c(*, output_dir: Path) -> PhaseCSummary:
     for record in records:
         bucket = by_agent.setdefault(
             record.agent,
-            {"ok": 0, "no_patch": 0, "error": 0, "skipped": 0, "total": 0},
+            {
+                "ok": 0,
+                "no_patch": 0,
+                "invalid_patch": 0,
+                "error": 0,
+                "skipped": 0,
+                "total": 0,
+            },
         )
         bucket["total"] += 1
         bucket[record.status] = bucket.get(record.status, 0) + 1
@@ -539,6 +555,9 @@ def summarize_phase_c(*, output_dir: Path) -> PhaseCSummary:
         attempt_count=len(records),
         ok_count=sum(1 for record in records if record.status == "ok"),
         no_patch_count=sum(1 for record in records if record.status == "no_patch"),
+        invalid_patch_count=sum(
+            1 for record in records if record.status == "invalid_patch"
+        ),
         error_count=sum(1 for record in records if record.status == "error"),
         skipped_count=sum(1 for record in records if record.status == "skipped"),
         by_agent=by_agent,

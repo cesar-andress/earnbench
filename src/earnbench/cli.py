@@ -37,6 +37,7 @@ from earnbench.exploit_validator import validate_runtime_run
 from earnbench.exploits.catalog import ExploitCatalogError, get_exploit, list_exploits
 from earnbench.exploits.validate import validate_path
 from earnbench.certified_controls import (
+    generate_certified_controls_manifest,
     generate_certified_controls_report,
     validate_certified_controls_manifest,
 )
@@ -47,8 +48,13 @@ from earnbench.cross_oracle_agreement import (
 )
 from earnbench.external_exploits import validate_external_exploit_catalog
 from earnbench.external_unearned import (
+    ExternalUnearnedExecuteConfig,
+    ExternalUnearnedExecuteError,
     generate_external_unearned_agreement_report,
     generate_external_unearned_report,
+    import_external_unearned_patches,
+    run_external_unearned_execution,
+    validate_execution_manifest,
     validate_external_unearned_catalog,
 )
 from earnbench.monte_carlo_ef import MonteCarloSimulationConfig, generate_monte_carlo_ef_report
@@ -56,7 +62,11 @@ from earnbench.pi_ablation import generate_pi_ablation_report
 from earnbench.registry_agreement import validate_registry_agreement_table
 from earnbench.registry_evolution import validate_registry_evolution_scenario
 from earnbench.stress_test_schema import validate_stress_test_catalog
-from earnbench.injection_batch import InjectionBatchConfig, run_injection_batch
+from earnbench.injection_batch import (
+    InjectionBatchConfig,
+    resolve_metadata_path,
+    run_injection_batch,
+)
 from earnbench.injection_unblind import BlindUnblindError, unblind_injection_run
 from earnbench.injection_validity import generate_injection_validity_report
 from earnbench.injections import (
@@ -1232,6 +1242,7 @@ def cmd_phase_c_run(args: argparse.Namespace) -> None:
             output_dir=output_dir,
             workers=args.workers,
             resume=args.resume,
+            repair_patch=args.repair_patches,
         )
     except PhaseCError as exc:
         raise CLIError(str(exc)) from exc
@@ -1244,6 +1255,7 @@ def cmd_phase_c_run(args: argparse.Namespace) -> None:
         "attempt_count": result.attempt_count,
         "ok_count": result.ok_count,
         "no_patch_count": result.no_patch_count,
+        "invalid_patch_count": result.invalid_patch_count,
         "error_count": result.error_count,
         "skipped_count": result.skipped_count,
         "attempts_csv": str(result.attempts_csv),
@@ -1326,6 +1338,7 @@ def cmd_phase_d_run(args: argparse.Namespace) -> None:
         "agent_results_csv": str(result.agent_results_csv),
         "failures_path": str(result.failures_path),
         "summary_path": str(result.summary_path),
+        "statistics_json": str(result.statistics_path),
     }
     json.dump(payload, sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")
@@ -1576,6 +1589,35 @@ def cmd_controls_validate_manifest(args: argparse.Namespace) -> None:
     sys.stdout.write("\n")
 
 
+def cmd_controls_generate_manifest(args: argparse.Namespace) -> None:
+    """Generate maintainer controls manifest with GitHub metadata enrichment."""
+    try:
+        result = generate_certified_controls_manifest(
+            phase_a_run_dir=Path(args.phase_a_run),
+            output_path=Path(args.output),
+            github_token=args.github_token or None,
+        )
+    except (FileNotFoundError, ValueError, RuntimeError) as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(
+        {
+            "manifest_path": str(result.output_path),
+            "row_count": result.row_count,
+            "verified_count": result.verified_count,
+            "undecidable_count": result.undecidable_count,
+            "enrichment_cache_path": str(result.enrichment_cache_path),
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
 def cmd_report_controls(args: argparse.Namespace) -> None:
     """Generate maintainer-certified correctness anchor report."""
     try:
@@ -1778,6 +1820,126 @@ def cmd_external_unearned_validate_catalog(args: argparse.Namespace) -> None:
             "status": "ok",
             "catalog": str(result.path),
             "row_count": result.row_count,
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
+def cmd_external_unearned_validate_manifest(args: argparse.Namespace) -> None:
+    """Validate an external unearned execution manifest CSV."""
+    catalog_path = Path(args.catalog) if args.catalog else None
+    patches_root = Path(args.patches_dir) if args.patches_dir else None
+    result = validate_execution_manifest(
+        Path(args.manifest),
+        catalog_path=catalog_path,
+        patches_root=patches_root,
+        require_patch_files=bool(args.require_patches),
+    )
+    if not result.ok:
+        for error in result.errors:
+            print(f"error: {error}", file=sys.stderr)
+        raise CLIError("external unearned execution manifest validation failed", exit_code=1)
+    if args.quiet:
+        return
+    json.dump(
+        {
+            "status": "ok",
+            "manifest": str(result.path),
+            "row_count": result.row_count,
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
+def cmd_external_unearned_import_patches(args: argparse.Namespace) -> None:
+    """Import external unearned patches into a runnable execution bundle."""
+    catalog_path = Path(args.catalog) if args.catalog else None
+    patches_root = Path(args.patches_dir) if args.patches_dir else None
+    try:
+        result = import_external_unearned_patches(
+            manifest_path=Path(args.manifest),
+            output_dir=Path(args.output),
+            catalog_path=catalog_path,
+            patches_root=patches_root,
+        )
+    except ValueError as exc:
+        raise CLIError(str(exc)) from exc
+    if args.quiet:
+        return
+    json.dump(
+        {
+            "output_dir": str(result.output_dir),
+            "execution_manifest_csv": str(result.execution_manifest_csv),
+            "execution_manifest_json": str(result.execution_manifest_json),
+            "patch_manifest_json": str(result.patch_manifest_json),
+            "imported_count": result.imported_count,
+        },
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )
+    sys.stdout.write("\n")
+
+
+def cmd_external_unearned_run(args: argparse.Namespace) -> None:
+    """Execute external unearned nominal + π grading and export results CSV."""
+    catalog_path = Path(args.catalog).resolve()
+    bundle_dir = Path(args.bundle).resolve()
+    if not catalog_path.is_file():
+        raise CLIError(f"--catalog not found: {catalog_path}")
+    if not (bundle_dir / "execution_manifest.csv").is_file():
+        raise CLIError(f"execution_manifest.csv not found under {bundle_dir}")
+    try:
+        metadata_path = resolve_metadata_path(
+            Path(args.metadata_parquet) if args.metadata_parquet else None,
+        )
+    except FileNotFoundError as exc:
+        raise CLIError(str(exc)) from exc
+    output_dir = Path(args.output).resolve()
+    try:
+        run_config = resolve_swebench_run_config_from_args(args)
+    except (FileNotFoundError, ValueError) as exc:
+        raise CLIError(str(exc)) from exc
+    configure_structured_logging(verbose=not args.quiet)
+    print_swebench_execution_summary(
+        command="external-unearned run",
+        config=run_config,
+        output_dir=output_dir,
+        instance_count=0,
+    )
+    try:
+        result = run_external_unearned_execution(
+            ExternalUnearnedExecuteConfig(
+                catalog_path=catalog_path,
+                bundle_dir=bundle_dir,
+                metadata_path=metadata_path,
+                output_dir=output_dir,
+                run_config=run_config,
+                run_id=args.run_id or "external_unearned",
+                dataset_revision=args.dataset_revision,
+                build_missing_images=bool(args.build_missing_images),
+                resume=bool(args.resume),
+            )
+        )
+    except ExternalUnearnedExecuteError as exc:
+        raise CLIError(str(exc)) from exc
+    if args.quiet:
+        return
+    json.dump(
+        {
+            "output_dir": str(result.output_dir),
+            "external_unearned_results_csv": str(result.results_csv),
+            "failures_csv": str(result.failures_csv),
+            "run_manifest_json": str(result.run_manifest_json),
+            "completed_count": result.completed_count,
+            "failed_count": result.failed_count,
+            "skipped_count": result.skipped_count,
         },
         sys.stdout,
         indent=2,
@@ -2168,6 +2330,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="Do not print validation summary JSON on success",
     )
 
+    controls_generate_parser = controls_subparsers.add_parser(
+        "generate-manifest",
+        help="Generate maintainer controls manifest with GitHub metadata enrichment",
+    )
+    controls_generate_parser.add_argument(
+        "--phase-a-run",
+        required=True,
+        help="Completed Phase A batch directory containing summary.csv",
+    )
+    controls_generate_parser.add_argument(
+        "--output",
+        required=True,
+        help="Output path for maintainer_certified_controls.csv",
+    )
+    controls_generate_parser.add_argument(
+        "--github-token",
+        default="",
+        help="Optional GitHub token for higher REST API rate limits",
+    )
+    controls_generate_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print generation summary JSON on success",
+    )
+
     phase_c_prime_parser = subparsers.add_parser(
         "phase-c-prime",
         help="Phase C′ variance-pilot planning tools",
@@ -2233,6 +2420,111 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Do not print validation summary JSON on success",
     )
+
+    external_unearned_validate_manifest_parser = external_unearned_subparsers.add_parser(
+        "validate-manifest",
+        help="Validate external unearned execution manifest CSV",
+    )
+    external_unearned_validate_manifest_parser.add_argument(
+        "manifest",
+        help="Path to execution_manifest.csv",
+    )
+    external_unearned_validate_manifest_parser.add_argument(
+        "--catalog",
+        default="",
+        help="Optional catalog CSV for external_id cross-check",
+    )
+    external_unearned_validate_manifest_parser.add_argument(
+        "--patches-dir",
+        default="",
+        help="Optional root directory for resolving patch_ref paths",
+    )
+    external_unearned_validate_manifest_parser.add_argument(
+        "--require-patches",
+        action="store_true",
+        help="Require patch_ref files to exist on disk",
+    )
+    external_unearned_validate_manifest_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print validation summary JSON on success",
+    )
+
+    external_unearned_import_parser = external_unearned_subparsers.add_parser(
+        "import-patches",
+        help="Import external unearned patches into an execution bundle",
+    )
+    external_unearned_import_parser.add_argument(
+        "--manifest",
+        required=True,
+        help="Source execution_manifest.csv with patch_ref paths",
+    )
+    external_unearned_import_parser.add_argument(
+        "--output",
+        required=True,
+        help="Output bundle directory",
+    )
+    external_unearned_import_parser.add_argument(
+        "--catalog",
+        default="",
+        help="Optional catalog CSV for external_id cross-check",
+    )
+    external_unearned_import_parser.add_argument(
+        "--patches-dir",
+        default="",
+        help="Optional root directory for resolving patch_ref paths",
+    )
+    external_unearned_import_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print import summary JSON on success",
+    )
+
+    external_unearned_run_parser = external_unearned_subparsers.add_parser(
+        "run",
+        help="Grade included external unearned rows and export results CSV",
+    )
+    external_unearned_run_parser.add_argument(
+        "--catalog",
+        required=True,
+        help="Path to external_unearned_anchor.csv",
+    )
+    external_unearned_run_parser.add_argument(
+        "--bundle",
+        required=True,
+        help="Prepared bundle directory containing execution_manifest.csv and patches/",
+    )
+    external_unearned_run_parser.add_argument(
+        "--output",
+        required=True,
+        help="Run output directory for grading artifacts and results CSV",
+    )
+    external_unearned_run_parser.add_argument(
+        "--metadata-parquet",
+        default="",
+        help="SWE-bench Verified metadata parquet/json path",
+    )
+    external_unearned_run_parser.add_argument(
+        "--run-id",
+        default="external_unearned",
+        help="Run identifier stored in grading artifacts",
+    )
+    external_unearned_run_parser.add_argument(
+        "--dataset-revision",
+        default="unpinned",
+        help="Dataset revision recorded in prepare artifacts",
+    )
+    external_unearned_run_parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Skip completed pipeline stages per external_id case",
+    )
+    external_unearned_run_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print run summary JSON on success",
+    )
+    add_swebench_performance_arguments(external_unearned_run_parser)
 
     validation_parser = subparsers.add_parser(
         "validation",
@@ -2955,6 +3247,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Skip tasks already recorded in attempts.jsonl",
     )
     phase_c_run_parser.add_argument(
+        "--repair-patches",
+        action="store_true",
+        help="Attempt syntax-only unified diff repair before marking invalid_patch",
+    )
+    phase_c_run_parser.add_argument(
         "--quiet",
         action="store_true",
         help="Do not print run summary JSON to stdout",
@@ -3407,6 +3704,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "controls":
             if args.controls_command == "validate-manifest":
                 cmd_controls_validate_manifest(args)
+            elif args.controls_command == "generate-manifest":
+                cmd_controls_generate_manifest(args)
             else:
                 parser.error(f"unknown controls command: {args.controls_command}")
         elif args.command == "phase-c-prime":
@@ -3426,6 +3725,12 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "external-unearned":
             if args.external_unearned_command == "validate-catalog":
                 cmd_external_unearned_validate_catalog(args)
+            elif args.external_unearned_command == "validate-manifest":
+                cmd_external_unearned_validate_manifest(args)
+            elif args.external_unearned_command == "import-patches":
+                cmd_external_unearned_import_patches(args)
+            elif args.external_unearned_command == "run":
+                cmd_external_unearned_run(args)
             else:
                 parser.error(
                     f"unknown external-unearned command: {args.external_unearned_command}"

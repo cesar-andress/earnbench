@@ -12,6 +12,36 @@ earnbench external-unearned validate-catalog \
   ../paper/experiments/external_unearned_anchor.template.csv
 ```
 
+## Execution pipeline
+
+Import external patches and bind them to SWE-bench Verified instances:
+
+```bash
+earnbench external-unearned validate-manifest execution_manifest.csv \
+  --catalog external_unearned_anchor.csv \
+  --require-patches
+
+earnbench external-unearned import-patches \
+  --manifest execution_manifest.csv \
+  --catalog external_unearned_anchor.csv \
+  --patches-dir ./patches \
+  --output out/external_unearned_bundle
+```
+
+Run nominal + π grading for catalog rows with `inclusion_decision=include`:
+
+```bash
+earnbench external-unearned run \
+  --catalog external_unearned_anchor.csv \
+  --bundle out/external_unearned_bundle \
+  --output out/external_unearned_run \
+  --metadata-parquet ../paper/vendor/swe_verified_test.parquet
+```
+
+Writes `external_unearned_results.csv` with columns required by the report layer.
+
+Execution manifest CSV columns: `external_id`, `instance_id`, `patch_ref`, optional `y0_policy` (`prod_only` default).
+
 ## Results CSV schema
 
 Required columns for harness outcomes (one row per catalog `external_id`):

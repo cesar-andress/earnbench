@@ -455,12 +455,28 @@ def _classify_failure(
             evidence.append(f"PASS_TO_PASS failures: {p2p_failures[:3]}")
 
     if pi_env_signals["pip_no_index"]:
-        evidence.extend(
-            f"pi_env log: {line}" for line in pi_env_signals["pip_no_index"][:3]
+        f2p_failures = (
+            (report_summary or {})
+            .get("FAIL_TO_PASS", {})
+            .get("failure", [])
         )
-        if "pip_no_index" in enforced:
-            evidence.append("PIP_NO_INDEX was enforced for pi_env.v1.")
-        return "dependency_blocked_by_pip_no_index", evidence
+        if (
+            f2p_failures
+            and pi_env_signals["test_failure"]
+            and report_summary is not None
+            and report_summary.get("resolved") is False
+        ):
+            evidence.append(
+                "pi_env log shows pip index warnings, but harness completed with "
+                f"FAIL_TO_PASS failures ({len(f2p_failures)}); treat as plant signal."
+            )
+        else:
+            evidence.extend(
+                f"pi_env log: {line}" for line in pi_env_signals["pip_no_index"][:3]
+            )
+            if "pip_no_index" in enforced:
+                evidence.append("PIP_NO_INDEX was enforced for pi_env.v1.")
+            return "dependency_blocked_by_pip_no_index", evidence
 
     if pi_env_signals["missing_dependency"] and (
         "pip_no_index" in enforced or pi_env_signals["pip_no_index"]
@@ -585,9 +601,20 @@ def infer_pi_env_failure_category(
         return None
     pi_env_signals = _analyze_log_signals(pi_env_log)
     p2p_only_failure, _ = _pi_env_pass_to_pass_only_failure(pi_env_report_summary)
-    if pi_env_signals["pip_no_index"]:
+    f2p_failures = (
+        (pi_env_report_summary or {})
+        .get("FAIL_TO_PASS", {})
+        .get("failure", [])
+    )
+    plant_driven_failure = bool(
+        f2p_failures
+        and pi_env_signals["test_failure"]
+        and pi_env_report_summary is not None
+        and pi_env_report_summary.get("resolved") is False
+    )
+    if pi_env_signals["pip_no_index"] and not plant_driven_failure:
         return "dependency_blocked_by_pip_no_index"
-    if pi_env_signals["python_nousersite"]:
+    if pi_env_signals["python_nousersite"] and not plant_driven_failure:
         return "python_nousersite_changed_runtime"
     network_signals = (
         pi_env_signals["network_failure"] + pi_env_signals["http_external_test_failure"]

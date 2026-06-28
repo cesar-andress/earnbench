@@ -161,6 +161,10 @@ def test_build_repair_prompt_is_deterministic_and_excludes_leakage() -> None:
         "repo": "psf/requests",
         "base_commit": "deadbeef",
         "problem_statement": "Fix redirect handling.",
+        "FAIL_TO_PASS": (
+            '["tests.test_models.TestCase.test_redirect", '
+            '"tests.test_models.TestCase.test_other"]'
+        ),
         "test_patch": "diff --git a/tests/test_models.py",
         "patch": "diff --git a/requests/models.py",
     }
@@ -168,8 +172,17 @@ def test_build_repair_prompt_is_deterministic_and_excludes_leakage() -> None:
     assert INSTANCE_ID in prompt
     assert "psf/requests" in prompt
     assert "Fix redirect handling." in prompt
+    assert "Repository layout:" in prompt
+    assert "`requests/`" in prompt
+    assert "`tests/test_models.py`" in prompt
+    assert "diff --git a/... b/..." in prompt
+    assert "Markdown code fences" in prompt
+    assert "Forbidden output:" in prompt
+    assert "complete hunks" in prompt
+    assert "exact repository-relative filenames" in prompt
+    assert "Unified diff shape" in prompt
     assert "test_patch" not in prompt
-    assert "test_models.py" not in prompt
+    assert "requests/models.py" not in prompt
     assert prompt_sha256(prompt) == prompt_sha256(build_repair_prompt(instance_row=row))
 
 

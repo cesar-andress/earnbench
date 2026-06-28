@@ -384,7 +384,7 @@ def run_injection_batch(config: InjectionBatchConfig) -> dict[str, Any]:
             continue
         instance_id = str(artifact["instance_id"])
         instance = load_verified_instance(config.metadata_path, instance_id)
-        scheduled = tuple(supported_perturbations(instance))
+        scheduled = supported_perturbations(instance_id, instance.fail_to_pass)
         tasks.append(
             InjectionArtifactTask(
                 artifact=artifact,

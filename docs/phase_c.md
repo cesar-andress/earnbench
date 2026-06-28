@@ -34,6 +34,7 @@ earnbench phase-c summarize \
 | `--manifest` | run | yes | Prepared `run_manifest.json` |
 | `--workers` | run | no | Concurrent collection workers (default: 1) |
 | `--resume` | run | no | Skip tasks already recorded in `attempts.jsonl` |
+| `--repair-patches` | run | no | Attempt syntax-only unified diff repair before `invalid_patch` |
 | `--run` | summarize | yes | Completed Phase C output directory |
 
 \*For `run`, `--output` overrides the directory stored in the manifest when set.
@@ -111,9 +112,48 @@ Each line in `attempts.jsonl` contains:
 | `patch_path` | Relative path under output root |
 | `patch_sha256` | SHA-256 of extracted patch (empty if none) |
 | `trajectory_log_ref` | Relative path to trajectory log |
-| `status` | `ok`, `no_patch`, `error`, or `skipped` |
+| `status` | `ok`, `no_patch`, `invalid_patch`, `error`, or `skipped` |
 | `started_at_utc` / `completed_at_utc` | ISO timestamps |
-| `error` | Error message when status is not `ok` |
+| `error` | Error message when status is not `ok`; for `invalid_patch`, encodes validation reason and detail |
+| `repair_applied` | `true` when syntax-only repair succeeded before validation |
+| `original_patch` | Relative path to pre-repair patch (`*.original.patch`) when `repair_applied` |
+| `repaired_patch` | Relative path to post-repair patch (same as `patch_path` when repaired) |
+
+## Patch validation
+
+After an agent returns patch text, Phase C validates unified diff syntax before
+marking the attempt `ok`. With `--repair-patches`, a syntax-only repair pass runs
+first when validation fails. Invalid patches are recorded with
+`status=invalid_patch` and the raw patch is still written under `patches/` for
+audit. Phase D only regrades attempts with `status=ok`.
+
+Validation checks:
+
+| Reason | Condition |
+|--------|-----------|
+| `empty_patch` | Blank patch or no added/removed hunk lines |
+| `malformed_patch` | Missing headers, bad hunk syntax, or unparseable blocks |
+| `duplicated_headers` | Repeated `---`/`+++`/`diff --git` for the same file |
+| `invalid_filename` | Absolute paths, `..` segments, forbidden characters, or backslashes |
+
+Syntactically valid diffs are accepted even when they touch test files or contain
+unusual but legal unified diff metadata.
+
+## Patch repair (optional)
+
+Enable with `earnbench phase-c run --repair-patches`. Repairs are syntax-only;
+hunk line content (` ` / `+` / `-` lines) is never modified.
+
+| Repair | Fix |
+|--------|-----|
+| `trailing_newline` | Append final newline |
+| `malformed_headers` | Add `diff --git`, normalize `a/` / `b/` prefixes on `---` / `+++` |
+| `duplicated_headers` | Drop consecutive duplicate `---` / `+++` headers |
+| `hunk_offsets` | Recompute hunk counts from hunk body when recoverable |
+
+When repair succeeds, the attempt record includes `repair_applied=true`,
+`original_patch` (path to `*.original.patch`), and `repaired_patch` (path to the
+effective `*.patch` used downstream). `patch_path` points at the repaired patch.
 
 ## Output layout
 
@@ -126,6 +166,7 @@ Each line in `attempts.jsonl` contains:
 ├── summary.json                 # from `earnbench phase-c summarize`
 ├── prompts/<agent>/<instance_id>/replicate_<k>.txt
 ├── patches/<agent>/<instance_id>/replicate_<k>.patch
+├── patches/<agent>/<instance_id>/replicate_<k>.original.patch   # when repair applied
 └── trajectories/<agent>/<instance_id>/replicate_<k>.log
 ```
 
