@@ -15,7 +15,7 @@ Legend: ✓ done · ◐ partial · ✗ missing · ☐ action item
 | ✓ | Public package in `earnbench/` | `src/earnbench/` layout |
 | ✓ | Paper supplement in `paper/` | Monorepo workspace |
 | ✓ | Workspace pointer README | `/README.md` |
-| ◐ | Single public git remote | `earnbench/` only; URL alignment pending |
+| ◐ | Single public git remote | `https://github.com/cesar-andress/earnbench` |
 | ✓ | `.gitignore` | Present in package repo |
 
 ---
@@ -29,7 +29,7 @@ Legend: ✓ done · ◐ partial · ✗ missing · ☐ action item
 | ✓ | CITATION.cff | `earnbench/CITATION.cff` — authors TBC |
 | ✓ | CONTRIBUTING | `earnbench/CONTRIBUTING.md` |
 | ✗ | CODE_OF_CONDUCT | Optional — not created |
-| ✓ | CHANGELOG | `earnbench/CHANGELOG.md` — 0.1.0 date TBD |
+| ✓ | CHANGELOG | `earnbench/CHANGELOG.md` — `0.1.0-rc1` dated 2026-06-28 |
 | ✓ | RELEASE_NOTES | `earnbench/RELEASE_NOTES.md` |
 | ✓ | SECURITY | `earnbench/SECURITY.md` |
 | ✓ | VERSION | `earnbench/VERSION` → `0.1.0-rc1` |
@@ -44,9 +44,11 @@ Legend: ✓ done · ◐ partial · ✗ missing · ☐ action item
 |-------|----------------|---------|
 | Git tag | `v0.1.0-rc1` | ✗ not cut |
 | `VERSION` | `0.1.0-rc1` | ✓ |
-| `pyproject.toml` | `0.1.0` | ◐ — bump to `-rc1` or keep 0.1.0 until final |
-| `CITATION.cff` | `0.1.0` | ◐ align at tag |
-| `CHANGELOG.md` | entry dated | ✗ TBD |
+| `pyproject.toml` | `0.1.0-rc1` | ✓ |
+| `__init__.__version__` | `0.1.0-rc1` | ✓ |
+| `CITATION.cff` | `0.1.0-rc1` | ✓ |
+| `.zenodo.json` | `0.1.0-rc1` | ✓ |
+| `CHANGELOG.md` | `[0.1.0-rc1]` dated | ✓ |
 
 ---
 
@@ -57,8 +59,10 @@ Legend: ✓ done · ◐ partial · ✗ missing · ☐ action item
 | ✓ | Synthetic example (no Docker) | `examples/synthetic_visible_test_overfitting.py` |
 | ✓ | Metric fixtures | `tests/fixtures/compute_input.json` |
 | ✓ | Install docs | `[dev]` and `[swebench]` documented |
+| ✓ | Reproducibility guide | `docs/REPRODUCIBILITY.md` |
+| ✓ | Docker setup guide | `docs/docker_setup.md` |
 | ◐ | Standalone clone path | Requires monorepo for batch replay |
-| ✗ | `vendor/swe_verified_test.parquet` | Empty `paper/vendor/` |
+| ◐ | `vendor/swe_verified_test.parquet` | Present in monorepo `paper/vendor/` (not in software repo) |
 | ✓ | Smoke protocol documented | `frozen_instrument_manifest.json` |
 | ◐ | Manifest sign-off | `pending_signoff` |
 | ✓ | Frozen runs (paper) | `paper/experiments/runs/` — not modified |
@@ -83,9 +87,9 @@ Legend: ✓ done · ◐ partial · ✗ missing · ☐ action item
 
 | Item | Status | Notes |
 |------|:------:|-------|
-| ◐ | pytest | 463 pass, **2 fail**, 10 skip |
-| ✓ | CI workflow file | `.github/workflows/ci.yml` |
-| ✗ | CI green on GitHub | Not run until push |
+| ✓ | pytest | 464 passed, 11 skipped (swebench integration tests skip without extra) |
+| ✓ | CI workflow file | `.github/workflows/ci.yml` installs `[dev,swebench]` |
+| ◐ | CI green on GitHub | Verify after push to `main` |
 | ✗ | Coverage target | Not defined |
 
 ---

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "earnbench"
-version = "0.1.0"
+version = "0.1.0-rc1"
 description = "Executable counterfactual measurement of earned success for SWE agents"
 readme = "README.md"
 license = "MIT"
@@ -18,7 +18,7 @@ keywords = [
   "evaluation-integrity",
 ]
 classifiers = [
-  "Development Status :: 2 - Pre-Alpha",
+  "Development Status :: 4 - Beta",
   "Intended Audience :: Science/Research",
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
@@ -37,8 +37,8 @@ dev = ["pytest>=8.0", "ruff>=0.4", "pyarrow>=15.0", "pyyaml>=6.0"]
 swebench = ["pyarrow>=15.0", "swebench>=2.0", "docker>=7.0"]
 
 [project.urls]
-Repository = "https://github.com/earnbench/earnbench"
-Documentation = "https://github.com/earnbench/earnbench/tree/main/docs"
+Repository = "https://github.com/cesar-andress/earnbench"
+Documentation = "https://github.com/cesar-andress/earnbench/tree/main/docs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/earnbench"]

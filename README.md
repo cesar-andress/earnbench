@@ -1,5 +1,10 @@
 # EarnBench
 
+[![CI](https://github.com/cesar-andress/earnbench/actions/workflows/ci.yml/badge.svg)](https://github.com/cesar-andress/earnbench/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](pyproject.toml)
+[![Version](https://img.shields.io/badge/version-0.1.0--rc1-orange.svg)](VERSION)
+
 An executable counterfactual measurement framework for estimating how much of an AI software-engineering agent's success is earned rather than supported by exploitable evaluation channels.
 
 ## Status
@@ -9,16 +14,17 @@ registry v1, SWE-bench Docker batch runners, and report generators used in the T
 manuscript validation ladder. Frozen experiment outputs cited in the paper live in
 the companion `paper/experiments/runs/` tree (monorepo layout).
 
-- **Standalone clone (this repo only):** metric computation, registry CLI, synthetic
-  example, and unit tests.
+- **This repository (code deposit):** metric computation, registry CLI, synthetic
+  example, unit tests, and batch runners when paired with supplement paths.
 - **Full batch reproduction:** requires sibling `paper/` paths (metadata parquet,
   exploit patches, frozen manifests) — see
-  [docs/publication_readiness_audit.md](docs/publication_readiness_audit.md).
-- **Zenodo DOI:** not yet assigned; cite git SHA until `v0.1.0` is tagged and
-  archived.
+  [docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md).
+- **Zenodo DOI:** not yet assigned; cite git tag `v0.1.0-rc1` or commit SHA until
+  `v0.1.0` is archived.
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md), [release_readiness_report.md](release_readiness_report.md),
-[release_checklist.md](release_checklist.md), and [docs/release_policy.md](docs/release_policy.md).
+[release_checklist.md](release_checklist.md), [docs/release_policy.md](docs/release_policy.md),
+and [docs/zenodo_checklist.md](docs/zenodo_checklist.md).
 
 ## Concept
 
@@ -36,6 +42,18 @@ examples/               Synthetic example (no Docker)
 scripts/                Helper scripts (minimal)
 ```
 
+Frozen validation evidence referenced by the TOSEM manuscript is **not** shipped
+inside this git repository. In a monorepo checkout, see `../paper/experiments/`:
+
+| Artifact | Path (monorepo) |
+|----------|-----------------|
+| Instrument pin | `paper/experiments/frozen_instrument_manifest.json` |
+| Phase A full Verified | `paper/experiments/runs/phase_a_verified_full/` |
+| Phase B all15 | `paper/experiments/runs/phase_b_all15/` |
+| Blind injection | `paper/experiments/runs/blind_run/` |
+| SWE-bench Verified metadata | `paper/vendor/swe_verified_test.parquet` |
+| Zenodo supplement policy | `paper/experiments/zenodo_output_policy.md` |
+
 ### Benchmark adapters
 
 `earnbench.adapters` defines typed request/response schemas and SWE-bench batch
@@ -48,9 +66,14 @@ grading uses `earnbench swebench *` and `phase-a|phase-b|phase-d run` batch path
 Requires Python 3.10+.
 
 ```bash
+git clone https://github.com/cesar-andress/earnbench.git
+cd earnbench
 pip install -e ".[dev]"      # metric, tests, reports
 pip install -e ".[swebench]" # adds Docker + swebench for batch grading
 ```
+
+See [docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) for monorepo layout and
+[docs/docker_setup.md](docs/docker_setup.md) for Docker prerequisites.
 
 After installation, the **`earnbench`** command is available on your `PATH`.
 

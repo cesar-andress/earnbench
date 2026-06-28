@@ -1,6 +1,13 @@
 # EarnBench documentation
 
-Documentation is in early draft. Design notes live in the private research repository during initial development.
+User-facing guides for the public measurement instrument (release candidate `0.1.0-rc1`).
+
+## Start here
+
+- [Reproducibility guide](REPRODUCIBILITY.md) — monorepo layout, frozen runs, smoke/batch replay
+- [Docker setup](docker_setup.md) — SWE-bench harness prerequisites and troubleshooting
+- [Release and versioning policy](release_policy.md)
+- [Zenodo readiness checklist](zenodo_checklist.md)
 
 ## Environment variables
 
@@ -8,6 +15,7 @@ EarnBench reads credentials from the shell environment; CLI flags are overrides 
 
 | Variable | Used by |
 |----------|---------|
+| `EARNBENCH_GIT_COMMIT` | Provenance block override in reports |
 | `GITHUB_TOKEN` | `controls generate-manifest` (GitHub REST enrichment) |
 | `OPENAI_API_KEY` | External agent CLIs configured in Phase C `arms.yaml` |
 | `ANTHROPIC_API_KEY` | External agent CLIs configured in Phase C `arms.yaml` |
@@ -16,8 +24,9 @@ EarnBench reads credentials from the shell environment; CLI flags are overrides 
 Phase C `external_cli` subprocesses inherit the parent environment, so provider
 CLIs pick up these keys without EarnBench passing them on the command line.
 
-## Checklists and policy
+## Measurement and protocols
 
+- [Perturbation outcome classification](outcome_classification.md)
 - [Validation ladder CLI](validation_ladder.md)
 - [External unearned anchor](external_unearned_anchor.md)
 - [Policy-level earned credit (stochastic agents)](policy_earned_credit.md)
@@ -30,13 +39,13 @@ CLIs pick up these keys without EarnBench passing them on the command line.
 - [Maintainer-certified correctness anchor](maintainer_certified_correctness.md)
 - [Certified correct control study (legacy)](certified_correct_controls.md)
 - [Docker container cleanup (Phase A/B idempotency)](docker_container_cleanup.md)
-- [Perturbation outcome classification](outcome_classification.md)
-- [Zenodo readiness checklist](zenodo_checklist.md)
-- [Release and versioning policy](release_policy.md)
 
-## Planned topics
+## Release and publication
 
-- Earned Fraction definitions
-- Counterfactual perturbation specifications
-- Harness integration (for example SWE-bench-class evaluators)
-- Audit log schema — see ``earnbench.audit.AuditRecord`` (``audit.json`` fields)
+- [Publication readiness audit](publication_readiness_audit.md)
+- [Release notes](../RELEASE_NOTES.md)
+- [Changelog](../CHANGELOG.md)
+
+Paper supplement (monorepo `paper/` tree): protocols under `paper/experiments/`,
+frozen runs under `paper/experiments/runs/`, Zenodo bundle policy in
+`paper/experiments/zenodo_output_policy.md`.

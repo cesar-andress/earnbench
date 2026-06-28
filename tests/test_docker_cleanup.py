@@ -110,6 +110,8 @@ def test_managed_swebench_container_create_wraps_docker_collection() -> None:
 
 
 def test_default_nominal_runner_uses_managed_container_create(monkeypatch) -> None:
+    pytest.importorskip("swebench")
+
     from earnbench.adapters.swebench_nominal import (
         NominalRunRequest,
         default_nominal_runner,
@@ -171,7 +173,6 @@ def test_default_nominal_runner_uses_managed_container_create(monkeypatch) -> No
         timeout_seconds=60,
     )
 
-    pytest.importorskip("swebench")
     result = default_nominal_runner(request)
 
     assert result.success is True

@@ -5,9 +5,10 @@ type: software
 authors:
   - name: EarnBench contributors
 license: MIT
-repository-code: "https://github.com/earnbench/earnbench"
-version: 0.1.0
-date-released: 2026-06-27
+repository-code: "https://github.com/cesar-andress/earnbench"
+url: "https://github.com/cesar-andress/earnbench"
+version: 0.1.0-rc1
+date-released: 2026-06-28
 keywords:
   - software engineering agents
   - benchmark integrity
@@ -18,3 +19,7 @@ abstract: >-
   Executable counterfactual measurement framework for estimating how much of an
   AI software-engineering agent's success is earned rather than supported by
   exploitable evaluation channels.
+identifiers:
+  - type: url
+    value: "https://github.com/cesar-andress/earnbench/releases/tag/v0.1.0-rc1"
+    description: "Release candidate tag (pre-release; cite git SHA until Zenodo DOI is assigned)"

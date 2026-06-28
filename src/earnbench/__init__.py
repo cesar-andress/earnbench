@@ -17,7 +17,7 @@ from earnbench.reports import EarnedFractionReport, EarnedFractionStatus
 from earnbench.runs import AgentRun
 from earnbench.tasks import Task
 
-__version__ = "0.1.0"
+__version__ = "0.1.0-rc1"
 
 __all__ = [
     "AgentRun",

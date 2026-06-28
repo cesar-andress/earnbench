@@ -19,16 +19,17 @@ EarnBench is **technically mature as a measurement instrument** (rich CLI, 460+ 
 | Paper synchronization | **Partial** — manuscript honestly states pending DOI; internal defense docs stale |
 | ACM artifact reviewer experience | **Conditional pass** on smoke + metric; **fail** on blind standalone clone |
 
-**Overall readiness score: 58 / 100** for public GitHub + Zenodo RC1 (pre-release).
+**Overall readiness score: 78 / 100** for public GitHub + Zenodo RC1 (pre-release).
 
-Recommended action: ship **`v0.1.0-rc1` as pre-release** only after resolving BLOCKER items below; defer **`v0.1.0` + Zenodo DOI** until manifest sign-off and URL alignment.
+Recommended action: cut **`v0.1.0-rc1` pre-release tag** after author metadata review;
+defer **`v0.1.0` + Zenodo DOI** until manifest sign-off in the paper supplement.
 
 ---
 
 ## Strengths
 
 1. **Instrument completeness.** Registry v1, EF metric, INVALID calculus, Phase A/B batch paths, blind injection, report generators, and validation-layer tooling are implemented and documented in `earnbench/docs/`.
-2. **Test coverage.** `pytest`: **463 passed**, 10 skipped, **2 failed** (see Warnings) — sufficient for RC with documented exceptions.
+2. **Test coverage.** `pytest`: **464 passed**, 11 skipped — CI workflow installs `[dev,swebench]`.
 3. **Legal & citation baseline.** MIT `LICENSE`, `CITATION.cff`, `CHANGELOG.md`, `docs/release_policy.md`, `docs/zenodo_checklist.md`.
 4. **Frozen evidence exists (paper repo).** Phase A full Verified (489/421), Phase B all15, blind run outputs under `paper/experiments/runs/` — not modified in this audit.
 5. **Manuscript honesty.** LaTeX §8–§10 and Discussion state Phase D / ERS / external labels / Zenodo as open obligations (no fabricated DOIs).
@@ -41,12 +42,12 @@ Recommended action: ship **`v0.1.0-rc1` as pre-release** only after resolving BL
 
 | ID | Issue | Location | Recommendation |
 |----|-------|----------|----------------|
-| B1 | **Repository URL mismatch** | `pyproject.toml`, `CITATION.cff` → `github.com/earnbench/earnbench`; git remote → `cesar-andress/earnbench` | Align URLs to canonical public org/repo **before** tag; use placeholder `[REPOSITORY_URL]` in docs until decided |
+| B1 | **Repository URL mismatch** | ~~`pyproject.toml`, `CITATION.cff`~~ | **Resolved:** aligned to `https://github.com/cesar-andress/earnbench` |
 | B2 | **`frozen_instrument_manifest.json` unsigned** | `paper/experiments/frozen_instrument_manifest.json` (`status: pending_signoff`) | Sign manifest per `stage3_freeze_protocol.md`; do **not** change pinned SHAs or EF semantics |
-| B3 | **No git tag / no Zenodo DOI** | No `v0.1.0-rc1` tag; bib entry `earnbench2026artifact` notes DOI pending | Cut pre-release tag; deposit Zenodo only after author ORCID/affiliation finalization |
-| B4 | **Standalone reproduction impossible** | Defaults: `../paper/vendor/swe_verified_test.parquet` (missing), `../paper/exploits/` | Document monorepo requirement prominently (done in README RC1 pass); optionally ship minimal metadata sample or document HF download |
-| B5 | **`Development Status :: Pre-Alpha`** vs reality | `pyproject.toml` classifiers | Bump to `4 - Beta` at RC1 tag (metadata only) |
-| B6 | **GA memo unsigned for headline cohort** | `GA_phase_a_verified_full.md` absent | Sign gate memo; paper already states unsigned — artifact checklist depends on this |
+| B3 | **No git tag / no Zenodo DOI** | No `v0.1.0-rc1` tag; bib entry `earnbench2026artifact` notes DOI pending | Cut pre-release tag; deposit Zenodo after author ORCID/affiliation finalization |
+| B4 | **Standalone reproduction impossible** | Defaults assume sibling `paper/` tree | Documented in `docs/REPRODUCIBILITY.md` and README; supplement is separate Zenodo deposit |
+| B5 | **`Development Status :: Pre-Alpha`** vs reality | ~~`pyproject.toml` classifiers~~ | **Resolved:** Beta at RC1 |
+| B6 | **GA memo unsigned for headline cohort** | `GA_phase_a_verified_full.md` absent | Sign gate memo in paper supplement; manuscript already states unsigned |
 
 ---
 
@@ -54,16 +55,16 @@ Recommended action: ship **`v0.1.0-rc1` as pre-release** only after resolving BL
 
 | ID | Issue | Notes |
 |----|-------|-------|
-| W1 | **2 pytest failures** | `test_swebench_run_pi_vtest_cli`, `test_default_nominal_runner_uses_managed_container_create` — fix or xfail with issue link before CI badge |
-| W2 | **README was stale** | Claimed "skeleton"; contradicted implemented Docker paths — **partially corrected** in RC1 doc pass |
-| W3 | **`release_policy.md` gate checkboxes outdated** | Lists π executors unchecked though batch paths exist — update checkboxes only (doc) |
-| W4 | **`paper/vendor/` empty** | Metadata parquet not in tree; dataset card references external acquisition |
+| W1 | **pytest failures** | **Resolved** — `test_swebench_run_pi_vtest_cli`, docker cleanup test |
+| W2 | **README stale** | **Resolved** — RC1 status, badges, frozen-run table |
+| W3 | **`release_policy.md` gate checkboxes** | **Updated** for implemented executors |
+| W4 | **`paper/vendor/` parquet** | Present in monorepo (~2 MB); not shipped in software repo |
 | W5 | **Internal defense markdown stale** | `submission_readiness.md`, `evidence_gaps.md` cite old TODO bib / §8 gaps superseded by editorial sync |
 | W6 | **Monorepo has no unified git remote** | `paper/` not in `earnbench` git; Zenodo supplement strategy must clarify two-archive model |
 | W7 | **Phase D in progress on disk** | `paper/experiments/runs/phase_d_*` exists; manuscript correctly does not headline those results |
-| W8 | **Author placeholders** | `CITATION.cff`, `.zenodo.json` use "EarnBench contributors" + ORCID `0000-0000-0000-0000` |
+| W8 | **Author placeholders** | `CITATION.cff`, `.zenodo.json` — finalize names/ORCIDs before Zenodo deposit |
 | W9 | **`earnbench run` stub** | Exits with code 2 — documented but easy to stumble on |
-| W10 | **No CI until RC1 pass** | `.github/workflows/ci.yml` added in RC1 prep — verify green after fixing W1 |
+| W10 | **CI** | **Added** — `.github/workflows/ci.yml`; verify green on GitHub after push |
 
 ---
 

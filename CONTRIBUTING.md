@@ -38,13 +38,14 @@ first-time image builds.
 ## Monorepo layout
 
 Full paper reproduction assumes a sibling `paper/` tree (exploit patches, instance
-metadata parquet, frozen run artifacts). Cloning **only** this repository supports:
+metadata parquet, frozen run artifacts). Cloning **only**
+https://github.com/cesar-andress/earnbench supports:
 
 - `earnbench compute` / `validate-audit` on JSON fixtures
 - `pytest` unit tests
 - `examples/synthetic_visible_test_overfitting.py`
 
-See [docs/publication_readiness_audit.md](docs/publication_readiness_audit.md) for
+See [docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) for
 standalone vs monorepo requirements.
 
 ## Pull request checklist

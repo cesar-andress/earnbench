@@ -8,26 +8,41 @@ and the [release policy](docs/release_policy.md).
 
 ## [Unreleased]
 
+## [0.1.0-rc1] - 2026-06-28
+
+First public **release candidate** (pre-release). Packages the measurement instrument
+and CLI used in the TOSEM manuscript validation ladder. Frozen experiment CSVs and
+Docker batch outputs remain in the companion `paper/experiments/runs/` supplement layout.
+
 ### Added
 
+- Release candidate metadata: `VERSION`, `.zenodo.json`, `RELEASE_NOTES.md`, CI workflow
 - Release and versioning policy (`docs/release_policy.md`)
 - Zenodo readiness checklist (`docs/zenodo_checklist.md`)
+- Reproducibility and Docker setup guides (`docs/REPRODUCIBILITY.md`, `docs/docker_setup.md`)
 - Synthetic visible-test overfitting example (`examples/synthetic_visible_test_overfitting.py`)
 - MVP Earned Fraction metric (`compute_earned_fraction`, `EarnedFractionReport`)
-- Core modules: `tasks`, `perturbations`, `runs`, `outcomes`, `metrics`, `reports`
-- Unit tests for architecture, metric edge cases, and example execution
-- Initial repository skeleton: README, LICENSE (MIT), CITATION.cff, pyproject.toml
+- Perturbation registry v1 (`pi_vtest.v1`, `pi_verif.v1`, `pi_env.v1`) with SWE-bench executors
+- Phase A/B batch runners, blind injection CLI, report generators, validation-layer tooling
+- Unit tests (460+) and GitHub Actions CI on Python 3.10–3.12
 
 ### Changed
 
-- README with installation, development, synthetic example, and policy links
+- README, CONTRIBUTING, and docs index updated for RC1 publication layout
+- Package classifier: Beta (release candidate)
+- Repository URLs aligned to `https://github.com/cesar-andress/earnbench`
+
+### Known limitations
+
+- `frozen_instrument_manifest.json` in the paper repo remains `pending_signoff`
+- Standalone clone cannot replay full Docker batches without sibling `paper/` paths
+- Zenodo DOI pending; cite tag `v0.1.0-rc1` or git SHA
 
 ## [0.1.0] - TBD
 
-_Not released. See [release policy](docs/release_policy.md) for the v0.1.0 gate._
+_Not released._ Final release after manifest sign-off, author metadata finalization,
+and Zenodo deposit. See [release policy](docs/release_policy.md).
 
-When released, this section will record the first benchmark-integrated artifact with
-perturbation executors `pi_vtest.v1`, `pi_verif.v1`, and `pi_env.v1`.
-
-[Unreleased]: https://github.com/earnbench/earnbench/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/earnbench/earnbench/releases/tag/v0.1.0
+[Unreleased]: https://github.com/cesar-andress/earnbench/compare/v0.1.0-rc1...HEAD
+[0.1.0-rc1]: https://github.com/cesar-andress/earnbench/releases/tag/v0.1.0-rc1
+[0.1.0]: https://github.com/cesar-andress/earnbench/releases/tag/v0.1.0

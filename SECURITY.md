@@ -5,14 +5,17 @@
 | Version | Supported |
 |---------|-----------|
 | `0.1.0-rc1` | Pre-release; security fixes on best effort |
-| `0.1.0` (tag pending) | Supported after public release |
-| `< 0.1.0` | Not supported |
+| `0.1.0` (final tag pending) | Supported after public release and Zenodo deposit |
+| `< 0.1.0-rc1` | Not supported |
 
 ## Reporting a vulnerability
 
 **Do not** open public GitHub issues for security-sensitive reports.
 
-Email the maintainers (replace with project contact before public launch) with:
+Preferred: [GitHub Security Advisories](https://github.com/cesar-andress/earnbench/security/advisories/new)
+(private report).
+
+Include:
 
 - Description and impact
 - Steps to reproduce

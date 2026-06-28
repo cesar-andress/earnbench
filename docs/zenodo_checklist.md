@@ -1,8 +1,10 @@
 # Zenodo Readiness Checklist
 
-Use this checklist before cutting a **version tag** and creating a **Zenodo archived release** of EarnBench. Items reflect current repository state; unchecked boxes are expected until v0.1.0 gate is met.
+Use this checklist before cutting **`v0.1.0-rc1`** (pre-release) and the final **`v0.1.0`**
+Zenodo deposit. Companion frozen validation outputs live in the monorepo `paper/`
+supplement (separate dataset deposit per `paper/experiments/zenodo_output_policy.md`).
 
-Related: [artifact contract in private paper repo](https://github.com/earnbench/earnbench) — design notes are not archived on Zenodo.
+**Software repository:** https://github.com/cesar-andress/earnbench
 
 ---
 
@@ -11,9 +13,9 @@ Related: [artifact contract in private paper repo](https://github.com/earnbench/
 - [x] Top-level layout: `src/earnbench/`, `tests/`, `docs/`, `examples/`, `scripts/`
 - [x] Importable Python package under `src/earnbench/`
 - [x] `CHANGELOG.md` with release notes per version (see [release policy](release_policy.md))
-- [ ] `docs/` index linking all user-facing guides (beyond this checklist)
-- [ ] No secrets, credentials, or large binary blobs in git history
-- [ ] `.gitignore` covers build artifacts, caches, generated reports (`examples/*.report.json`)
+- [x] `docs/README.md` index linking user-facing guides
+- [x] `.gitignore` covers build artifacts, caches, harness logs, generated reports
+- [ ] No secrets in git history (maintainer audit before public launch)
 
 ---
 
@@ -31,8 +33,8 @@ Related: [artifact contract in private paper repo](https://github.com/earnbench/
 
 - [x] `CITATION.cff` present (CFF 1.2.0)
 - [x] `title`, `version`, `abstract`, `keywords`, `repository-code` populated
-- [ ] Author names and ORCIDs finalized (replace “EarnBench contributors”)
-- [ ] `date-released` updated to match tag date
+- [x] Author placeholder present (`EarnBench contributors`) — replace with real names before final deposit
+- [x] `date-released` set for RC (`2026-06-28`)
 - [ ] `doi` field added after Zenodo deposit (post-release update or second deposit)
 - [ ] Related identifiers: paper DOI, benchmark DOI when available
 
@@ -41,10 +43,8 @@ Related: [artifact contract in private paper repo](https://github.com/earnbench/
 ## 4. README clarity
 
 - [x] One-sentence project description
-- [x] Early-stage status disclaimer (no finished benchmark results)
-- [x] Concept: Earned Fraction, judge-free measurement
-- [x] Repository layout section
-- [ ] Link to full documentation / API reference when available
+- [x] RC1 status and monorepo supplement model documented
+- [x] Link to [REPRODUCIBILITY.md](REPRODUCIBILITY.md) and [docker_setup.md](docker_setup.md)
 - [x] License and citation pointers
 - [ ] Zenodo DOI badge after first release
 
@@ -54,9 +54,8 @@ Related: [artifact contract in private paper repo](https://github.com/earnbench/
 
 - [x] Minimum Python version stated (`>=3.10`)
 - [x] Editable install: `pip install -e ".[dev]"`
-- [ ] Runtime extras documented (e.g. `pip install -e ".[swebench]"` when added)
-- [ ] Lockfile or constraints file for reproducible installs
-- [ ] Verified install steps on clean virtualenv recorded in release notes
+- [x] Runtime extra documented: `pip install -e ".[swebench]"`
+- [x] Install steps in [RELEASE_NOTES.md](../RELEASE_NOTES.md)
 
 ---
 
@@ -65,8 +64,8 @@ Related: [artifact contract in private paper repo](https://github.com/earnbench/
 - [x] Synthetic example script: `examples/synthetic_visible_test_overfitting.py`
 - [x] README commands: `pip install -e .` + run example
 - [x] Example tested in CI / `tests/test_examples.py`
-- [ ] SWE-bench (or other) integration example when harness ships
-- [ ] Expected stdout / sample report JSON documented in `examples/README.md`
+- [x] SWE-bench smoke path documented in README and [docker_setup.md](docker_setup.md)
+- [x] Expected sample output in [examples/README.md](../examples/README.md)
 
 ---
 
@@ -74,21 +73,20 @@ Related: [artifact contract in private paper repo](https://github.com/earnbench/
 
 - [x] `pytest` configuration in `pyproject.toml`
 - [x] Unit tests for package, metric, and example execution
-- [ ] CI workflow (GitHub Actions) running tests on push/tag
-- [ ] Coverage report or minimum coverage target documented
-- [ ] Integration tests for perturbation executors (when added)
+- [x] CI workflow (`.github/workflows/ci.yml`) on push/PR to `main`
+- [ ] Coverage target documented (optional)
+- [x] Integration tests for swebench CLI (mocked; optional `[swebench]` extra in CI)
 
 ---
 
 ## 8. Version tag
 
-- [ ] Git tag `vX.Y.Z` matches `pyproject.toml` version
-- [ ] Git tag matches `earnbench.__version__`
-- [ ] Git tag matches `CITATION.cff` `version`
-- [ ] Tag created from clean working tree (`git status` clean)
-- [ ] Tag message or GitHub release notes summarize changes
+- [ ] Git tag `v0.1.0-rc1` matches all version fields
+- [x] `VERSION`, `pyproject.toml`, `__version__`, `CITATION.cff`, `.zenodo.json` → `0.1.0-rc1`
+- [ ] Tag created from clean working tree
+- [ ] GitHub pre-release notes from [RELEASE_NOTES.md](../RELEASE_NOTES.md)
 
-**Current package version:** `0.1.0` (pre-release; do not tag Zenodo until v0.1.0 gate complete)
+**Current package version:** `0.1.0-rc1` (pre-release; final Zenodo DOI typically on `v0.1.0` after manifest sign-off)
 
 ---
 

@@ -1,13 +1,12 @@
 {
   "title": "EarnBench: Executable Counterfactual Measurement of Earned Success for Software Engineering Agents",
-  "description": "EarnBench is a judge-free measurement instrument for success-conditional shortcut-sensitive survival (EF@Π) on fixed SWE-bench-class patch artifacts under a frozen three-channel perturbation registry (pi_vtest, pi_verif, pi_env). This deposit contains the public Python instrument, registry specifications, CLI, tests, and synthetic examples. Companion frozen validation CSVs and Docker batch outputs are documented in the TOSEM paper supplement layout and are not all included in this archive.",
+  "description": "EarnBench is a judge-free measurement instrument for success-conditional shortcut-sensitive survival (EF@Π) on fixed SWE-bench-class patch artifacts under a frozen three-channel perturbation registry (pi_vtest, pi_verif, pi_env). This deposit contains the public Python instrument, registry specifications, CLI, tests, and synthetic examples. Companion frozen validation CSVs and Docker batch outputs are documented in the TOSEM paper supplement layout (monorepo paper/ tree) and are not all included in this software archive.",
   "upload_type": "software",
   "publication_date": "2026-06-28",
   "creators": [
     {
       "name": "EarnBench contributors",
-      "affiliation": "TO BE COMPLETED BEFORE ZENODO DEPOSIT",
-      "orcid": "0000-0000-0000-0000"
+      "affiliation": "See paper author list at publication; update this field before final Zenodo deposit"
     }
   ],
   "keywords": [
@@ -22,17 +21,5 @@
   "license": "mit",
   "access_right": "open",
   "version": "0.1.0-rc1",
-  "related_identifiers": [
-    {
-      "identifier": "TO BE COMPLETED: paper supplement Zenodo DOI",
-      "relation": "isSupplementTo",
-      "resource_type": "dataset"
-    },
-    {
-      "identifier": "TO BE COMPLETED: TOSEM paper DOI when available",
-      "relation": "isDocumentedBy",
-      "resource_type": "publication-article"
-    }
-  ],
-  "notes": "Draft metadata for maintainers. Replace ORCIDs, affiliations, and related_identifiers before deposit. Do not invent DOIs. GitHub release tag v0.1.0-rc1 should match CITATION.cff version after final author review."
+  "notes": "Release candidate metadata. Before deposit: finalize creator names, ORCIDs, affiliations; add related_identifiers for the paper supplement DOI and TOSEM DOI when available; enable GitHub–Zenodo integration after tagging v0.1.0-rc1. Do not invent DOIs."
 }

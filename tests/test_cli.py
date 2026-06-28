@@ -451,7 +451,7 @@ def test_swebench_run_pi_vtest_cli(capsys, tmp_path: Path) -> None:
 
     with (
         patch(
-            "earnbench.adapters.swebench_pi_vtest.default_nominal_runner",
+            "earnbench.adapters.swebench_pi_vtest.default_pi_vtest_runner",
             _mock_nominal_runner_for_cli,
         ),
         patch(

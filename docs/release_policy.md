@@ -2,7 +2,8 @@
 
 This document defines how EarnBench versions are numbered, released, archived on Zenodo, and deprecated. It complements [zenodo_checklist.md](zenodo_checklist.md).
 
-**Current status:** development on `main`; package version `0.1.0` in metadata is **aspirational** until the v0.1.0 gate below is satisfied and a git tag is cut.
+**Current status:** release candidate **`v0.1.0-rc1`** on `main`; final **`v0.1.0`**
+requires manifest sign-off and Zenodo DOI per gate below.
 
 ---
 
@@ -18,12 +19,14 @@ EarnBench follows [Semantic Versioning 2.0.0](https://semver.org/) for git tags 
 
 ### Version alignment (required at tag time)
 
-These must match for every release tag `vX.Y.Z`:
+These must match for every release tag `vX.Y.Z` (or pre-release tag `vX.Y.Z-rcN`):
 
 - Git tag
+- `VERSION` file
 - `pyproject.toml` `project.version`
 - `src/earnbench/__version__`
 - `CITATION.cff` `version`
+- `.zenodo.json` `version` (when depositing)
 - Top entry in [CHANGELOG.md](../CHANGELOG.md)
 
 ### Pre-release labels
@@ -52,26 +55,26 @@ Tag **`v0.1.0`** and the **first Zenodo DOI** require all of the following.
 - [x] Unit tests for metric edge cases
 - [x] Synthetic end-to-end example
 
-### Perturbation executors (required for v0.1.0)
+### Perturbation executors (implemented; validation evidence in paper supplement)
 
-- [ ] `pi_vtest.v1` — holdout re-grade with published partition rule
-- [ ] `pi_verif.v1` — pristine trusted verifier + tamper detection
-- [ ] `pi_env.v1` — clean hardened re-execution
-- [ ] Golden-patch validation on reference instances
-- [ ] `audit.json` per perturbation run
+- [x] `pi_vtest.v1` — holdout re-grade with published partition rule
+- [x] `pi_verif.v1` — pristine trusted verifier + tamper detection
+- [x] `pi_env.v1` — clean hardened re-execution
+- [x] Golden-patch validation on reference instances (Phase A frozen runs)
+- [x] `audit.json` per perturbation run
 
 ### Integration
 
-- [ ] SWE-bench-class adapter (read-only: patch + instance → outcomes)
-- [ ] End-to-end example on ≥1 real benchmark instance
-- [ ] CI running `pytest` on supported Python versions
+- [x] SWE-bench-class adapter (patch + instance → outcomes via Docker harness)
+- [x] End-to-end example on real benchmark instance (smoke path documented)
+- [x] CI running `pytest` on supported Python versions (`.github/workflows/ci.yml`)
 
 ### Release hygiene
 
-- [ ] [CHANGELOG.md](../CHANGELOG.md) entry for v0.1.0
-- [ ] Dependency lockfile for reproducible installs
-- [ ] README updated (no longer “skeleton only”)
-- [ ] [zenodo_checklist.md](zenodo_checklist.md) complete for this tag
+- [x] [CHANGELOG.md](../CHANGELOG.md) entry for `0.1.0-rc1`
+- [ ] Dependency lockfile for reproducible installs (optional for RC1)
+- [x] README updated for RC1 (instrument + monorepo supplement model)
+- [x] [zenodo_checklist.md](zenodo_checklist.md) maintained for deposit
 
 ### Explicitly not required for v0.1.0
 

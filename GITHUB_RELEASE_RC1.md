@@ -1,53 +1,54 @@
-# GitHub Release Preparation — v0.1.0-rc1 (draft, not published)
+# GitHub Release Preparation — v0.1.0-rc1
 
-## Repository settings (manual)
+## Repository settings
 
-| Field | Recommended value |
-|-------|-------------------|
+| Field | Value |
+|-------|-------|
+| **URL** | https://github.com/cesar-andress/earnbench |
 | **Description** | Judge-free EF@Π measurement instrument for SWE-bench-class patch artifacts |
-| **Website** | Link to `docs/README.md` or project page when available |
+| **Website** | https://github.com/cesar-andress/earnbench/tree/main/docs |
 | **Topics** | `benchmark-integrity`, `software-engineering`, `llm-agents`, `swe-bench`, `reward-hacking`, `counterfactual-evaluation`, `measurement-instrument`, `reproducibility` |
 
-## Suggested release
+## Release
 
 | Field | Value |
 |-------|-------|
 | **Tag** | `v0.1.0-rc1` |
-| **Target** | `main` at signed-off commit |
+| **Target** | `main` at RC commit |
 | **Title** | `v0.1.0-rc1 — First public release candidate` |
-| **Pre-release** | Yes (check "This is a pre-release") |
+| **Pre-release** | Yes |
 
-## Release notes body (copy/paste)
+## Release notes body
 
-See [RELEASE_NOTES.md](RELEASE_NOTES.md).
-
-Add at top after publish:
+Copy [RELEASE_NOTES.md](RELEASE_NOTES.md). Add at top:
 
 ```markdown
-> **Citation:** Until Zenodo DOI is live, cite commit `<SHA>` and version `0.1.0-rc1`.
-> See CITATION.cff.
+> **Citation:** Until Zenodo DOI is live, cite tag `v0.1.0-rc1` and commit `<SHA>`.
+> See [CITATION.cff](CITATION.cff).
 ```
 
-## Badges for README (after DOI exists)
+## README badges (after Zenodo DOI)
+
+Add DOI badge **only after deposit** — do not invent DOIs:
 
 ```markdown
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](pyproject.toml)
-[![DOI](https://zenodo.org/badge/DOI/PLACEHOLDER.svg)](https://doi.org/PLACEHOLDER)
+[![DOI](https://zenodo.org/badge/DOI/<ZENODO-DOI>.svg)](https://doi.org/<ZENODO-DOI>)
 ```
-
-Replace `PLACEHOLDER` only after Zenodo deposit — do not invent DOIs.
-
-## Issue templates
-
-Optional templates added under `.github/ISSUE_TEMPLATE/`.
 
 ## Pre-release checklist
 
-- [ ] Align `pyproject.toml` and `CITATION.cff` `repository-code` URL with actual GitHub remote
-- [ ] `frozen_instrument_manifest.json` signed (`status: signed` or equivalent)
-- [ ] `pytest` green (or document known failures)
-- [ ] README Status section updated
-- [ ] Tag matches `VERSION`, `CITATION.cff`, `pyproject.toml`
-- [ ] Zenodo `.zenodo.json` authors finalized
-- [ ] No secrets in git history
+- [x] Align `pyproject.toml`, `CITATION.cff`, `VERSION`, `__version__` with `0.1.0-rc1`
+- [x] Repository URL → `cesar-andress/earnbench`
+- [x] `pytest` green locally (464 passed)
+- [x] CI workflow (`.github/workflows/ci.yml`)
+- [x] README Status + reproducibility docs
+- [ ] Cut git tag `v0.1.0-rc1`
+- [ ] GitHub pre-release from this tag
+- [ ] `frozen_instrument_manifest.json` signed in paper supplement (separate repo path)
+- [ ] Finalize `.zenodo.json` creators (names, ORCIDs, affiliations)
+- [ ] Enable GitHub–Zenodo integration and deposit after tag
+- [ ] Update `CITATION.cff` `doi` field post-deposit
+
+## Issue templates
+
+See `.github/ISSUE_TEMPLATE/` and `.github/pull_request_template.md`.
