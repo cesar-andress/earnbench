@@ -9,6 +9,7 @@ Documentation is in early draft. Design notes live in the private research repos
 - [Policy-level earned credit (stochastic agents)](policy_earned_credit.md)
 - [Policy variance decomposition (Phase C′)](policy_variance.md)
 - [Phase C′ pilot manifest validation](phase_c_prime.md)
+- [Phase D agent re-grade (ERS glue)](phase_d_ers.md)
 - [Registry geometry report](registry_geometry.md)
 - [Registry Structure Validation (Validation 11)](registry_structure_validation.md)
 - [Policy-level EF reference (legacy alias)](policy_ef.md)

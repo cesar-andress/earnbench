@@ -92,6 +92,12 @@ from earnbench.phase_c_agents import (
     run_phase_c,
     summarize_phase_c,
 )
+from earnbench.phase_d_regrade import (
+    PhaseDError,
+    PhaseDRegradeConfig,
+    run_phase_d,
+    summarize_phase_d,
+)
 from earnbench.provenance import Provenance, build_provenance
 from earnbench.phase_c_prime import validate_phase_c_prime_manifest
 from earnbench.registry_geometry import generate_registry_geometry_report
@@ -1252,6 +1258,84 @@ def cmd_phase_c_summarize(args: argparse.Namespace) -> None:
     try:
         summary = summarize_phase_c(output_dir=Path(args.run))
     except PhaseCError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    json.dump(summary.to_dict(), sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
+def cmd_phase_d_run(args: argparse.Namespace) -> None:
+    """Re-grade Phase C agent patches under frozen EF@Π semantics."""
+    phase_c_run = Path(args.phase_c_run).resolve()
+    if not phase_c_run.is_dir():
+        raise CLIError(f"--phase-c-run not found: {phase_c_run}")
+    if not (phase_c_run / "attempts.csv").is_file():
+        raise CLIError(f"attempts.csv not found under {phase_c_run}")
+
+    metadata_path = Path(args.metadata_parquet).resolve()
+    suffix = metadata_path.suffix.lower()
+    if suffix not in {".parquet", ".json"}:
+        raise CLIError(
+            f"--metadata-parquet must be a .parquet or .json file, got: {metadata_path}"
+        )
+    if not metadata_path.is_file():
+        raise CLIError(f"--metadata-parquet not found: {metadata_path}")
+
+    output_dir = Path(args.output).resolve()
+    try:
+        run_config = resolve_swebench_run_config_from_args(args)
+    except (FileNotFoundError, ValueError) as exc:
+        raise CLIError(str(exc)) from exc
+
+    configure_structured_logging(verbose=not args.quiet)
+    print_swebench_execution_summary(
+        command="phase-d run",
+        config=run_config,
+        output_dir=output_dir,
+        instance_count=0,
+    )
+
+    config = PhaseDRegradeConfig(
+        phase_c_run=phase_c_run,
+        metadata_path=metadata_path,
+        output_dir=output_dir,
+        workers=args.workers if args.workers is not None else run_config.workers,
+        resume=args.resume,
+        run_config=run_config,
+        run_id=args.run_id or f"phase_d_{output_dir.name}",
+        dataset_revision=args.dataset_revision,
+        build_missing_images=args.build_missing_images,
+    )
+
+    try:
+        result = run_phase_d(config)
+    except PhaseDError as exc:
+        raise CLIError(str(exc)) from exc
+
+    if args.quiet:
+        return
+
+    payload = {
+        "output_dir": str(result.output_dir),
+        "graded_count": result.graded_count,
+        "failure_count": result.failure_count,
+        "skipped_count": result.skipped_count,
+        "agent_results_csv": str(result.agent_results_csv),
+        "failures_path": str(result.failures_path),
+        "summary_path": str(result.summary_path),
+    }
+    json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+
+
+def cmd_phase_d_summarize(args: argparse.Namespace) -> None:
+    """Summarize a completed Phase D run directory."""
+    try:
+        summary = summarize_phase_d(output_dir=Path(args.run))
+    except PhaseDError as exc:
         raise CLIError(str(exc)) from exc
 
     if args.quiet:
@@ -2891,6 +2975,76 @@ def build_parser() -> argparse.ArgumentParser:
         help="Do not print summary JSON to stdout",
     )
 
+    phase_d_parser = subparsers.add_parser(
+        "phase-d",
+        help="Phase D agent patch re-grade (EF@Π for Phase C patches)",
+    )
+    phase_d_subparsers = phase_d_parser.add_subparsers(
+        dest="phase_d_command",
+        required=True,
+    )
+
+    phase_d_run_parser = phase_d_subparsers.add_parser(
+        "run",
+        help="Re-grade eligible Phase C attempts and write agent_results.csv",
+    )
+    phase_d_run_parser.add_argument(
+        "--phase-c-run",
+        required=True,
+        help="Completed Phase C directory (attempts.csv and patch files)",
+    )
+    phase_d_run_parser.add_argument(
+        "--metadata-parquet",
+        required=True,
+        help="SWE-bench Verified metadata (.parquet or .json)",
+    )
+    phase_d_run_parser.add_argument(
+        "--output",
+        required=True,
+        help="Phase D output directory",
+    )
+    add_swebench_performance_arguments(phase_d_run_parser)
+    phase_d_run_parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Skip completed cells recorded on disk",
+    )
+    phase_d_run_parser.add_argument(
+        "--run-id",
+        default="",
+        help="Run identifier stored in run_manifest.json and agent_results.csv",
+    )
+    phase_d_run_parser.add_argument(
+        "--dataset-revision",
+        default="unpinned",
+        help="Dataset revision label stored in adapter config digest inputs",
+    )
+    phase_d_run_parser.add_argument(
+        "--build-missing-images",
+        action="store_true",
+        help="Build missing SWE-bench harness images during preflight",
+    )
+    phase_d_run_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Progress on stderr only; do not print batch summary JSON to stdout",
+    )
+
+    phase_d_summarize_parser = phase_d_subparsers.add_parser(
+        "summarize",
+        help="Summarize a completed Phase D run directory",
+    )
+    phase_d_summarize_parser.add_argument(
+        "--run",
+        required=True,
+        help="Phase D output directory",
+    )
+    phase_d_summarize_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print summary JSON to stdout",
+    )
+
     report_parser = subparsers.add_parser(
         "report",
         help="Generate publication reports from completed batch outputs",
@@ -3350,6 +3504,13 @@ def main(argv: list[str] | None = None) -> int:
                 cmd_phase_c_summarize(args)
             else:
                 parser.error(f"unknown phase-c command: {args.phase_c_command}")
+        elif args.command == "phase-d":
+            if args.phase_d_command == "run":
+                cmd_phase_d_run(args)
+            elif args.phase_d_command == "summarize":
+                cmd_phase_d_summarize(args)
+            else:
+                parser.error(f"unknown phase-d command: {args.phase_d_command}")
         elif args.command == "report":
             if args.report_command == "phase-a":
                 cmd_report_phase_a(args)
