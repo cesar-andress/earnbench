@@ -1,14 +1,26 @@
-# EarnBench RC1 — Release Checklist
+# EarnBench Release Checklist
 
-**Target:** `v0.1.0-rc1` (pre-release) → `v0.1.0` (first Zenodo DOI)  
+**Current release:** `v1.0.0` — Zenodo [10.5281/zenodo.21019033](https://doi.org/10.5281/zenodo.21019033)  
 **Last updated:** 2026-06-28  
-**Full audit:** [release_readiness_report.md](release_readiness_report.md)
+**RC1 planning (historical):** sections below retained for audit trail; see banner on [release_readiness_report.md](release_readiness_report.md)
 
 Legend: ✓ done · ◐ partial · ✗ missing · ☐ action item
 
 ---
 
-## Repository structure
+## v1.0.0 sign-off (complete)
+
+| Item | Status |
+|------|:------:|
+| Git tag `v1.0.0` | ✓ |
+| GitHub release | ✓ |
+| Zenodo software deposit + DOI | ✓ |
+| `CITATION.cff` / README / `.zenodo.json` DOI | ✓ |
+| Package version `1.0.0` aligned | ✓ |
+
+---
+
+## Repository structure (RC1 audit — historical)
 
 | Item | Status | Notes |
 |------|:------:|-------|

@@ -1,5 +1,9 @@
 # GitHub Release Preparation — v0.1.0-rc1
 
+> **Historical document.** RC1 planning notes from June 2026. The public release of record is
+> **`v1.0.0`** ([10.5281/zenodo.21019033](https://doi.org/10.5281/zenodo.21019033)). See
+> [RELEASE_NOTES.md](RELEASE_NOTES.md) and [docs/zenodo_checklist.md](docs/zenodo_checklist.md).
+
 ## Repository settings
 
 | Field | Value |

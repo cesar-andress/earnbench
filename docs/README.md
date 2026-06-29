@@ -1,6 +1,7 @@
 # EarnBench documentation
 
-User-facing guides for the public measurement instrument (release candidate `0.1.0-rc1`).
+User-facing guides for the public measurement instrument (release **`v1.0.0`**, Zenodo
+DOI [10.5281/zenodo.21019033](https://doi.org/10.5281/zenodo.21019033)).
 
 ## Start here
 

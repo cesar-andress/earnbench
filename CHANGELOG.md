@@ -8,41 +8,35 @@ and the [release policy](docs/release_policy.md).
 
 ## [Unreleased]
 
-## [0.1.0-rc1] - 2026-06-28
+## [1.0.0] - 2026-06-28
 
-First public **release candidate** (pre-release). Packages the measurement instrument
-and CLI used in the TOSEM manuscript validation ladder. Frozen experiment CSVs and
-Docker batch outputs remain in the companion `paper/experiments/runs/` supplement layout.
+Initial public reproducibility release archived on Zenodo
+([10.5281/zenodo.21019033](https://doi.org/10.5281/zenodo.21019033)).
 
 ### Added
 
-- Release candidate metadata: `VERSION`, `.zenodo.json`, `RELEASE_NOTES.md`, CI workflow
-- Release and versioning policy (`docs/release_policy.md`)
-- Zenodo readiness checklist (`docs/zenodo_checklist.md`)
-- Reproducibility and Docker setup guides (`docs/REPRODUCIBILITY.md`, `docs/docker_setup.md`)
-- Synthetic visible-test overfitting example (`examples/synthetic_visible_test_overfitting.py`)
-- MVP Earned Fraction metric (`compute_earned_fraction`, `EarnedFractionReport`)
-- Perturbation registry v1 (`pi_vtest.v1`, `pi_verif.v1`, `pi_env.v1`) with SWE-bench executors
-- Phase A/B batch runners, blind injection CLI, report generators, validation-layer tooling
-- Unit tests (460+) and GitHub Actions CI on Python 3.10–3.12
+- Zenodo DOI propagated to `CITATION.cff`, README, and `.zenodo.json`
+- Post-release Zenodo checklist documenting software vs supplement archive split
 
 ### Changed
 
-- README, CONTRIBUTING, and docs index updated for RC1 publication layout
-- Package classifier: Beta (release candidate)
-- Repository URLs aligned to `https://github.com/cesar-andress/earnbench`
+- Package version aligned to `1.0.0` across `VERSION`, `pyproject.toml`, and `__version__`
+- Release notes and reproducibility docs cite tag `v1.0.0` and minted DOI
+- PyPI classifier: Production/Stable
 
-### Known limitations
+### Archive scope
 
-- `frozen_instrument_manifest.json` in the paper repo remains `pending_signoff`
-- Standalone clone cannot replay full Docker batches without sibling `paper/` paths
-- Zenodo DOI pending; cite tag `v0.1.0-rc1` or git SHA
+- **Software deposit:** instrument, registry, CLI, tests, synthetic example, docs
+- **Excluded:** large frozen run trees and Docker batch outputs under `paper/experiments/runs/`
+  (companion dataset deposit if needed)
 
-## [0.1.0] - TBD
+## [0.1.0-rc1] - 2026-06-28
 
-_Not released._ Final release after manifest sign-off, author metadata finalization,
-and Zenodo deposit. See [release policy](docs/release_policy.md).
+First public **release candidate** (superseded by `v1.0.0`). Packages the measurement
+instrument and CLI used in the TOSEM manuscript validation ladder.
 
-[Unreleased]: https://github.com/cesar-andress/earnbench/compare/v0.1.0-rc1...HEAD
+See git tag `v0.1.0-rc1` for the RC snapshot. Do not cite RC1 when the Zenodo DOI is available.
+
+[Unreleased]: https://github.com/cesar-andress/earnbench/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/cesar-andress/earnbench/releases/tag/v1.0.0
 [0.1.0-rc1]: https://github.com/cesar-andress/earnbench/releases/tag/v0.1.0-rc1
-[0.1.0]: https://github.com/cesar-andress/earnbench/releases/tag/v0.1.0

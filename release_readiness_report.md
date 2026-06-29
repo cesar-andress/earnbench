@@ -1,5 +1,9 @@
 # EarnBench RC1 — Release Readiness Report
 
+> **Historical document.** Pre-release audit snapshot (2026-06-28). Superseded by public
+> release **`v1.0.0`** — Zenodo DOI [10.5281/zenodo.21019033](https://doi.org/10.5281/zenodo.21019033).
+> Use [RELEASE_NOTES.md](RELEASE_NOTES.md) and [docs/zenodo_checklist.md](docs/zenodo_checklist.md) for current status.
+
 **Audit date:** 2026-06-28  
 **Scope:** Publication, reproducibility, and repository quality for first public release candidate (`v0.1.0-rc1`)  
 **Auditor role:** ACM/TOSEM artifact evaluation + production editor  

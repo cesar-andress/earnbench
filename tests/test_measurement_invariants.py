@@ -29,7 +29,7 @@ REFERENCE_FIXTURE_SHA256: dict[str, str] = {
         "76d0156b5b97fe2b22b5e721444cd5ac245d07550391c5bad4c3fd1989119e31"
     ),
     "valid_audit.json": (
-        "41116378068c2ae4e3eeae9fbd9a728a1c795e0edc1c9f488b24670a43507124"
+        "7b51663e1871b58613df086700999a8f36e1537704b37f06fffb9d109da6594e"
     ),
     "invalid_audit.json": (
         "86ac73f832504b3324e52d07c68fc42ec0f7b614fae20a20c52e0b580a682b5e"

@@ -1,6 +1,6 @@
 {
   "schema_version": "earnbench_audit.v1",
-  "earnbench_version": "0.1.0",
+  "earnbench_version": "1.0.0",
   "instance_id": "django__django-13279",
   "perturbation_id": "pi_vtest.v1",
   "config_digest": "sha256:abc",

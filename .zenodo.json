@@ -1,6 +1,6 @@
 {
   "title": "EarnBench: Executable Counterfactual Measurement of Earned Success for Software Engineering Agents",
-  "description": "EarnBench is a judge-free measurement instrument for success-conditional shortcut-sensitive survival (EF@Π) on fixed SWE-bench-class patch artifacts under a frozen three-channel perturbation registry (pi_vtest, pi_verif, pi_env). This deposit contains the public Python instrument, registry specifications, CLI, tests, and synthetic examples. Companion frozen validation CSVs and Docker batch outputs are documented in the TOSEM paper supplement layout (monorepo paper/ tree) and are not all included in this software archive.",
+  "description": "EarnBench is a judge-free measurement instrument for success-conditional shortcut-sensitive survival (EF@Π) on fixed SWE-bench-class patch artifacts under a frozen three-channel perturbation registry (pi_vtest, pi_verif, pi_env). This deposit contains the public Python instrument, registry specifications, CLI, tests, and synthetic examples. Large generated experiment outputs cited in the TOSEM manuscript (frozen run trees, Docker batch artifacts) are excluded from this software archive and may be archived separately as a companion dataset.",
   "upload_type": "software",
   "publication_date": "2026-06-28",
   "creators": [
@@ -21,6 +21,6 @@
   ],
   "license": "mit",
   "access_right": "open",
-  "version": "0.1.0-rc1",
-  "notes": "Release candidate metadata. Add related_identifiers for the paper supplement DOI and TOSEM DOI when available. Do not invent DOIs."
+  "version": "1.0.0",
+  "notes": "Published at https://doi.org/10.5281/zenodo.21019033 (GitHub tag v1.0.0). Add related_identifiers for a companion paper supplement dataset DOI and TOSEM DOI when available."
 }

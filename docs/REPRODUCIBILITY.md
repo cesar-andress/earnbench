@@ -46,8 +46,22 @@ git rev-parse HEAD
 # Compare to paper/experiments/frozen_instrument_manifest.json → software.git_commit
 ```
 
-Manifest status `pending_signoff` means gate memos are not yet signed; RC1 cites
-frozen run outputs as-is without changing pinned SHAs.
+Manifest status `pending_signoff` means gate memos are not yet signed; frozen run
+outputs are cited as-is without changing pinned SHAs.
+
+## Reproducing from the archived release
+
+Check out tag **`v1.0.0`** (or download the Zenodo software tarball) before batch replay:
+
+```bash
+git clone https://github.com/cesar-andress/earnbench.git
+cd earnbench
+git checkout v1.0.0
+pip install -e ".[dev,swebench]"
+```
+
+The version of record for citation is Zenodo DOI
+**[10.5281/zenodo.21019033](https://doi.org/10.5281/zenodo.21019033)**.
 
 ## What you can reproduce from this repo alone
 
@@ -139,10 +153,11 @@ earnbench report phase-a ../paper/experiments/runs/phase_a_verified_full
 earnbench report phase-b ../paper/experiments/runs/phase_b_all15
 ```
 
-## Citation until DOI exists
+## Citation
 
-Cite tag **`v0.1.0-rc1`** and git SHA from [CITATION.cff](../CITATION.cff). Add Zenodo
-DOI after deposit per [zenodo_checklist.md](zenodo_checklist.md).
+Cite Zenodo DOI **[10.5281/zenodo.21019033](https://doi.org/10.5281/zenodo.21019033)** or tag
+**`v1.0.0`** per [CITATION.cff](../CITATION.cff). See [zenodo_checklist.md](zenodo_checklist.md)
+for archive scope (software vs companion supplement).
 
 ## Related documents
 

@@ -29,7 +29,7 @@ def _default_earnbench_version() -> str:
 
         return version("earnbench")
     except Exception:
-        return "0.1.0"
+        return "1.0.0"
 
 
 @dataclass(frozen=True, slots=True)

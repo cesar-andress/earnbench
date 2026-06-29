@@ -2,8 +2,10 @@
 
 This document defines how EarnBench versions are numbered, released, archived on Zenodo, and deprecated. It complements [zenodo_checklist.md](zenodo_checklist.md).
 
-**Current status:** release candidate **`v0.1.0-rc1`** on `main`; final **`v0.1.0`**
-requires manifest sign-off and Zenodo DOI per gate below.
+**Current status:** public release **`v1.0.0`** on `main`, archived on Zenodo as
+**[10.5281/zenodo.21019033](https://doi.org/10.5281/zenodo.21019033)** (Initial
+Reproducibility Release). The earlier **`v0.1.0-rc1`** tag remains available as a
+historical release candidate only.
 
 ---
 
@@ -44,9 +46,11 @@ Counterfactual perturbations use stable IDs: `pi_<name>.vN` (e.g. `pi_vtest.v1`)
 
 ---
 
-## What qualifies for v0.1.0
+## Initial public release gate (fulfilled by v1.0.0)
 
-Tag **`v0.1.0`** and the **first Zenodo DOI** require all of the following.
+Tag **`v1.0.0`** and Zenodo DOI **`10.5281/zenodo.21019033`** satisfy the initial public
+release gate below. (An earlier planning document referred to **`v0.1.0`**; the shipped
+Initial Reproducibility Release uses **`v1.0.0`** semver.)
 
 ### Measurement core (done on current `main`)
 
@@ -71,28 +75,28 @@ Tag **`v0.1.0`** and the **first Zenodo DOI** require all of the following.
 
 ### Release hygiene
 
-- [x] [CHANGELOG.md](../CHANGELOG.md) entry for `0.1.0-rc1`
-- [ ] Dependency lockfile for reproducible installs (optional for RC1)
-- [x] README updated for RC1 (instrument + monorepo supplement model)
-- [x] [zenodo_checklist.md](zenodo_checklist.md) maintained for deposit
+- [x] [CHANGELOG.md](../CHANGELOG.md) entries for `0.1.0-rc1` and `1.0.0`
+- [ ] Dependency lockfile for reproducible installs (optional)
+- [x] README updated (instrument + monorepo supplement model + Zenodo DOI)
+- [x] [zenodo_checklist.md](zenodo_checklist.md) documents archived release
 
-### Explicitly not required for v0.1.0
+### Explicitly not required for the initial software release
 
 - Full five-mechanism perturbation set
 - Paper experiment tables
 - Public leaderboard
 
-Until the gate passes, **`v0.1.0` must not be tagged** and **no Zenodo DOI** should be cited as the official artifact.
+**Status (2026-06-28):** gate satisfied — cite **`v1.0.0`** and DOI **`10.5281/zenodo.21019033`**.
 
 ---
 
 ## What qualifies for paper artifact release
 
-The version cited in the paper must satisfy **v0.1.0** plus paper-specific requirements:
+The version cited in the paper must satisfy **`v1.0.0`** (or later) plus paper-specific requirements:
 
 | Requirement | Description |
 |-------------|-------------|
-| **Frozen tag** | Immutable git tag (≥ `v0.1.0`); paper states exact tag and Zenodo DOI |
+| **Frozen tag** | Immutable git tag (≥ `v1.0.0`); paper states exact tag and Zenodo DOI |
 | **Perturbation parity** | Every `pi_*` used in experiments is in the public registry with configs |
 | **Formula parity** | Paper EF definition matches `compute_earned_fraction()` (or divergence is stated) |
 | **Reproduction script** | Documented commands reproduce ≥1 main table from public inputs |
@@ -102,10 +106,9 @@ The version cited in the paper must satisfy **v0.1.0** plus paper-specific requi
 
 ### Paper vs preview
 
-- **Preview / draft:** cite GitHub commit hash only; label as pre-release in the paper.
-- **Camera-ready:** cite Zenodo DOI of the paper artifact tag; upload matching source to Zenodo.
+- **Camera-ready:** cite Zenodo DOI **`10.5281/zenodo.21019033`** (tag `v1.0.0`) or later patch release DOI.
 
-If the paper ships before v0.1.0 gate completion, the paper must **not** claim a general-purpose benchmark release—only a preview implementation.
+Historical preview builds may cite git SHA only; do not cite superseded RC tags when the DOI is available.
 
 ---
 

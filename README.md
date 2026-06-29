@@ -3,24 +3,26 @@
 [![CI](https://github.com/cesar-andress/earnbench/actions/workflows/ci.yml/badge.svg)](https://github.com/cesar-andress/earnbench/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](pyproject.toml)
-[![Version](https://img.shields.io/badge/version-0.1.0--rc1-orange.svg)](VERSION)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21019033.svg)](https://doi.org/10.5281/zenodo.21019033)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](VERSION)
 
 An executable counterfactual measurement framework for estimating how much of an AI software-engineering agent's success is earned rather than supported by exploitable evaluation channels.
 
 ## Status
 
-**Release candidate `0.1.0-rc1` (pre-release).** The instrument implements EF@Π,
-registry v1, SWE-bench Docker batch runners, and report generators used in the TOSEM
-manuscript validation ladder. Frozen experiment outputs cited in the paper live in
-the companion `paper/experiments/runs/` tree (monorepo layout).
+**Release `v1.0.0` — Initial Reproducibility Release** (archived on Zenodo:
+[10.5281/zenodo.21019033](https://doi.org/10.5281/zenodo.21019033)). The instrument
+implements EF@Π, registry v1, SWE-bench Docker batch runners, and report generators used
+in the TOSEM manuscript validation ladder. Frozen experiment outputs cited in the paper
+live in the companion `paper/experiments/runs/` tree (monorepo layout) and are **not**
+included in the Zenodo software archive.
 
 - **This repository (code deposit):** metric computation, registry CLI, synthetic
   example, unit tests, and batch runners when paired with supplement paths.
 - **Full batch reproduction:** requires sibling `paper/` paths (metadata parquet,
   exploit patches, frozen manifests) — see
   [docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md).
-- **Zenodo DOI:** not yet assigned; cite git tag `v0.1.0-rc1` or commit SHA until
-  `v0.1.0` is archived.
+- **Citation:** cite the Zenodo DOI above or git tag `v1.0.0` (see [CITATION.cff](CITATION.cff)).
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md), [release_readiness_report.md](release_readiness_report.md),
 [release_checklist.md](release_checklist.md), [docs/release_policy.md](docs/release_policy.md),
@@ -599,6 +601,10 @@ See [CITATION.cff](CITATION.cff).
 
 ## Zenodo release
 
-Before archiving on Zenodo, complete [docs/zenodo_checklist.md](docs/zenodo_checklist.md).
+Archived as Zenodo software release **`v1.0.0`**
+([10.5281/zenodo.21019033](https://doi.org/10.5281/zenodo.21019033)).
+Large generated experiment outputs are excluded from the software tarball; see
+[docs/zenodo_checklist.md](docs/zenodo_checklist.md) and
+[docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md).
 
 See also the [release and versioning policy](docs/release_policy.md) and [CHANGELOG.md](CHANGELOG.md).

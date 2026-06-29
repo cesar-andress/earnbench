@@ -4,8 +4,8 @@
 
 | Version | Supported |
 |---------|-----------|
-| `0.1.0-rc1` | Pre-release; security fixes on best effort |
-| `0.1.0` (final tag pending) | Supported after public release and Zenodo deposit |
+| `1.0.0` | Yes — current Zenodo / GitHub release |
+| `0.1.0-rc1` | No — superseded by `v1.0.0` |
 | `< 0.1.0-rc1` | Not supported |
 
 ## Reporting a vulnerability
@@ -28,12 +28,12 @@ We aim to acknowledge reports within **7 business days**.
 
 EarnBench executes user-supplied shell commands in Phase C agent drivers
 (`external_cli` with `command_template` in YAML arms files). Treat agent arm
-configs as **trusted input** only.
+configs as trusted input only from maintainers.
 
-Docker-based SWE-bench grading runs third-party harness code inside containers.
-Review Docker socket access and network policies in shared environments.
+Docker batch grading runs third-party SWE-bench harness containers with elevated
+filesystem and network access relative to the core EF library.
 
-## Out of scope
+## Disclosure policy
 
-- Vulnerabilities in upstream SWE-bench harnesses or base images
-- Misconfiguration of API keys in user-provided agent YAML (documented user responsibility)
+We coordinate fixes on supported release branches before public disclosure when
+practical.

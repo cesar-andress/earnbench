@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: EarnBench
+title: "EarnBench: Executable Counterfactual Measurement of Earned Success for Software Engineering Agents"
 message: "If you use this software, please cite it as below."
 type: software
 authors:
@@ -11,7 +11,8 @@ authors:
 license: MIT
 repository-code: "https://github.com/cesar-andress/earnbench"
 url: "https://github.com/cesar-andress/earnbench"
-version: 0.1.0-rc1
+doi: 10.5281/zenodo.21019033
+version: 1.0.0
 date-released: 2026-06-28
 keywords:
   - software engineering agents
@@ -24,6 +25,9 @@ abstract: >-
   AI software-engineering agent's success is earned rather than supported by
   exploitable evaluation channels.
 identifiers:
+  - type: doi
+    value: 10.5281/zenodo.21019033
+    description: "Zenodo software archive (v1.0.0)"
   - type: url
-    value: "https://github.com/cesar-andress/earnbench/releases/tag/v0.1.0-rc1"
-    description: "Release candidate tag (pre-release; cite git SHA until Zenodo DOI is assigned)"
+    value: "https://github.com/cesar-andress/earnbench/releases/tag/v1.0.0"
+    description: "GitHub release tag matching the Zenodo source archive"
