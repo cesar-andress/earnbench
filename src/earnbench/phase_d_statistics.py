@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 import json
 import statistics
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -160,8 +160,8 @@ def _parse_utc_timestamp(value: object) -> datetime | None:
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(UTC)
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def _grade_duration_seconds(grade_path: Path) -> float | None:

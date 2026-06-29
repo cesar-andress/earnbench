@@ -7,7 +7,7 @@ import platform
 import subprocess
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -48,7 +48,7 @@ def resolve_git_commit() -> str:
 
 def utc_timestamp() -> str:
     """Return the current UTC timestamp in ISO-8601 format."""
-    stamp = datetime.now(tz=UTC).replace(microsecond=0).isoformat()
+    stamp = datetime.now(tz=timezone.utc).replace(microsecond=0).isoformat()
     return stamp.replace("+00:00", "Z")
 
 
