@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import types
 from pathlib import Path
@@ -67,6 +68,27 @@ def _require_working_docker_sdk() -> None:
             "Docker SDK import failed in this environment "
             f"(environment/package issue, not EarnBench logic): {exc}",
         )
+
+
+def _docker_integration_enabled() -> bool:
+    return os.environ.get("EARNBENCH_RUN_DOCKER_INTEGRATION") == "1"
+
+
+def _require_local_swebench_eval_image(image_key: str) -> None:
+    """Skip when the SWE-bench instance image is not present locally."""
+    _require_working_docker_sdk()
+    import docker
+
+    client = docker.from_env()
+    try:
+        client.images.get(image_key)
+    except docker.errors.ImageNotFound:
+        pytest.skip(
+            f"SWE-bench eval image not present locally ({image_key}); "
+            "preload the image before running Docker integration tests",
+        )
+    finally:
+        client.close()
 
 
 def _install_fake_docker_container_collection(
@@ -203,15 +225,21 @@ def test_hardened_container_create_reports_readonly_not_enforced(
     ]
 
 
-def test_hardened_container_create_applies_on_real_docker_client() -> None:
-    _require_working_docker_sdk()
+@pytest.mark.skipif(
+    not _docker_integration_enabled(),
+    reason="set EARNBENCH_RUN_DOCKER_INTEGRATION=1 to run live Docker integration tests",
+)
+def test_hardened_container_create_applies_on_real_docker_client(
+    tmp_path: Path,
+) -> None:
     pytest.importorskip("swebench")
-    import logging
     import uuid
-    from unittest.mock import MagicMock
 
     import docker
-    from swebench.harness.docker_build import build_container
+    from swebench.harness.docker_build import build_container, setup_logger
+
+    image_key = "sweb.eval.x86_64.psf__requests-1724:latest"
+    _require_local_swebench_eval_image(image_key)
 
     client = docker.from_env()
     hardening = PiEnvHardeningConfig()
@@ -219,10 +247,11 @@ def test_hardened_container_create_applies_on_real_docker_client() -> None:
     spec = MagicMock()
     spec.instance_id = "psf__requests-1724"
     spec.is_remote_image = True
-    spec.instance_image_key = "sweb.eval.x86_64.psf__requests-1724:latest"
+    spec.instance_image_key = image_key
     spec.docker_specs = {}
     spec.platform = None
     spec.get_instance_container_name.return_value = run_id
+    logger = setup_logger(spec.instance_id, tmp_path / "docker_build.log")
     container = None
 
     try:
@@ -231,7 +260,7 @@ def test_hardened_container_create_applies_on_real_docker_client() -> None:
                 spec,
                 client,
                 run_id,
-                logging.getLogger("earnbench.test"),
+                logger,
                 nocache=False,
             )
             assert enforced == [
