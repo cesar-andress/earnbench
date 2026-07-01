@@ -22,7 +22,7 @@ Include:
 - Affected commands or modules
 - Suggested fix (optional)
 
-We aim to acknowledge reports within **7 business days**.
+Reports are acknowledged within **7 business days**.
 
 ## Known risk surfaces
 
@@ -35,5 +35,5 @@ filesystem and network access relative to the core EF library.
 
 ## Disclosure policy
 
-We coordinate fixes on supported release branches before public disclosure when
+Fixes are coordinated on supported release branches before public disclosure when
 practical.
