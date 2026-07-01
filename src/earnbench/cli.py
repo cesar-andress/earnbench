@@ -109,6 +109,7 @@ from earnbench.phase_c_agents import (
 from earnbench.phase_d_regrade import (
     PhaseDError,
     PhaseDRegradeConfig,
+    default_phase_d_run_id,
     run_phase_d,
     summarize_phase_d,
 )
@@ -1321,7 +1322,7 @@ def cmd_phase_d_run(args: argparse.Namespace) -> None:
         workers=args.workers if args.workers is not None else run_config.workers,
         resume=args.resume,
         run_config=run_config,
-        run_id=args.run_id or f"phase_d_{output_dir.name}",
+        run_id=args.run_id or default_phase_d_run_id(output_dir),
         dataset_revision=args.dataset_revision,
         build_missing_images=args.build_missing_images,
     )

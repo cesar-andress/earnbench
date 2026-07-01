@@ -16,6 +16,7 @@ from earnbench.registry.pi_vtest_v1 import PI_VTEST_V1_ID
 
 FAILURE_EMPTY_PATCH = "empty_patch"
 FAILURE_MALFORMED_PATCH = "malformed_patch"
+FAILURE_PATCH_FILE_NOT_FOUND = "patch_file_not_found"
 FAILURE_PATCH_APPLY_FAILED = "patch_apply_failed"
 FAILURE_BUILD_FAILED = "build_failed"
 FAILURE_NOMINAL_FAILED = "nominal_failed"
@@ -26,6 +27,7 @@ FAILURE_HARNESS_ERROR = "harness_error"
 FAILURE_REASONS = (
     FAILURE_EMPTY_PATCH,
     FAILURE_MALFORMED_PATCH,
+    FAILURE_PATCH_FILE_NOT_FOUND,
     FAILURE_PATCH_APPLY_FAILED,
     FAILURE_BUILD_FAILED,
     FAILURE_NOMINAL_FAILED,
@@ -41,6 +43,7 @@ GRADE_STATUS_PARTIAL = "partial"
 PHASE_D_FAILURE_CATEGORIES = (
     "none",
     "no_patch",
+    "patch_file_not_found",
     "malformed_patch",
     "patch_apply_failed",
     "nominal_failed",
@@ -145,7 +148,7 @@ def classify_validate_patch(
     patch_content: str | None = None,
 ) -> tuple[str, str] | None:
     if not patch_path.is_file():
-        return FAILURE_MALFORMED_PATCH, f"patch file not found: {patch_path}"
+        return FAILURE_PATCH_FILE_NOT_FOUND, f"patch file not found: {patch_path}"
     content = patch_content if patch_content is not None else patch_path.read_text(
         encoding="utf-8",
     )
@@ -497,6 +500,8 @@ def _category_from_diagnostics(
 
     if reason == FAILURE_EMPTY_PATCH:
         return "malformed_patch", _short_detail(detail or "empty patch file")
+    if reason == FAILURE_PATCH_FILE_NOT_FOUND:
+        return "patch_file_not_found", _short_detail(detail or "patch file not found")
     if reason == FAILURE_MALFORMED_PATCH:
         return "malformed_patch", _short_detail(detail or "malformed patch")
     if reason == FAILURE_PATCH_APPLY_FAILED:
@@ -544,6 +549,20 @@ def derive_phase_d_failure_fields(
     """Map cell diagnostics to analyst-facing Phase D failure columns."""
     if attempt_status != "ok" or not str(patch_path or "").strip():
         return "no_patch", "no patch file"
+
+    if row is not None:
+        stage = str(row.get("failure_stage", "") or "").strip()
+        reason = str(row.get("failure_reason", "") or "").strip()
+        detail = _short_detail(
+            str(row.get("failure_detail", "") or row.get("error", "") or "")
+        )
+        if stage == "validate":
+            if reason == FAILURE_PATCH_FILE_NOT_FOUND or "patch file not found" in detail.lower():
+                return "patch_file_not_found", detail or "patch file not found"
+            if reason == FAILURE_EMPTY_PATCH:
+                return "malformed_patch", detail or "empty patch file"
+            if reason == FAILURE_MALFORMED_PATCH:
+                return "malformed_patch", detail or "malformed patch"
 
     if diagnostics is not None:
         mapped = _category_from_diagnostics(diagnostics, row=row)

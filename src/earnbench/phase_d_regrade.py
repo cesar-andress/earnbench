@@ -20,9 +20,11 @@ from earnbench.phase_b_batch import (
     run_exploit_nominal_stage,
     run_exploit_perturbation_stage,
 )
+from earnbench.phase_c_patch_paths import PhaseCPatchError, resolve_phase_c_patch
 from earnbench.phase_d_statistics import (
     STATISTICS_JSON,
     build_phase_d_statistics,
+    load_failures_csv,
     write_phase_d_statistics,
 )
 from earnbench.phase_d_diagnostics import (
@@ -192,6 +194,32 @@ def task_key(agent: str, instance_id: str, replicate: int) -> str:
     return f"{agent}:{instance_id}:r{replicate}"
 
 
+def default_phase_d_run_id(output_dir: Path) -> str:
+    """Derive a stable run id from the output directory name without double prefixing."""
+    name = output_dir.name
+    if name.startswith("phase_d_"):
+        return name
+    return f"phase_d_{name}"
+
+
+def merge_phase_d_failures(
+    prior: list[dict[str, str]],
+    new: list[dict[str, str]],
+    *,
+    refreshed_task_keys: set[str],
+) -> list[dict[str, str]]:
+    """Keep prior failure rows for skipped cells; replace rows for re-graded cells."""
+    def _cell_key(row: dict[str, str]) -> str:
+        return task_key(
+            row.get("agent", ""),
+            row.get("instance_id", ""),
+            int(row.get("replicate") or 0),
+        )
+
+    kept = [row for row in prior if _cell_key(row) not in refreshed_task_keys]
+    return kept + list(new)
+
+
 def agent_work_root(output_dir: Path, agent: str, replicate: int) -> Path:
     agent_root = output_dir / CELLS_DIR / agent
     if replicate == 0:
@@ -234,13 +262,28 @@ def filter_eligible_attempts(records: list[AttemptRecord]) -> tuple[list[Attempt
 
 
 def resolve_patch_path(phase_c_run: Path, patch_path: str) -> Path:
-    candidate = Path(patch_path)
-    if candidate.is_file():
-        return candidate.resolve()
-    relative = phase_c_run / patch_path
-    if relative.is_file():
-        return relative.resolve()
-    return relative
+    """Resolve patch path; falls back to unresolved relative path for validate-stage errors."""
+    try:
+        return resolve_phase_c_patch(phase_c_run, patch_path)
+    except PhaseCPatchError:
+        candidate = Path(patch_path)
+        if candidate.is_file():
+            return candidate.resolve()
+        return phase_c_run / patch_path
+
+
+def _diagnostics_from_result_row(row: dict[str, Any]) -> CellDiagnostics | None:
+    reason = str(row.get("failure_reason", "") or "").strip()
+    stage = str(row.get("failure_stage", "") or "").strip()
+    if not reason and not stage:
+        return None
+    diagnostics = CellDiagnostics(
+        grade_status=str(row.get("grade_status", "") or GRADE_STATUS_FAILED),
+    )
+    diagnostics.failure_reason = reason
+    diagnostics.failure_stage = stage
+    diagnostics.failure_detail = str(row.get("failure_detail", "") or "").strip()
+    return diagnostics
 
 
 def _format_failed_mechanisms(report_payload: dict[str, Any]) -> str:
@@ -363,11 +406,12 @@ def refresh_agent_result_failure_fields(
     refreshed: dict[str, dict[str, Any]] = {}
     for key, row in rows.items():
         merged = {col: row.get(col, "") for col in AGENT_RESULTS_COLUMNS}
+        diagnostics = _diagnostics_from_result_row(merged)
         attach_phase_d_failure_fields(
             merged,
             attempt_status=str(merged.get("attempt_status", "") or ""),
             patch_path=str(merged.get("patch_path", "") or ""),
-            diagnostics=None,
+            diagnostics=diagnostics,
             instance_dir=_cell_instance_dir(output_dir, merged),
         )
         refreshed[key] = merged
@@ -767,6 +811,7 @@ def write_run_manifest(
     output_dir: Path,
     *,
     config: PhaseDRegradeConfig,
+    run_id: str,
     started_at_utc: str,
     completed_at_utc: str | None,
     summary: dict[str, Any],
@@ -774,7 +819,7 @@ def write_run_manifest(
     path = output_dir / RUN_MANIFEST_JSON
     payload = {
         "schema_version": PHASE_D_SCHEMA_VERSION,
-        "run_id": config.run_id,
+        "run_id": run_id,
         "phase_c_run": str(config.phase_c_run.resolve()),
         "metadata_path": str(config.metadata_path.resolve()),
         "output_dir": str(config.output_dir.resolve()),
@@ -813,11 +858,14 @@ def run_phase_d(config: PhaseDRegradeConfig) -> PhaseDRunResult:
 
     output_dir = config.output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
-    effective_run_id = config.run_id or f"phase_d_{output_dir.name}"
+    effective_run_id = config.run_id or default_phase_d_run_id(output_dir)
     started_at = utc_timestamp()
 
     existing_rows = load_agent_results_rows(output_dir / AGENT_RESULTS_CSV) if config.resume else {}
     result_rows: dict[str, dict[str, Any]] = dict(existing_rows)
+    prior_failures = (
+        load_failures_csv(output_dir / FAILURES_CSV) if config.resume else []
+    )
     failures: list[dict[str, str]] = []
     skipped_resume = 0
 
@@ -829,6 +877,7 @@ def run_phase_d(config: PhaseDRegradeConfig) -> PhaseDRunResult:
                 skipped_resume += 1
                 continue
         pending.append(task)
+    refreshed_task_keys = {task.task_key for task in pending}
 
     def _run_one(task: PhaseDTask) -> PhaseDCellResult:
         return run_phase_d_cell(
@@ -855,6 +904,11 @@ def run_phase_d(config: PhaseDRegradeConfig) -> PhaseDRunResult:
                 failures.extend(result.failures)
 
     result_rows = refresh_agent_result_failure_fields(output_dir, result_rows)
+    failures = merge_phase_d_failures(
+        prior_failures,
+        failures,
+        refreshed_task_keys=refreshed_task_keys,
+    )
     agent_results_csv = write_agent_results_csv(output_dir, result_rows)
     failures_path = write_failures_csv(output_dir, failures)
 
@@ -889,6 +943,7 @@ def run_phase_d(config: PhaseDRegradeConfig) -> PhaseDRunResult:
     write_run_manifest(
         output_dir,
         config=config,
+        run_id=effective_run_id,
         started_at_utc=started_at,
         completed_at_utc=completed_at,
         summary={
@@ -1000,8 +1055,10 @@ __all__ = [
     "build_phase_d_summary",
     "build_synthetic_agent_result_row",
     "refresh_agent_result_failure_fields",
+    "default_phase_d_run_id",
     "filter_eligible_attempts",
     "load_attempts_csv",
+    "merge_phase_d_failures",
     "resolve_patch_path",
     "run_phase_d",
     "run_phase_d_cell",

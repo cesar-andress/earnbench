@@ -17,8 +17,10 @@ from earnbench.phase_d_regrade import (
     AGENT_RESULTS_COLUMNS,
     PhaseDRegradeConfig,
     build_agent_result_row,
+    default_phase_d_run_id,
     filter_eligible_attempts,
     load_attempts_csv,
+    merge_phase_d_failures,
     run_phase_d,
     summarize_phase_d,
     task_key,
@@ -309,7 +311,7 @@ def test_run_phase_d_records_missing_patch_failure(tmp_path: Path) -> None:
         rows = list(csv.DictReader(handle))
     assert len(rows) == 1
     assert rows[0]["grade_status"] == "failed"
-    assert rows[0]["failure_reason"] == "malformed_patch"
+    assert rows[0]["failure_reason"] == "patch_file_not_found"
     with result.failures_path.open(encoding="utf-8", newline="") as handle:
         failures = list(csv.DictReader(handle))
     assert failures[0]["stage"] == "validate"
@@ -483,7 +485,7 @@ def test_run_phase_d_summary_includes_failure_reason_counts(tmp_path: Path) -> N
     )
     summary = json.loads(result.summary_path.read_text(encoding="utf-8"))
     assert summary["graded_count"] == 2
-    assert summary["by_failure_reason"]["malformed_patch"] == 2
+    assert summary["by_failure_reason"]["patch_file_not_found"] == 2
     assert result.failure_count == 2
 
 
@@ -519,3 +521,103 @@ def test_summarize_phase_d_reads_completed_run(tmp_path: Path) -> None:
     summary = summarize_phase_d(output_dir=output)
     assert summary.graded_count == 1
     assert "ollama_devstral" in summary.by_agent
+
+
+def test_default_phase_d_run_id_avoids_double_prefix() -> None:
+    assert default_phase_d_run_id(Path("/runs/phase_d_ers_primary4")) == "phase_d_ers_primary4"
+    assert default_phase_d_run_id(Path("/runs/custom_out")) == "phase_d_custom_out"
+
+
+def test_merge_phase_d_failures_keeps_skipped_cells() -> None:
+    prior = [
+        {
+            "agent": "alpha",
+            "instance_id": "inst-1",
+            "replicate": "0",
+            "stage": "validate",
+            "failure_reason": "patch_file_not_found",
+            "error": "missing",
+            "failure_detail": "missing",
+            "timestamp_utc": "t1",
+        }
+    ]
+    new = [
+        {
+            "agent": "beta",
+            "instance_id": "inst-2",
+            "replicate": "0",
+            "stage": "nominal",
+            "failure_reason": "nominal_failed",
+            "error": "fail",
+            "failure_detail": "fail",
+            "timestamp_utc": "t2",
+        }
+    ]
+    merged = merge_phase_d_failures(
+        prior,
+        new,
+        refreshed_task_keys={task_key("beta", "inst-2", 0)},
+    )
+    assert len(merged) == 2
+    assert merged[0]["agent"] == "alpha"
+    assert merged[1]["agent"] == "beta"
+
+
+def test_run_phase_d_resume_preserves_prior_failures_when_nothing_pending(
+    tmp_path: Path,
+) -> None:
+    attempt = _attempt_row(status="ok")
+    phase_c = _setup_phase_c_run(tmp_path, rows=[attempt])
+    output = tmp_path / "phase_d_ers_primary4"
+
+    def _mock_cell(**kwargs):
+        from earnbench.phase_d_regrade import PhaseDCellResult, PhaseDTask
+
+        task: PhaseDTask = kwargs["task"]
+        row = _write_mock_graded_cell(
+            work_root=task.work_root,
+            metadata_path=METADATA_FIXTURE,
+            run_id=default_phase_d_run_id(output),
+            attempt_row=attempt,
+            y0=False,
+            pi_success={"pi_verif.v1": True, "pi_env.v1": True},
+        )
+        failures = (
+            {
+                "agent": task.attempt.agent,
+                "instance_id": task.attempt.instance_id,
+                "replicate": str(task.attempt.replicate),
+                "stage": "nominal",
+                "failure_reason": "nominal_failed",
+                "error": "nominal harness completed with success=false",
+                "failure_detail": "nominal harness completed with success=false",
+                "timestamp_utc": "2026-01-01T00:00:00Z",
+            },
+        )
+        return PhaseDCellResult(task_key=task.task_key, row=row, failures=failures)
+
+    config = PhaseDRegradeConfig(
+        phase_c_run=phase_c,
+        metadata_path=METADATA_FIXTURE,
+        output_dir=output,
+        run_config=_run_config(),
+        resume=True,
+    )
+    with patch("earnbench.phase_d_regrade.run_phase_d_cell", side_effect=_mock_cell):
+        first = run_phase_d(config)
+        assert first.failure_count == 1
+
+        def _should_not_run(**kwargs):
+            msg = "resume should skip completed cell"
+            raise AssertionError(msg)
+
+        with patch(
+            "earnbench.phase_d_regrade.run_phase_d_cell",
+            side_effect=_should_not_run,
+        ):
+            second = run_phase_d(config)
+
+    assert second.failure_count == 1
+    assert default_phase_d_run_id(output) == "phase_d_ers_primary4"
+    summary = json.loads((output / "phase_d_summary.json").read_text(encoding="utf-8"))
+    assert summary["run_id"] == "phase_d_ers_primary4"

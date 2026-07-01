@@ -11,10 +11,17 @@ An executable counterfactual measurement framework for estimating how much of an
 ## Status
 
 **Release `v1.0.0` — Initial Reproducibility Release** (archived on Zenodo:
-[10.5281/zenodo.21019033](https://doi.org/10.5281/zenodo.21019033)). The instrument
-implements EF@Π, registry v1, SWE-bench Docker batch runners, and report generators used
-in the TOSEM manuscript validation ladder. Frozen experiment outputs cited in the paper
-live in the companion `paper/experiments/runs/` tree (monorepo layout) and are **not**
+[10.5281/zenodo.21019033](https://doi.org/10.5281/zenodo.21019033)). This repository is the
+**executable software and reproducibility artifact**: Python package, frozen registry specs,
+CLI, tests, synthetic example, and batch-runner scripts. Large generated experiment outputs
+cited in the TOSEM manuscript are **excluded** from this archive (companion dataset policy in
+the paper supplement); outputs can be **regenerated** from scripts when paired with supplement
+paths. **API keys and credentials are not included** — export them locally for Phase C agent
+runs only.
+
+The instrument implements EF@Π, registry v1, SWE-bench Docker batch runners, and report
+generators used in the TOSEM manuscript validation ladder. Frozen experiment outputs cited in
+the paper live in the companion `paper/experiments/runs/` tree (monorepo layout) and are **not**
 included in the Zenodo software archive.
 
 - **This repository (code deposit):** metric computation, registry CLI, synthetic
@@ -24,8 +31,7 @@ included in the Zenodo software archive.
   [docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md).
 - **Citation:** cite the Zenodo DOI above or git tag `v1.0.0` (see [CITATION.cff](CITATION.cff)).
 
-See [RELEASE_NOTES.md](RELEASE_NOTES.md), [release_readiness_report.md](release_readiness_report.md),
-[release_checklist.md](release_checklist.md), [docs/release_policy.md](docs/release_policy.md),
+See [RELEASE_NOTES.md](RELEASE_NOTES.md), [docs/release_policy.md](docs/release_policy.md),
 and [docs/zenodo_checklist.md](docs/zenodo_checklist.md).
 
 ## Concept

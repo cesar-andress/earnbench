@@ -12,7 +12,7 @@ from earnbench.phase_d_diagnostics import (
     FAILURE_BUILD_FAILED,
     FAILURE_EMPTY_PATCH,
     FAILURE_HARNESS_ERROR,
-    FAILURE_MALFORMED_PATCH,
+    FAILURE_PATCH_FILE_NOT_FOUND,
     FAILURE_NOMINAL_FAILED,
     FAILURE_PATCH_APPLY_FAILED,
     FAILURE_PERTURBATION_FAILED,
@@ -31,7 +31,7 @@ from earnbench.phase_d_diagnostics import (
 def test_classify_validate_patch_empty_and_missing(tmp_path: Path) -> None:
     missing = tmp_path / "missing.patch"
     reason, detail = classify_validate_patch(patch_path=missing) or ("", "")
-    assert reason == FAILURE_MALFORMED_PATCH
+    assert reason == FAILURE_PATCH_FILE_NOT_FOUND
     assert "not found" in detail
 
     empty = tmp_path / "empty.patch"
